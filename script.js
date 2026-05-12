@@ -2,7 +2,7 @@
 // CONSTANTES E CREDENCIAIS DO SISTEMA
 // =========================================================================
 const ADMIN_CREDENTIALS = {
-    login: 'adminweg',
+    login: 'admin@weg.net',
     senha: 'admin123'
 };
 
@@ -46,7 +46,8 @@ let usuarioLogado = null;
 
 let gavetaAtualAberta = null;
 let pecaSendoConferidaId = null;
-let gavetaSendoEditadaId = null; // Variável para rastrear a gaveta sendo renomeada
+let gavetaSendoEditadaId = null; 
+let pecaSendoEditadaId = null; // Para saber qual peça o ADM está editando
 
 // =========================================================================
 // INICIALIZAÇÃO E VERIFICAÇÃO DE DISPOSITIVO
@@ -80,7 +81,6 @@ window.onload = () => {
 // CONFIGURAÇÃO DOS EVENTOS DA TECLA "ENTER"
 // =========================================================================
 function configurarEventosEnter() {
-    // Array relacionando o ID do campo (Input) à função do Botão respectivo
     const mapeamentoEnter = [
         { inputId: 'input-device-key', btnAcao: autorizarDispositivo },
         { inputId: 'input-login-id', btnAcao: realizarLogin },
@@ -88,7 +88,8 @@ function configurarEventosEnter() {
         { inputId: 'reg-senha', btnAcao: registrarUsuario },
         { inputId: 'conf-qtd-atual', btnAcao: salvarConferencia },
         { inputId: 'edit-gaveta-nome', btnAcao: salvarNomeGaveta },
-        { inputId: 'novo-atual', btnAcao: salvarNovoItem } 
+        { inputId: 'novo-atual', btnAcao: salvarNovoItem }, 
+        { inputId: 'edit-peca-atual', btnAcao: salvarEdicaoPeca } // Enter na edição da peça
     ];
 
     mapeamentoEnter.forEach(item => {
@@ -96,8 +97,8 @@ function configurarEventosEnter() {
         if (elemento) {
             elemento.addEventListener('keypress', function(event) {
                 if (event.key === 'Enter') {
-                    event.preventDefault(); // Evita que o enter recarregue a página
-                    item.btnAcao(); // Dispara a função ligada àquele input
+                    event.preventDefault(); 
+                    item.btnAcao(); 
                 }
             });
         }
@@ -124,25 +125,15 @@ function autorizarDispositivo() {
 // GERENCIAMENTO DE DADOS (LOCALSTORAGE)
 // =========================================================================
 function carregarDados() {
-    // Carrega o Banco de Peças
     const dbSalvo = localStorage.getItem('5s_database');
-    if (dbSalvo) {
-        database = JSON.parse(dbSalvo);
-    } else {
-        database = JSON.parse(JSON.stringify(defaultDatabase));
-    }
+    if (dbSalvo) { database = JSON.parse(dbSalvo); } 
+    else { database = JSON.parse(JSON.stringify(defaultDatabase)); }
 
-    // Carrega a Lista de Usuários
     const usersSalvos = localStorage.getItem('5s_usuarios');
-    if (usersSalvos) {
-        usuariosSalvos = JSON.parse(usersSalvos);
-    }
+    if (usersSalvos) { usuariosSalvos = JSON.parse(usersSalvos); }
     
-    // Carrega o Histórico de Atividades (Logs)
     const histSalvo = localStorage.getItem('5s_historico');
-    if (histSalvo) {
-        historicoLogs = JSON.parse(histSalvo);
-    }
+    if (histSalvo) { historicoLogs = JSON.parse(histSalvo); }
 }
 
 function salvarDadosLocal() {
@@ -152,7 +143,7 @@ function salvarDadosLocal() {
 }
 
 // =========================================================================
-// SISTEMA DE BACKUP (BAIXAR E RESTAURAR) E PLANILHAS CSV
+// SISTEMA DE BACKUP E PLANILHAS CSV (EXCEL)
 // =========================================================================
 function fazerBackup() {
     const data = {
@@ -170,7 +161,7 @@ function fazerBackup() {
     downloadNode.click();
     downloadNode.remove();
     
-    registrarLog("fez o download do backup do sistema");
+    registrarLog("fez o download do arquivo de backup do sistema");
 }
 
 function restaurarBackup(event) {
@@ -186,19 +177,19 @@ function restaurarBackup(event) {
             if (contents.historico) historicoLogs = contents.historico;
             
             salvarDadosLocal();
-            mostrarAlerta('Sucesso', 'Backup restaurado com sucesso! Os dados foram atualizados.');
-            registrarLog("restaurou um backup anterior no sistema");
+            mostrarAlerta('Sucesso', 'Backup restaurado com sucesso! Os dados do sistema foram substituídos.');
+            registrarLog("restaurou um arquivo de backup no sistema");
             atualizarDashboard();
         } catch (err) {
-            mostrarAlerta('Erro', 'Arquivo de backup inválido ou corrompido.');
+            mostrarAlerta('Erro', 'O arquivo selecionado é inválido ou está corrompido.');
         }
     };
     reader.readAsText(file);
-    event.target.value = ''; // Limpa o input file
+    event.target.value = ''; 
 }
 
 function exportarEstoqueCSV() {
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // \uFEFF força o formato UTF-8 no Excel
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
     csvContent += "Gaveta,Codigo_Local,Peca,Padrao_5S,Fisica_Atual,Status\n";
 
     database.drawers.forEach(gaveta => {
@@ -222,13 +213,12 @@ function exportarHistoricoCSV() {
     csvContent += "Data_Hora,Usuario,Acao\n";
 
     historicoLogs.forEach(log => {
-        // Escapa aspas duplas de dentro do texto do log para não quebrar o CSV
         const acao = `"${log.acao.replace(/"/g, '""')}"`; 
         csvContent += `"${log.data}","${log.usuario}",${acao}\n`;
     });
 
     baixarArquivoCSV(csvContent, "historico_atividades_5s.csv");
-    registrarLog("exportou a planilha Excel de Histórico");
+    registrarLog("exportou a planilha Excel do Histórico");
 }
 
 function baixarArquivoCSV(content, filename) {
@@ -255,13 +245,8 @@ function registrarLog(acao) {
         data: dataFormatada
     };
     
-    // Adiciona o novo log sempre no topo da lista
     historicoLogs.unshift(novoLog);
-    
-    // Limita o histórico a 500 registros para não pesar a memória do navegador
-    if(historicoLogs.length > 500) {
-        historicoLogs.pop();
-    }
+    if(historicoLogs.length > 500) { historicoLogs.pop(); }
     
     salvarDadosLocal();
     renderizarHistorico();
@@ -290,7 +275,7 @@ function renderizarHistorico() {
 }
 
 // =========================================================================
-// SISTEMA DE NOTIFICAÇÕES NATIVAS (CELULAR/PC)
+// SISTEMA DE NOTIFICAÇÕES NATIVAS
 // =========================================================================
 function solicitarPermissaoNotificacao() {
     if ("Notification" in window) {
@@ -400,13 +385,11 @@ function realizarLogin() {
         return mostrarAlerta('Erro', 'Preencha os dados de acesso.');
     }
 
-    // Verifica a chave do Administrador embutida no código
     if (idAcesso === ADMIN_CREDENTIALS.login && senhaAcesso === ADMIN_CREDENTIALS.senha) {
         aplicarLogin({ nome: 'Administrador', cracha: 'Admin', role: 'ADMIN' });
         return;
     }
 
-    // Busca o eletricista cadastrado
     const user = usuariosSalvos.find(u => u.cracha === idAcesso && u.senha === senhaAcesso);
     
     if (user) {
@@ -422,7 +405,6 @@ function aplicarLogin(user) {
     document.getElementById('usuario-logado-nome').innerText = user.nome;
     document.getElementById('usuario-logado-codigo').innerText = `Crachá: ${user.cracha}`;
 
-    // Mostra ferramentas de ADMIN caso seja um
     if (user.role === 'ADMIN') {
         document.body.classList.add('is-admin');
         document.getElementById('badge-admin').classList.remove('view-hidden');
@@ -445,34 +427,24 @@ function aplicarLogin(user) {
 // NAVEGAÇÃO ENTRE TELAS DO SISTEMA
 // =========================================================================
 function mostrarTela(id) {
-    // Esconde todas as abas
     document.getElementById('view-gavetas').classList.replace('view-active', 'view-hidden');
     document.getElementById('view-compartimentos').classList.replace('view-active', 'view-hidden');
     document.getElementById('view-historico').classList.replace('view-active', 'view-hidden');
     document.getElementById('view-config').classList.replace('view-active', 'view-hidden');
     
-    // Mostra a aba solicitada
     document.getElementById(id).classList.replace('view-hidden', 'view-active');
     
-    // Ao trocar de tela, fecha o menu no celular automaticamente
     document.getElementById('sidebar-menu').classList.remove('open');
     document.getElementById('mobile-overlay').classList.remove('open');
     
-    // Limpezas e atualizações de rotina
     if(id === 'view-gavetas') gavetaAtualAberta = null;
     if(id === 'view-historico') renderizarHistorico(); 
     
-    // Joga a tela pro topo (útil no celular)
     window.scrollTo(0, 0); 
 }
 
-function voltarParaGavetas() { 
-    mostrarTela('view-gavetas'); 
-}
-
-function sairDoSistema() { 
-    location.reload(); 
-}
+function voltarParaGavetas() { mostrarTela('view-gavetas'); }
+function sairDoSistema() { location.reload(); }
 
 // =========================================================================
 // DASHBOARD PRINCIPAL E ARMÁRIO
@@ -488,7 +460,6 @@ function atualizarDashboard() {
     }
 }
 
-// Verifica todo o armário em busca de peças com a quantidade = 0
 function verificarEstoqueZerado() {
     let qtdZerados = 0;
     
@@ -507,7 +478,6 @@ function verificarEstoqueZerado() {
     }
 }
 
-// Gera a lista de status de cada gaveta no topo da tela
 function calcularKPIs() {
     let gavetasComAlertas = 0;
     const listaHtml = document.getElementById('kpi-lista-gavetas');
@@ -531,7 +501,6 @@ function calcularKPIs() {
     document.getElementById('kpi-pendencias-count').innerText = gavetasComAlertas;
 }
 
-// Desenha as gavetas azuis
 function renderArmarioVertical() {
     const chassi = document.getElementById('menu-gavetas');
     chassi.innerHTML = '';
@@ -544,7 +513,6 @@ function renderArmarioVertical() {
         div.className = 'btn-gaveta';
         div.onclick = () => abrirGaveta(gaveta.id);
         
-        // Botão de edição da gaveta (Lápis) - Visível apenas para o ADM
         div.innerHTML = `
             <div class="gaveta-content">
                 <span class="gnumber">${gaveta.label}</span>
@@ -563,7 +531,6 @@ function renderArmarioVertical() {
 // FUNÇÕES PARA EDITAR O NOME DA GAVETA (SÓ ADM)
 // =========================================================================
 function abrirModalEditarGaveta(eventoClick, idGaveta) {
-    // Esse comando evita que ao clicar no lápis, a gaveta abra por baixo.
     eventoClick.stopPropagation(); 
     
     gavetaSendoEditadaId = idGaveta;
@@ -572,7 +539,6 @@ function abrirModalEditarGaveta(eventoClick, idGaveta) {
     document.getElementById('edit-gaveta-nome').value = gaveta.title;
     document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
     
-    // Coloca o cursor já piscando no input para facilitar
     setTimeout(() => {
         document.getElementById('edit-gaveta-nome').focus();
     }, 100);
@@ -593,15 +559,12 @@ function salvarNomeGaveta() {
     const nomeAntigo = gaveta.title;
     
     gaveta.title = novoNome;
-
-    // Registra a alteração no Histórico do ADM
     registrarLog(`alterou o nome da gaveta ${gaveta.label} de "${nomeAntigo}" para "${novoNome}"`);
 
     salvarDadosLocal();
     fecharModalEditarGaveta();
     atualizarDashboard();
     
-    // Se a gaveta estivesse aberta lá por trás, atualiza o título dela lá também
     if (gavetaAtualAberta === gavetaSendoEditadaId) {
         document.getElementById('titulo-gaveta-aberta').innerText = `${gaveta.label}: ${gaveta.title}`;
     }
@@ -639,7 +602,6 @@ function renderizarPecasDaGaveta(idGaveta) {
             ? `<img src="${peca.image}" alt="${peca.name}">` 
             : `<i class="fa-solid fa-microchip"></i>`;
             
-        // Rastreabilidade visível no Card da Peça
         const infoRetiradaHtml = peca.lastTakenBy 
             ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>`
             : '';
@@ -651,6 +613,7 @@ function renderizarPecasDaGaveta(idGaveta) {
             <div class="card-top">
                 <div>
                     <span class="card-local">${peca.code || 'S/N'}</span>
+                    <button class="btn-edit-peca admin-only" onclick="abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
                     <button class="btn-excluir admin-only" onclick="excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
                 </div>
                 <div class="badge-status ${statusPeca}">${textoStatus}</div>
@@ -701,25 +664,19 @@ function ajusteRapidoEstoque(idPeca, delta) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     let novaQtd = peca.current + delta;
     
-    // Evita quantidade negativa
     if (novaQtd < 0) novaQtd = 0; 
     
-    // Se estiver retirando peça
     if (delta < 0 && peca.current > 0) {
         peca.lastTakenBy = usuarioLogado.nome; 
-        
         registrarLog(`retirou 1 unidade da peça "${peca.name}" (Local: ${peca.code})`);
-        
         enviarNotificacao("Peça Retirada", `Você retirou 1x ${peca.name}. Estoque restou com ${novaQtd} peça(s).`);
     } 
-    // Se estiver adicionando peça
     else if (delta > 0) {
         registrarLog(`adicionou 1 unidade da peça "${peca.name}" (Local: ${peca.code})`);
     }
     
     peca.current = novaQtd;
     
-    // Tira o status de requisitado automaticamente se chegou na quantidade certa
     if (peca.current >= peca.expected) {
         peca.requested = false;
     }
@@ -740,16 +697,14 @@ function alternarStatusRequisitado(idPeca) {
 }
 
 // =========================================================================
-// GERENCIAMENTO DE PEÇAS (EXCLUSÃO E CADASTRO)
+// GERENCIAMENTO DE PEÇAS (CADASTRO, EDIÇÃO E EXCLUSÃO)
 // =========================================================================
 function excluirPeca(idPeca) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     
     if (confirm(`Tem certeza que deseja excluir a peça "${peca.name}" da gaveta?`)) {
         database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== idPeca);
-        
         registrarLog(`excluiu a peça "${peca.name}" do sistema`);
-        
         salvarDadosLocal();
         atualizarDashboard();
     }
@@ -764,9 +719,7 @@ function abrirModalCadastro() {
     
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
     
-    setTimeout(() => {
-        document.getElementById('novo-nome').focus();
-    }, 100);
+    setTimeout(() => { document.getElementById('novo-nome').focus(); }, 100);
 }
 
 function fecharModalCadastro() {
@@ -795,9 +748,7 @@ function salvarNovoItem() {
 
     const finalizarCadastro = () => {
         database.items[gavetaAtualAberta].push(novaPeca);
-        
         registrarLog(`cadastrou a nova peça "${novaPeca.name}" (Local: ${novaPeca.code}) com ${atual} un. iniciais.`);
-        
         salvarDadosLocal();
         fecharModalCadastro();
         atualizarDashboard();
@@ -815,6 +766,65 @@ function salvarNovoItem() {
     }
 }
 
+// ------ FUNÇÕES DE EDIÇÃO DE PEÇA (NOVO) ------
+function abrirModalEditarPeca(idPeca) {
+    pecaSendoEditadaId = idPeca;
+    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
+    
+    document.getElementById('edit-peca-codigo').value = peca.code || '';
+    document.getElementById('edit-peca-nome').value = peca.name;
+    document.getElementById('edit-peca-esperado').value = peca.expected;
+    document.getElementById('edit-peca-atual').value = peca.current;
+    document.getElementById('edit-peca-imagem').value = ''; // Limpa o input de arquivo
+    
+    document.getElementById('modal-editar-peca').classList.remove('view-hidden');
+    
+    setTimeout(() => { document.getElementById('edit-peca-nome').focus(); }, 100);
+}
+
+function fecharModalEditarPeca() {
+    document.getElementById('modal-editar-peca').classList.add('view-hidden');
+}
+
+function salvarEdicaoPeca() {
+    const novoCodigo = document.getElementById('edit-peca-codigo').value.trim();
+    const novoNome = document.getElementById('edit-peca-nome').value.trim();
+    const novoEsperado = parseInt(document.getElementById('edit-peca-esperado').value);
+    const novoAtual = parseInt(document.getElementById('edit-peca-atual').value);
+    const imagemInput = document.getElementById('edit-peca-imagem');
+
+    if(novoNome === '') return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
+    if(isNaN(novoEsperado) || isNaN(novoAtual)) return mostrarAlerta('Erro', 'Valores numéricos inválidos.');
+
+    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
+    
+    peca.code = novoCodigo;
+    peca.name = novoNome;
+    peca.expected = novoEsperado;
+    peca.current = novoAtual;
+    
+    if (peca.current >= peca.expected) peca.requested = false;
+
+    const finalizarEdicao = () => {
+        registrarLog(`editou as informações da peça "${peca.name}"`);
+        salvarDadosLocal();
+        fecharModalEditarPeca();
+        atualizarDashboard();
+    };
+
+    // Se o ADM escolheu uma nova foto, atualiza. Se não escolheu, mantém a antiga.
+    if (imagemInput.files && imagemInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            peca.image = e.target.result; 
+            finalizarEdicao();
+        };
+        reader.readAsDataURL(imagemInput.files[0]);
+    } else {
+        finalizarEdicao();
+    }
+}
+
 // =========================================================================
 // CONFERÊNCIA EXATA DE QUANTIDADE
 // =========================================================================
@@ -827,10 +837,7 @@ function abrirModalConferencia(idPeca) {
     
     document.getElementById('modal-conferencia').classList.remove('view-hidden');
     
-    // Pequeno atraso para dar tempo do modal abrir e o input receber foco
-    setTimeout(() => {
-        document.getElementById('conf-qtd-atual').focus();
-    }, 100);
+    setTimeout(() => { document.getElementById('conf-qtd-atual').focus(); }, 100);
 }
 
 function fecharModalConferencia() {
@@ -851,7 +858,6 @@ function salvarConferencia() {
         registrarLog(`alterou a contagem de "${peca.name}" de ${peca.current} para ${novaQtd}`);
     }
     
-    // Se a pessoa inseriu uma quantidade menor do que tinha antes, assume que ela pegou peças
     if (novaQtd < peca.current) {
         peca.lastTakenBy = usuarioLogado.nome;
     }
