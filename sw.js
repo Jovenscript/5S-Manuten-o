@@ -1,10 +1,12 @@
-const CACHE_NAME = '5s-manutencao-v1';
+const CACHE_NAME = '5s-manutencao-v2';
 const ASSETS_TO_CACHE = [
     './',
-    './index.html',
-    './style.css',
-    './script.js',
-    './manifest.json'
+    'index.html',
+    'style.css',
+    'script.js',
+    'manifest.json',
+    'logo-192.png',
+    'logo-512.png'
 ];
 
 // Instala o Service Worker e salva os arquivos no cache do celular
