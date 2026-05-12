@@ -2,20 +2,22 @@
   "name": "5S Manutenção Gaveteiro",
   "short_name": "5S Manutenção",
   "description": "Controle de peças do gaveteiro elétrico da manutenção.",
-  "start_url": "./",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#1e3a5f",
   "icons": [
     {
-      "src": "logo-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "logo-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
