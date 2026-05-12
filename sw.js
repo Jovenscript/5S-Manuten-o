@@ -1,26 +1,28 @@
-const CACHE_NAME = '5s-weg-v1';
-const urlsToCache = [
-  './index.html',
-  './style.css',
-  './script.js',
-  './manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+const CACHE_NAME = '5s-manutencao-v1';
+const ASSETS_TO_CACHE = [
+    './',
+    './index.html',
+    './style.css',
+    './script.js',
+    './manifest.json'
 ];
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(urlsToCache);
-      })
-  );
+// Instala o Service Worker e salva os arquivos no cache do celular
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+        .then((cache) => {
+            return cache.addAll(ASSETS_TO_CACHE);
+        })
+    );
 });
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        return response || fetch(event.request);
-      })
-  );
+// Intercepta as requisições (permite abrir o app mesmo sem internet)
+self.addEventListener('fetch', (event) => {
+    event.respondWith(
+        caches.match(event.request)
+        .then((response) => {
+            return response || fetch(event.request);
+        })
+    );
 });
