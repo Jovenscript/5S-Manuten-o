@@ -41,8 +41,10 @@ body {
 ========================================================================= */
 .view-hidden { display: none !important; }
 
+/* Correção de Layout: .view-active agora é flex block por padrão, 
+   o Flex será usado apenas nos containers que realmente precisam dele */
 .view-active { 
-    display: flex; 
+    display: block; 
     animation: fadeIn 0.3s ease-in-out; 
 }
 
@@ -61,7 +63,8 @@ body:not(.is-admin) .admin-only { display: none !important; }
 /* =========================================================================
    TELA DE BLOQUEIO DE DISPOSITIVO E LOGIN
 ========================================================================= */
-#view-device-auth, #view-login { 
+#view-device-auth.view-active, #view-login.view-active { 
+    display: flex; /* Telas de login devem ser flex para centralizar o quadrado */
     justify-content: center; 
     align-items: center; 
     min-height: 100vh; 
@@ -149,7 +152,8 @@ body:not(.is-admin) .admin-only { display: none !important; }
 /* =========================================================================
    ESTRUTURA PRINCIPAL DO SISTEMA
 ========================================================================= */
-#app-container { 
+#app-container.view-active { 
+    display: flex; /* O app principal precisa ser flex para a sidebar e área de conteúdo lado a lado */
     height: 100vh; 
     width: 100%; 
 }
@@ -414,7 +418,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     margin-top: 15px; 
 }
 
-/* CORREÇÃO DO LAYOUT: GAVETAS COM ALERTA */
 .kpi-summary { 
     width: 30%; 
     border-right: 1px solid var(--border-color); 
@@ -519,7 +522,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
     text-align: left; 
 }
 
-/* Botão de Editar a Gaveta (Somente ADM) */
+/* Botões do ADM na Gaveta */
 .btn-edit-gaveta {
     background: rgba(255, 255, 255, 0.15);
     color: white;
@@ -637,6 +640,19 @@ body:not(.is-admin) .admin-only { display: none !important; }
     font-size: 0.8rem; 
 }
 
+/* Botões do ADM no Card da Peça */
+.btn-edit-peca { 
+    background: #e0f2fe; 
+    color: #0284c7; 
+    border: none; 
+    padding: 6px 10px; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    margin-left: 10px; 
+    transition: background 0.2s;
+}
+.btn-edit-peca:hover { background: #0284c7; color: white; }
+
 .btn-excluir { 
     background: #fee2e2; 
     color: var(--status-vermelho); 
@@ -644,8 +660,10 @@ body:not(.is-admin) .admin-only { display: none !important; }
     padding: 6px 10px; 
     border-radius: 4px; 
     cursor: pointer; 
-    margin-left: 10px; 
+    margin-left: 5px; 
+    transition: background 0.2s;
 }
+.btn-excluir:hover { background: var(--status-vermelho); color: white; }
 
 .badge-status { 
     padding: 4px 10px; 
