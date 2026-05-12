@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>5S Manutenção - Gaveteiro Elétrico</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div id="mobile-overlay" class="sidebar-overlay" onclick="toggleMenuMobile()"></div>
+
+    <section id="view-device-auth" class="view-active lock-screen">
+        <div class="login-container lock-container">
+            <i class="fa-solid fa-lock lock-icon"></i>
+            <h2>Acesso Restrito</h2>
+            <p>Este dispositivo não está autorizado para acessar a rede 5S da Manutenção.</p>
+            
+            <div class="form-group" style="margin-top: 2rem;">
+                <label>Chave de Liberação (Somente ADM)</label>
+                <input type="password" id="input-device-key" placeholder="Digite a chave mestre">
+            </div>
+            <button class="btn-login btn-auth" onclick="autorizarDispositivo()">Liberar Dispositivo</button>
+        </div>
+    </section>
+
+    <section id="view-login" class="view-hidden">
+        <div class="login-container">
+            <h2>Sistema de Manutenção 5S</h2>
+            <p id="login-subtitle">Controle de Gaveteiro Elétrico</p>
+            
+            <div id="form-entrar">
+                <div class="form-group">
+                    <label for="input-login-id">Crachá (WEG) ou E-mail (Admin)</label>
+                    <input type="text" id="input-login-id" placeholder="Ex: usuario ou cadastro">
+                </div>
+                <div class="form-group">
+                    <label for="input-login-senha">Senha</label>
+                    <input type="password" id="input-login-senha" placeholder="Sua senha">
+                </div>
+                <button class="btn-login" onclick="realizarLogin()">Entrar no Sistema</button>
+                <p class="link-toggle" onclick="alternarTelaLogin()">Primeiro Acesso? Crie seu cadastro</p>
+            </div>
+
+            <div id="form-registrar" class="view-hidden">
+                <div class="form-group">
+                    <label for="reg-nome">Nome do Colaborador</label>
+                    <input type="text" id="reg-nome" placeholder="Ex: João">
+                </div>
+                <div class="form-group">
+                    <label for="reg-cracha">Código do Crachá (WEG)</label>
+                    <input type="text" id="reg-cracha" placeholder="Ex: 123456">
+                </div>
+                <div class="form-group">
+                    <label for="reg-senha">Crie uma Senha</label>
+                    <input type="password" id="reg-senha" placeholder="Sua senha secreta">
+                </div>
+                <button class="btn-login btn-registrar" onclick="registrarUsuario()">Cadastrar e Entrar</button>
+                <p class="link-toggle" onclick="alternarTelaLogin()">Já possui cadastro? Voltar ao login</p>
+            </div>
+        </div>
+    </section>
+
+    <main id="app-container" class="view-hidden">
+        
+        <nav class="sidebar" id="sidebar-menu">
+            <div class="logo">5S</div>
+            <div class="nav-items">
+                <div class="nav-item active" onclick="mostrarTela('view-gavetas')">
+                    <i class="fa-solid fa-house"></i>
+                    <span>Armário</span>
+                </div>
+                <div class="nav-item admin-only" onclick="mostrarTela('view-historico')">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Histórico</span>
+                </div>
+                <div class="nav-item admin-only" onclick="mostrarTela('view-config')">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Ajustes</span>
+                </div>
+                <div class="nav-item" onclick="gerarEmailPedido()">
+                    <i class="fa-solid fa-envelope-open-text"></i>
+                    <span>Pedir Peças</span>
+                </div>
+            </div>
+            <div class="nav-footer" onclick="sairDoSistema()">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Sair</span>
+            </div>
+        </nav>
+
+        <div class="content-area">
+            <header class="top-bar">
+                <div class="page-info">
+                    <div class="menu-toggle-mobile" onclick="toggleMenuMobile()">
+                        <i class="fa-solid fa-bars"></i>
+                    </div>
+                    <h1>5S Manutenção - Controle</h1>
+                </div>
+                <div class="user-profile">
+                    <div class="user-text">
+                        <p class="user-name" id="usuario-logado-nome">---</p>
+                        <p class="user-code" id="usuario-logado-codigo">---</p>
+                        <span id="badge-admin" class="badge-admin view-hidden">ADMIN</span>
+                    </div>
+                    <div class="user-avatar"><i class="fa-solid fa-user-gear"></i></div>
+                </div>
+            </header>
+
+            <div class="main-padding">
+                <div id="alerta-global-zerado" class="alerta-global view-hidden">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem;"></i>
+                    <span id="texto-alerta-zerado"><strong>Atenção:</strong> Existem itens com estoque ZERADO no armário!</span>
+                </div>
+
+                <section id="view-gavetas" class="view-active">
+                    <div class="relatorio-geral">
+                        <h3>Visão Geral do Armário</h3>
+                        <div class="kpi-grid">
+                            <div class="kpi-summary">
+                                <div class="kpi-big-number">
+                                    <span id="kpi-pendencias-count">0</span>
+                                    <p>Gavetas com<br>Alertas</p>
+                                </div>
+                            </div>
+                            <div class="kpi-status-list" id="kpi-lista-gavetas">
+                                </div>
+                        </div>
+                    </div>
+
+                    <div class="cabinet-vertical" id="menu-gavetas">
+                        </div>
+                </section>
+
+                <section id="view-historico" class="view-hidden">
+                    <div class="header-gaveta">
+                        <h2><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Atividades</h2>
+                    </div>
+                    <p class="subtitulo-historico">Acompanhe todas as retiradas, adições e modificações feitas no sistema.</p>
+                    
+                    <div id="lista-historico" class="historico-lista">
+                        </div>
+                </section>
+
+                <section id="view-config" class="view-hidden">
+                    <div class="header-gaveta">
+                        <h2><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2>
+                    </div>
+                    
+                    <div class="config-grid">
+                        <div class="config-card">
+                            <h3><i class="fa-solid fa-database"></i> Backup do Sistema</h3>
+                            <p>Baixe todos os dados salvos ou restaure um arquivo de backup anterior para o sistema.</p>
+                            
+                            <div class="config-buttons">
+                                <button class="btn-save" onclick="fazerBackup()">
+                                    <i class="fa-solid fa-download"></i> Baixar Arquivo
+                                </button>
+                                <button class="btn-cancel" onclick="document.getElementById('input-restore').click()">
+                                    <i class="fa-solid fa-upload"></i> Restaurar
+                                </button>
+                                <input type="file" id="input-restore" style="display: none;" accept=".json" onchange="restaurarBackup(event)">
+                            </div>
+                        </div>
+
+                        <div class="config-card">
+                            <h3><i class="fa-solid fa-file-excel"></i> Planilhas Excel (CSV)</h3>
+                            <p>Exporte o relatório atualizado do estoque do armário ou baixe os registros do histórico.</p>
+                            
+                            <div class="config-buttons">
+                                <button class="btn-save" style="background-color: #10b981;" onclick="exportarEstoqueCSV()">
+                                    <i class="fa-solid fa-boxes-stacked"></i> Estoque
+                                </button>
+                                <button class="btn-save" style="background-color: #3b82f6;" onclick="exportarHistoricoCSV()">
+                                    <i class="fa-solid fa-clock-rotate-left"></i> Histórico
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="view-compartimentos" class="view-hidden">
+                    <div class="header-gaveta">
+                        <button class="btn-voltar" onclick="voltarParaGavetas()">⬅ Voltar</button>
+                        <h2 id="titulo-gaveta-aberta">Gaveta X</h2>
+                        <button class="btn-add-item admin-only" onclick="abrirModalCadastro()">
+                            <i class="fa-solid fa-plus"></i> Nova Peça
+                        </button>
+                    </div>
+                    
+                    <div id="grid-pecas" class="grid-pecas">
+                        </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal-cadastro" class="modal-overlay view-hidden">
+        <div class="modal-content">
+            <h3>Cadastrar Novo Componente</h3>
+            <p id="modal-gaveta-alvo" class="modal-subtitle"></p>
+            
+            <div class="form-group row">
+                <div class="col">
+                    <label>Código/Local (Opcional):</label>
+                    <input type="text" id="novo-codigo" placeholder="Ex: G2-01">
+                </div>
+                <div class="col">
+                    <label>Nome da Peça:</label>
+                    <input type="text" id="novo-nome" placeholder="Ex: Contatora">
+                </div>
+            </div>
+            <div class="form-group row">
+                <div class="col">
+                    <label>Padrão 5S (Qtd Ideal):</label>
+                    <input type="number" id="novo-esperado" min="1" value="1">
+                </div>
+                <div class="col">
+                    <label>Qtd Física Atual:</label>
+                    <input type="number" id="novo-atual" min="0" value="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Foto do Componente (Opcional):</label>
+                <input type="file" id="novo-imagem" accept="image/*" class="file-input">
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="fecharModalCadastro()">Cancelar</button>
+                <button class="btn-save" onclick="salvarNovoItem()">Salvar Peça</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-conferencia" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3 id="conf-nome-peca">Nome da Peça</h3>
+            <p class="modal-subtitle">Informe a quantidade física exata na gaveta agora.</p>
+            
+            <div class="form-group text-center">
+                <label>Quantidade Atual:</label>
+                <input type="number" id="conf-qtd-atual" min="0" class="input-grande">
+            </div>
+            
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="fecharModalConferencia()">Cancelar</button>
+                <button class="btn-save" onclick="salvarConferencia()">Confirmar Contagem</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar-gaveta" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3>Editar Nome da Gaveta</h3>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Novo Nome:</label>
+                <input type="text" id="edit-gaveta-nome" placeholder="Ex: Sensores">
+            </div>
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="fecharModalEditarGaveta()">Cancelar</button>
+                <button class="btn-save" onclick="salvarNomeGaveta()">Salvar Alteração</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-pedido" class="modal-overlay view-hidden">
+        <div class="modal-content modal-largo">
+            <h3>Solicitação de Compra</h3>
+            <p class="modal-subtitle">Copie o texto pronto abaixo para enviar diretamente no seu Outlook ou Teams.</p>
+            
+            <textarea id="texto-pedido-gerado" readonly rows="12" class="textarea-pedido"></textarea>
+            
+            <div class="modal-actions espacado">
+                <button class="btn-cancel" onclick="fecharModalPedido()">Fechar</button>
+                <button class="btn-save btn-copiar" onclick="copiarTextoPedido()">
+                    <i class="fa-solid fa-copy"></i> Copiar Mensagem
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-alerta" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno text-center">
+            <i class="fa-solid fa-circle-exclamation icone-alerta-grande"></i>
+            <h3 id="alerta-titulo" class="titulo-alerta">Atenção</h3>
+            <p id="alerta-mensagem" class="mensagem-alerta">Mensagem de erro aqui.</p>
+            <button class="btn-save btn-full" onclick="fecharAlerta()">Entendi</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
