@@ -33,7 +33,7 @@
             <div id="form-entrar">
                 <div class="form-group">
                     <label for="input-login-id">Crachá (WEG) ou E-mail (Admin)</label>
-                    <input type="text" id="input-login-id" placeholder="Ex: usuario ou cadastro">
+                    <input type="text" id="input-login-id" placeholder="Ex: 69146 ou admin@weg.net">
                 </div>
                 <div class="form-group">
                     <label for="input-login-senha">Senha</label>
@@ -46,11 +46,11 @@
             <div id="form-registrar" class="view-hidden">
                 <div class="form-group">
                     <label for="reg-nome">Nome do Colaborador</label>
-                    <input type="text" id="reg-nome" placeholder="Ex: João">
+                    <input type="text" id="reg-nome" placeholder="Ex: Marlon">
                 </div>
                 <div class="form-group">
                     <label for="reg-cracha">Código do Crachá (WEG)</label>
-                    <input type="text" id="reg-cracha" placeholder="Ex: 123456">
+                    <input type="text" id="reg-cracha" placeholder="Ex: 69146">
                 </div>
                 <div class="form-group">
                     <label for="reg-senha">Crie uma Senha</label>
@@ -181,9 +181,9 @@
                 </section>
 
                 <section id="view-compartimentos" class="view-hidden">
-                    <div class="header-gaveta">
+                    <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%;">
                         <button class="btn-voltar" onclick="voltarParaGavetas()">⬅ Voltar</button>
-                        <h2 id="titulo-gaveta-aberta">Gaveta X</h2>
+                        <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1;">Gaveta X</h2>
                         <button class="btn-add-item admin-only" onclick="abrirModalCadastro()">
                             <i class="fa-solid fa-plus"></i> Nova Peça
                         </button>
@@ -229,6 +229,43 @@
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="fecharModalCadastro()">Cancelar</button>
                 <button class="btn-save" onclick="salvarNovoItem()">Salvar Peça</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar-peca" class="modal-overlay view-hidden">
+        <div class="modal-content">
+            <h3>Editar Componente</h3>
+            <p class="modal-subtitle">Altere as informações da peça selecionada.</p>
+            
+            <div class="form-group row">
+                <div class="col">
+                    <label>Código/Local:</label>
+                    <input type="text" id="edit-peca-codigo">
+                </div>
+                <div class="col">
+                    <label>Nome da Peça:</label>
+                    <input type="text" id="edit-peca-nome">
+                </div>
+            </div>
+            <div class="form-group row">
+                <div class="col">
+                    <label>Padrão 5S (Qtd Ideal):</label>
+                    <input type="number" id="edit-peca-esperado" min="1">
+                </div>
+                <div class="col">
+                    <label>Qtd Física Atual:</label>
+                    <input type="number" id="edit-peca-atual" min="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Nova Foto (Deixe em branco para manter a atual):</label>
+                <input type="file" id="edit-peca-imagem" accept="image/*" class="file-input">
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="fecharModalEditarPeca()">Cancelar</button>
+                <button class="btn-save" onclick="salvarEdicaoPeca()">Salvar Alterações</button>
             </div>
         </div>
     </div>
