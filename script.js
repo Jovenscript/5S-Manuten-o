@@ -639,6 +639,7 @@ function renderizarPecasDaGaveta(idGaveta) {
             <div class="botoes-acao-card">
                 <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})"><i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata</button>
                 <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})"><i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}</button>
+                <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})"><i class="fa-solid fa-right-left"></i> Mover para outra Gaveta</button>
             </div>
         `;
         grid.appendChild(div);
@@ -679,6 +680,54 @@ function excluirPeca(idPeca) {
         registrarLog(`excluiu a peça "${peca.name}" do sistema`);
         salvarDadosFirebase();
     }
+}
+
+// =========================================================================
+// MOVER PEÇA ENTRE GAVETAS
+// =========================================================================
+let pecaSendoMovidaId = null;
+
+function abrirModalMoverPeca(idPeca) {
+    pecaSendoMovidaId = idPeca;
+    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
+
+    document.getElementById('mover-peca-nome').innerText = peca.name;
+
+    const select = document.getElementById('mover-destino-select');
+    select.innerHTML = '';
+
+    database.drawers.forEach(gaveta => {
+        if (gaveta.id === gavetaAtualAberta) return; // pula gaveta atual
+        const option = document.createElement('option');
+        option.value = gaveta.id;
+        option.innerText = `${gaveta.label} — ${gaveta.title}`;
+        select.appendChild(option);
+    });
+
+    document.getElementById('modal-mover-peca').classList.remove('view-hidden');
+}
+
+function fecharModalMoverPeca() {
+    document.getElementById('modal-mover-peca').classList.add('view-hidden');
+    pecaSendoMovidaId = null;
+}
+
+function confirmarMoverPeca() {
+    const select = document.getElementById('mover-destino-select');
+    const destinoId = parseInt(select.value);
+
+    const gavetaOrigem = database.drawers.find(d => d.id === gavetaAtualAberta);
+    const gavetaDestino = database.drawers.find(d => d.id === destinoId);
+    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoMovidaId);
+
+    // Move a peça
+    database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== pecaSendoMovidaId);
+    if (!database.items[destinoId]) database.items[destinoId] = [];
+    database.items[destinoId].push(peca);
+
+    registrarLog(`moveu a peça "${peca.name}" da ${gavetaOrigem.label} (${gavetaOrigem.title}) para ${gavetaDestino.label} (${gavetaDestino.title})`);
+    salvarDadosFirebase();
+    fecharModalMoverPeca();
 }
 
 // =========================================================================
@@ -901,3 +950,6 @@ window.alternarStatusRequisitado = alternarStatusRequisitado;
 window.abrirModalConferencia = abrirModalConferencia;
 window.excluirPeca = excluirPeca;
 window.abrirModalEditarPeca = abrirModalEditarPeca;
+window.abrirModalMoverPeca = abrirModalMoverPeca;
+window.fecharModalMoverPeca = fecharModalMoverPeca;
+window.confirmarMoverPeca = confirmarMoverPeca;
