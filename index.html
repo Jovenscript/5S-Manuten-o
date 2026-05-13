@@ -9,7 +9,7 @@
 </head>
 <body>
 
-    <div id="mobile-overlay" class="sidebar-overlay" onclick="toggleMenuMobile()"></div>
+    <div id="mobile-overlay" class="sidebar-overlay" onclick="window.toggleMenuMobile()"></div>
 
     <section id="view-device-auth" class="view-active lock-screen">
         <div class="login-container lock-container">
@@ -21,7 +21,7 @@
                 <label>Chave de Liberação (Somente ADM)</label>
                 <input type="password" id="input-device-key" placeholder="Digite a chave mestre">
             </div>
-            <button class="btn-login btn-auth" onclick="autorizarDispositivo()">Liberar Dispositivo</button>
+            <button class="btn-login btn-auth" onclick="window.autorizarDispositivo()">Liberar Dispositivo</button>
         </div>
     </section>
 
@@ -39,8 +39,8 @@
                     <label for="input-login-senha">Senha</label>
                     <input type="password" id="input-login-senha" placeholder="Sua senha">
                 </div>
-                <button class="btn-login" onclick="realizarLogin()">Entrar no Sistema</button>
-                <p class="link-toggle" onclick="alternarTelaLogin()">Primeiro Acesso? Crie seu cadastro</p>
+                <button class="btn-login" onclick="window.realizarLogin()">Entrar no Sistema</button>
+                <p class="link-toggle" onclick="window.alternarTelaLogin()">Primeiro Acesso? Crie seu cadastro</p>
             </div>
 
             <div id="form-registrar" class="view-hidden">
@@ -56,8 +56,8 @@
                     <label for="reg-senha">Crie uma Senha</label>
                     <input type="password" id="reg-senha" placeholder="Sua senha secreta">
                 </div>
-                <button class="btn-login btn-registrar" onclick="registrarUsuario()">Cadastrar e Entrar</button>
-                <p class="link-toggle" onclick="alternarTelaLogin()">Já possui cadastro? Voltar ao login</p>
+                <button class="btn-login btn-registrar" onclick="window.registrarUsuario()">Cadastrar e Entrar</button>
+                <p class="link-toggle" onclick="window.alternarTelaLogin()">Já possui cadastro? Voltar ao login</p>
             </div>
         </div>
     </section>
@@ -67,24 +67,24 @@
         <nav class="sidebar" id="sidebar-menu">
             <div class="logo">5S</div>
             <div class="nav-items">
-                <div class="nav-item active" onclick="mostrarTela('view-gavetas')">
+                <div class="nav-item active" onclick="window.mostrarTela('view-gavetas')">
                     <i class="fa-solid fa-house"></i>
                     <span>Armário</span>
                 </div>
-                <div class="nav-item admin-only" onclick="mostrarTela('view-historico')">
+                <div class="nav-item admin-only" onclick="window.mostrarTela('view-historico')">
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>Histórico</span>
                 </div>
-                <div class="nav-item admin-only" onclick="mostrarTela('view-config')">
+                <div class="nav-item admin-only" onclick="window.mostrarTela('view-config')">
                     <i class="fa-solid fa-gear"></i>
                     <span>Ajustes</span>
                 </div>
-                <div class="nav-item" onclick="gerarEmailPedido()">
+                <div class="nav-item" onclick="window.gerarEmailPedido()">
                     <i class="fa-solid fa-envelope-open-text"></i>
                     <span>Pedir Peças</span>
                 </div>
             </div>
-            <div class="nav-footer" onclick="sairDoSistema()">
+            <div class="nav-footer" onclick="window.sairDoSistema()">
                 <i class="fa-solid fa-right-from-bracket"></i>
                 <span>Sair</span>
             </div>
@@ -93,7 +93,7 @@
         <div class="content-area">
             <header class="top-bar">
                 <div class="page-info">
-                    <div class="menu-toggle-mobile" onclick="toggleMenuMobile()">
+                    <div class="menu-toggle-mobile" onclick="window.toggleMenuMobile()">
                         <i class="fa-solid fa-bars"></i>
                     </div>
                     <h1>5S Manutenção - Controle</h1>
@@ -154,13 +154,13 @@
                             <p>Baixe todos os dados salvos ou restaure um arquivo de backup anterior para o sistema.</p>
                             
                             <div class="config-buttons">
-                                <button class="btn-save" onclick="fazerBackup()">
+                                <button class="btn-save" onclick="window.fazerBackup()">
                                     <i class="fa-solid fa-download"></i> Baixar Arquivo
                                 </button>
                                 <button class="btn-cancel" onclick="document.getElementById('input-restore').click()">
                                     <i class="fa-solid fa-upload"></i> Restaurar
                                 </button>
-                                <input type="file" id="input-restore" style="display: none;" accept=".json" onchange="restaurarBackup(event)">
+                                <input type="file" id="input-restore" style="display: none;" accept=".json" onchange="window.restaurarBackup(event)">
                             </div>
                         </div>
 
@@ -169,10 +169,10 @@
                             <p>Exporte o relatório atualizado do estoque do armário ou baixe os registros do histórico.</p>
                             
                             <div class="config-buttons">
-                                <button class="btn-save" style="background-color: #10b981;" onclick="exportarEstoqueCSV()">
+                                <button class="btn-save" style="background-color: #10b981;" onclick="window.exportarEstoqueCSV()">
                                     <i class="fa-solid fa-boxes-stacked"></i> Estoque
                                 </button>
-                                <button class="btn-save" style="background-color: #3b82f6;" onclick="exportarHistoricoCSV()">
+                                <button class="btn-save" style="background-color: #3b82f6;" onclick="window.exportarHistoricoCSV()">
                                     <i class="fa-solid fa-clock-rotate-left"></i> Histórico
                                 </button>
                             </div>
@@ -182,9 +182,9 @@
 
                 <section id="view-compartimentos" class="view-hidden">
                     <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%;">
-                        <button class="btn-voltar" onclick="voltarParaGavetas()">⬅ Voltar</button>
+                        <button class="btn-voltar" onclick="window.voltarParaGavetas()">⬅ Voltar</button>
                         <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1;">Gaveta X</h2>
-                        <button class="btn-add-item admin-only" onclick="abrirModalCadastro()">
+                        <button class="btn-add-item admin-only" onclick="window.abrirModalCadastro()">
                             <i class="fa-solid fa-plus"></i> Nova Peça
                         </button>
                     </div>
@@ -233,8 +233,8 @@
             </div>
             
             <div class="modal-actions">
-                <button class="btn-cancel" onclick="fecharModalCadastro()">Cancelar</button>
-                <button class="btn-save" onclick="salvarNovoItem()">Salvar Peça</button>
+                <button class="btn-cancel" onclick="window.fecharModalCadastro()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarNovoItem()">Salvar Peça</button>
             </div>
         </div>
     </div>
@@ -276,8 +276,8 @@
             </div>
             
             <div class="modal-actions">
-                <button class="btn-cancel" onclick="fecharModalEditarPeca()">Cancelar</button>
-                <button class="btn-save" onclick="salvarEdicaoPeca()">Salvar Alterações</button>
+                <button class="btn-cancel" onclick="window.fecharModalEditarPeca()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarEdicaoPeca()">Salvar Alterações</button>
             </div>
         </div>
     </div>
@@ -293,8 +293,8 @@
             </div>
             
             <div class="modal-actions centralizado">
-                <button class="btn-cancel" onclick="fecharModalConferencia()">Cancelar</button>
-                <button class="btn-save" onclick="salvarConferencia()">Confirmar Contagem</button>
+                <button class="btn-cancel" onclick="window.fecharModalConferencia()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarConferencia()">Confirmar Contagem</button>
             </div>
         </div>
     </div>
@@ -307,8 +307,8 @@
                 <input type="text" id="edit-gaveta-nome" placeholder="Ex: Sensores">
             </div>
             <div class="modal-actions centralizado">
-                <button class="btn-cancel" onclick="fecharModalEditarGaveta()">Cancelar</button>
-                <button class="btn-save" onclick="salvarNomeGaveta()">Salvar Alteração</button>
+                <button class="btn-cancel" onclick="window.fecharModalEditarGaveta()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarNomeGaveta()">Salvar Alteração</button>
             </div>
         </div>
     </div>
@@ -316,13 +316,21 @@
     <div id="modal-pedido" class="modal-overlay view-hidden">
         <div class="modal-content modal-largo">
             <h3>Solicitação de Compra</h3>
-            <p class="modal-subtitle">Copie o texto pronto abaixo para enviar diretamente no seu Outlook ou Teams.</p>
+            <p class="modal-subtitle" id="pedido-subtitle">Preencha os detalhes de cada item para gerar a solicitação.</p>
             
-            <textarea id="texto-pedido-gerado" readonly rows="12" class="textarea-pedido"></textarea>
+            <div id="formulario-pedido-itens" style="max-height: 55vh; overflow-y: auto; margin-bottom: 15px; padding-right: 10px;">
+            </div>
+
+            <textarea id="texto-pedido-gerado" readonly rows="14" class="textarea-pedido view-hidden"></textarea>
             
             <div class="modal-actions espacado">
-                <button class="btn-cancel" onclick="fecharModalPedido()">Fechar</button>
-                <button class="btn-save btn-copiar" onclick="copiarTextoPedido()">
+                <button class="btn-cancel" onclick="window.fecharModalPedido()">Fechar</button>
+                
+                <button id="btn-gerar-texto-pedido" class="btn-save" onclick="window.processarFormularioPedido()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Texto
+                </button>
+                
+                <button id="btn-copiar-pedido" class="btn-save btn-copiar view-hidden" onclick="window.copiarTextoPedido()">
                     <i class="fa-solid fa-copy"></i> Copiar Mensagem
                 </button>
             </div>
@@ -334,24 +342,24 @@
             <i class="fa-solid fa-circle-exclamation icone-alerta-grande"></i>
             <h3 id="alerta-titulo" class="titulo-alerta">Atenção</h3>
             <p id="alerta-mensagem" class="mensagem-alerta">Mensagem de erro aqui.</p>
-            <button class="btn-save btn-full" onclick="fecharAlerta()">Entendi</button>
+            <button class="btn-save btn-full" onclick="window.fecharAlerta()">Entendi</button>
         </div>
     </div>
 
- <div id="modal-mover-peca" class="modal-overlay view-hidden">
-    <div class="modal-content modal-pequeno">
-        <h3>Mover Peça de Gaveta</h3>
-        <p id="mover-peca-nome" class="modal-subtitle" style="font-weight:bold;font-size:1rem;color:#0f172a;"></p>
-        <div class="form-group" style="margin-top:15px;">
-            <label>Mover para a Gaveta:</label>
-            <select id="mover-destino-select" style="width:100%;padding:0.8rem;border:1px solid #e2e8f0;border-radius:8px;font-size:1rem;"></select>
-        </div>
-        <div class="modal-actions centralizado">
-            <button class="btn-cancel" onclick="fecharModalMoverPeca()">Cancelar</button>
-            <button class="btn-save" onclick="confirmarMoverPeca()">Confirmar Mover</button>
+    <div id="modal-mover-peca" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3>Mover Peça de Gaveta</h3>
+            <p id="mover-peca-nome" class="modal-subtitle" style="font-weight:bold;font-size:1rem;color:#0f172a;"></p>
+            <div class="form-group" style="margin-top:15px;">
+                <label>Mover para a Gaveta:</label>
+                <select id="mover-destino-select" style="width:100%;padding:0.8rem;border:1px solid #e2e8f0;border-radius:8px;font-size:1rem;"></select>
+            </div>
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="window.fecharModalMoverPeca()">Cancelar</button>
+                <button class="btn-save" onclick="window.confirmarMoverPeca()">Confirmar Mover</button>
+            </div>
         </div>
     </div>
-</div>
 
     <script type="module" src="script.js"></script>
 </body>
