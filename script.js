@@ -62,8 +62,6 @@ let pecaSendoMovidaId    = null;
 
 // =========================================================================
 // CLOUDINARY — UPLOAD DE IMAGEM
-// A imagem vai para o Cloudinary e o Firestore guarda apenas a URL (~100 bytes).
-// Isso resolve o limite de 1MB definitivamente — nenhuma imagem fica no Firestore.
 // =========================================================================
 async function uploadImagemCloudinary(file) {
     const formData = new FormData();
@@ -78,23 +76,12 @@ async function uploadImagemCloudinary(file) {
     }
 
     const data = await response.json();
-    return data.secure_url; // URL pública HTTPS — isso que fica salvo no Firestore
+    return data.secure_url; 
 }
 
 // =========================================================================
 // FIRESTORE — DOCUMENTOS SEPARADOS
-//
-// ESTRUTURA NOVA (resolve o limite de 1MB):
-//   manutencao_5s/config      → gavetas + usuários  (~2 KB)
-//   manutencao_5s/historico   → logs de atividade  (~80 KB)
-//   manutencao_5s/itens_g1    → itens da gaveta 1  (só texto + URLs curtas)
-//   manutencao_5s/itens_g2    → itens da gaveta 2
-//   ...
-//   manutencao_5s/itens_g12   → itens da gaveta 12
-//
-// Cada operação salva SOMENTE o documento afetado.
 // =========================================================================
-
 async function salvarConfig() {
     try {
         await setDoc(doc(db, "manutencao_5s", "config"), {
@@ -140,19 +127,12 @@ window.onload = () => {
     }
 };
 
-// =========================================================================
-// INICIALIZAÇÃO E SINCRONIZAÇÃO FIREBASE
-// =========================================================================
 async function iniciarSincronizacaoFirebase() {
-    // FIX: Listeners criados PRIMEIRO — não espera a migração
     setupListeners();
-
-    // Migração roda em background, sem travar o carregamento
     migrarDadosLegados();
 }
 
 function setupListeners() {
-    // Listener: config
     onSnapshot(doc(db, "manutencao_5s", "config"), (snap) => {
         if (snap.exists()) {
             const d = snap.data();
@@ -165,13 +145,11 @@ function setupListeners() {
         atualizarSeLogado();
     });
 
-    // Listener: histórico
     onSnapshot(doc(db, "manutencao_5s", "historico"), (snap) => {
         if (snap.exists()) historicoLogs = snap.data().logs || [];
         atualizarSeLogado();
     });
 
-    // Listener: itens de cada gaveta
     GAVETAS_PADRAO.forEach(gaveta => {
         onSnapshot(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), (snap) => {
             database.items[gaveta.id] = snap.exists() ? (snap.data().items || []) : [];
@@ -184,23 +162,23 @@ function setupListeners() {
     });
 }
 
-// Para evitar erro no load do onSnapshot caso não esteja logado
+// ATENÇÃO: Esta é a função que faltava e causava o erro na tela!
 function atualizarSeLogado() {
-    if (document.getElementById('app-container').classList.contains('view-active')) {
+    const container = document.getElementById('app-container');
+    if (container && container.classList.contains('view-active')) {
         atualizarDashboard();
     }
 }
 
-// FIX: Flag no localStorage — migração só roda UMA vez por dispositivo
 async function migrarDadosLegados() {
-    if (localStorage.getItem('5s_migrado_v2')) return; // já foi feita
+    if (localStorage.getItem('5s_migrado_v2')) return; 
 
     try {
         const legadoSnap = await getDoc(doc(db, "manutencao_5s", "dados_sistema"));
         const configSnap = await getDoc(doc(db, "manutencao_5s", "config"));
 
         if (!legadoSnap.exists() || configSnap.exists()) {
-            localStorage.setItem('5s_migrado_v2', 'true'); // marca como feita
+            localStorage.setItem('5s_migrado_v2', 'true'); 
             return;
         }
 
@@ -224,7 +202,7 @@ async function migrarDadosLegados() {
             await setDoc(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), { items: itens });
         }
 
-        localStorage.setItem('5s_migrado_v2', 'true'); // marca como feita
+        localStorage.setItem('5s_migrado_v2', 'true'); 
         console.log("Migração concluída.");
     } catch (e) {
         console.warn("Aviso na migração:", e);
