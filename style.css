@@ -114,12 +114,13 @@ body:not(.is-admin) .admin-only { display: none !important; }
     font-size: 0.9rem; 
 }
 
-.form-group input { 
+.form-group input, .form-group select { 
     width: 100%; 
     padding: 1rem; 
     border: 1px solid var(--border-color); 
     border-radius: 8px; 
     font-size: 1rem; 
+    background-color: white;
 }
 
 .btn-login { 
@@ -833,6 +834,28 @@ body:not(.is-admin) .admin-only { display: none !important; }
     border-color: #eab308; 
 }
 
+.btn-mover {
+    width: 100%; 
+    padding: 0.6rem; 
+    background: #f5f3ff; 
+    color: #7c3aed; 
+    border: 1px solid #c4b5fd; 
+    border-radius: 6px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    font-size: 0.85rem; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.btn-mover:hover {
+    background: #7c3aed;
+    color: white;
+}
+
 /* =========================================================================
    MODAIS E ALERTAS
 ========================================================================= */
@@ -1075,21 +1098,3 @@ body:not(.is-admin) .admin-only { display: none !important; }
         gap: 5px; 
     }
 }
-
-.btn-mover {
-    width: 100%;
-    padding: 0.6rem;
-    background: #f5f3ff;
-    color: #7c3aed;
-    border: 1px solid #c4b5fd;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-    font-size: 0.85rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s;
-}
-.btn-mover:hover { background: #7c3aed; color: white; }
