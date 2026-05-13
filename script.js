@@ -184,6 +184,13 @@ function setupListeners() {
     });
 }
 
+// Para evitar erro no load do onSnapshot caso não esteja logado
+function atualizarSeLogado() {
+    if (document.getElementById('app-container').classList.contains('view-active')) {
+        atualizarDashboard();
+    }
+}
+
 // FIX: Flag no localStorage — migração só roda UMA vez por dispositivo
 async function migrarDadosLegados() {
     if (localStorage.getItem('5s_migrado_v2')) return; // já foi feita
@@ -528,7 +535,7 @@ function renderArmarioVertical() {
             <div class="gaveta-content">
                 <span class="gnumber">${gaveta.label}</span>
                 <span class="glabel">${gaveta.title}</span>
-                <button class="btn-edit-gaveta admin-only" onclick="abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
+                <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
                     <i class="fa-solid fa-pen"></i>
                 </button>
                 <div class="gstatus-light ${status}"></div>
