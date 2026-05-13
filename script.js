@@ -140,9 +140,18 @@ window.onload = () => {
     }
 };
 
+// =========================================================================
+// INICIALIZAÇÃO E SINCRONIZAÇÃO FIREBASE
+// =========================================================================
 async function iniciarSincronizacaoFirebase() {
-    await migrarDadosLegados();
+    // FIX: Listeners criados PRIMEIRO — não espera a migração
+    setupListeners();
 
+    // Migração roda em background, sem travar o carregamento
+    migrarDadosLegados();
+}
+
+function setupListeners() {
     // Listener: config
     onSnapshot(doc(db, "manutencao_5s", "config"), (snap) => {
         if (snap.exists()) {
@@ -175,14 +184,18 @@ async function iniciarSincronizacaoFirebase() {
     });
 }
 
-// Migra o documento legado "dados_sistema" (estrutura antiga) para a nova estrutura.
-// Remove imagens base64 durante a migração — imagens antigas precisam ser recadastradas.
+// FIX: Flag no localStorage — migração só roda UMA vez por dispositivo
 async function migrarDadosLegados() {
+    if (localStorage.getItem('5s_migrado_v2')) return; // já foi feita
+
     try {
         const legadoSnap = await getDoc(doc(db, "manutencao_5s", "dados_sistema"));
         const configSnap = await getDoc(doc(db, "manutencao_5s", "config"));
 
-        if (!legadoSnap.exists() || configSnap.exists()) return;
+        if (!legadoSnap.exists() || configSnap.exists()) {
+            localStorage.setItem('5s_migrado_v2', 'true'); // marca como feita
+            return;
+        }
 
         console.log("Migrando dados legados para nova estrutura...");
         const legado    = legadoSnap.data();
@@ -199,20 +212,15 @@ async function migrarDadosLegados() {
 
         for (const gaveta of GAVETAS_PADRAO) {
             const itens = ((db_legado.items || {})[gaveta.id] || []).map(p => ({
-                ...p,
-                image: null // Remove base64 antigo; imagens serão recadastradas via Cloudinary
+                ...p, image: null
             }));
             await setDoc(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), { items: itens });
         }
-        console.log("Migração concluída. Imagens antigas removidas — recadastre via editar peça.");
+
+        localStorage.setItem('5s_migrado_v2', 'true'); // marca como feita
+        console.log("Migração concluída.");
     } catch (e) {
         console.warn("Aviso na migração:", e);
-    }
-}
-
-function atualizarSeLogado() {
-    if (document.getElementById('app-container').classList.contains('view-active')) {
-        atualizarDashboard();
     }
 }
 
