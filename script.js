@@ -64,6 +64,35 @@ let gavetaSendoEditadaId = null;
 let pecaSendoEditadaId = null; 
 
 // =========================================================================
+// UTILITÁRIO: COMPRESSÃO DE IMAGEM
+// =========================================================================
+// FIX: Comprime a imagem para no máximo 400px de largura e qualidade 65%,
+// evitando que o documento do Firestore ultrapasse o limite de 1MB.
+function comprimirImagem(file, maxWidth = 400, qualidade = 0.65) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.width;
+                let h = img.height;
+                if (w > maxWidth) {
+                    h = Math.round(h * maxWidth / w);
+                    w = maxWidth;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', qualidade));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// =========================================================================
 // INICIALIZAÇÃO E SINCRONIZAÇÃO FIREBASE (ONSNAPSHOT)
 // =========================================================================
 window.onload = () => {
@@ -80,7 +109,6 @@ window.onload = () => {
 function iniciarSincronizacaoFirebase() {
     const docRef = doc(db, "manutencao_5s", "dados_sistema");
 
-    // O onSnapshot "escuta" o banco. Qualquer mudança lá atualiza a tela de todos na hora.
     onSnapshot(docRef, (snapshot) => {
         if (snapshot.exists()) {
             const dados = snapshot.data();
@@ -88,7 +116,6 @@ function iniciarSincronizacaoFirebase() {
             usuariosSalvos = dados.usuarios || [];
             historicoLogs = dados.historico || [];
 
-            // Varredura de segurança nos dados recebidos
             database.drawers.forEach(d => {
                 if (!database.items[d.id]) database.items[d.id] = [];
                 database.items[d.id].forEach(peca => {
@@ -97,12 +124,10 @@ function iniciarSincronizacaoFirebase() {
                 });
             });
 
-            // Se o usuário já estiver dentro do sistema, recarrega a tela para mostrar a atualização
             if (document.getElementById('app-container').classList.contains('view-active')) {
                 atualizarDashboard();
             }
         } else {
-            // Se for o primeiro acesso absoluto e o documento não existir, cria ele.
             database = JSON.parse(JSON.stringify(defaultDatabase));
             salvarDadosFirebase();
         }
@@ -156,7 +181,6 @@ function autorizarDispositivo() {
     
     if (key === DEVICE_MASTER_KEY) {
         localStorage.setItem('5s_device_authorized', 'true');
-        
         document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
         document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
     } else {
@@ -228,7 +252,7 @@ function exportarHistoricoCSV() {
     csvContent += "Data_Hora,Usuario,Acao\n";
 
     historicoLogs.forEach(log => {
-        const acao = `"${log.acao.replace(/"/g, '""')}"`; 
+        const acao = `"${log.acao.replace(/"/g, '""')}"`;
         csvContent += `"${log.data}","${log.usuario}",${acao}\n`;
     });
 
@@ -689,11 +713,15 @@ function salvarNovoItem() {
         fecharModalCadastro();
     };
 
+    // FIX: usa comprimirImagem() em vez de FileReader direto
     if (imagemInput.files && imagemInput.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) { novaPeca.image = e.target.result; finalizarCadastro(); };
-        reader.readAsDataURL(imagemInput.files[0]);
-    } else finalizarCadastro();
+        comprimirImagem(imagemInput.files[0]).then(base64 => {
+            novaPeca.image = base64;
+            finalizarCadastro();
+        });
+    } else {
+        finalizarCadastro();
+    }
 }
 
 function abrirModalEditarPeca(idPeca) {
@@ -731,11 +759,15 @@ function salvarEdicaoPeca() {
         fecharModalEditarPeca();
     };
 
+    // FIX: usa comprimirImagem() em vez de FileReader direto
     if (imagemInput.files && imagemInput.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) { peca.image = e.target.result; finalizarEdicao(); };
-        reader.readAsDataURL(imagemInput.files[0]);
-    } else finalizarEdicao();
+        comprimirImagem(imagemInput.files[0]).then(base64 => {
+            peca.image = base64;
+            finalizarEdicao();
+        });
+    } else {
+        finalizarEdicao();
+    }
 }
 
 function abrirModalConferencia(idPeca) {
@@ -817,9 +849,6 @@ function copiarTextoPedido() {
 
 // =========================================================================
 // EXPOSIÇÃO GLOBAL DE FUNÇÕES (MÓDULO)
-// Como o script agora é tipo "module" (para suportar imports do Firebase),
-// as funções não ficam no escopo global automaticamente.
-// Precisamos atrelar as funções usadas no HTML diretamente ao objeto window.
 // =========================================================================
 window.toggleMenuMobile = toggleMenuMobile;
 window.autorizarDispositivo = autorizarDispositivo;
