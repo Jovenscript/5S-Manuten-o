@@ -156,7 +156,7 @@ function setupListeners() {
             database.items[gaveta.id].forEach(p => {
                 if (p.requested   === undefined) p.requested   = false;
                 if (p.lastTakenBy === undefined) p.lastTakenBy = null;
-                if (p.position    === undefined) p.position    = 999; // 999 Joga as peças sem posição pro final
+                if (p.position    === undefined) p.position    = 999; 
             });
             atualizarSeLogado();
         });
@@ -565,7 +565,6 @@ function renderizarPecasDaGaveta(idGaveta) {
         return;
     }
 
-    // ORDENAÇÃO PERFECCIONISTA: Organiza pelo número da posição que você definir no campo.
     const pecasOrdenadas = [...pecasBrutas].sort((a, b) => (a.position || 999) - (b.position || 999));
 
     pecasOrdenadas.forEach(peca => {
@@ -575,7 +574,6 @@ function renderizarPecasDaGaveta(idGaveta) {
         const retiradaHtml = peca.lastTakenBy
             ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
             
-        // Indicador visual de posição na gaveta para facilitar o check visual
         const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
 
         const div = document.createElement('div');
@@ -583,7 +581,7 @@ function renderizarPecasDaGaveta(idGaveta) {
         div.innerHTML = `
             <div class="card-top">
                 <div>
-                    <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | ${peca.code || 'S/N'}</span>
+                    <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
                     <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
                     <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
                 </div>
@@ -623,10 +621,10 @@ function ajusteRapidoEstoque(idPeca, delta) {
     let novaQtd = Math.max(0, peca.current + delta);
     if (delta < 0 && peca.current > 0) {
         peca.lastTakenBy = usuarioLogado.nome;
-        registrarLog(`retirou 1 unidade da peça "${peca.name}" (Local: ${peca.code})`);
+        registrarLog(`retirou 1 unidade da peça "${peca.name}" (Item: ${peca.code})`);
         enviarNotificacao("Peça Retirada", `Você retirou 1x ${peca.name}. Restaram ${novaQtd} peça(s).`);
     } else if (delta > 0) {
-        registrarLog(`adicionou 1 unidade da peça "${peca.name}" (Local: ${peca.code})`);
+        registrarLog(`adicionou 1 unidade da peça "${peca.name}" (Item: ${peca.code})`);
     }
     peca.current = novaQtd;
     if (peca.current >= peca.expected) peca.requested = false;
@@ -735,7 +733,7 @@ async function salvarNovoItem() {
     }
 
     database.items[gavetaAtualAberta].push(novaPeca);
-    registrarLog(`cadastrou a nova peça "${novaPeca.name}" (Local: ${novaPeca.code}) na Posição ${posicao === 999 ? 'Livre' : posicao}.`);
+    registrarLog(`cadastrou a nova peça "${novaPeca.name}" (Item: ${novaPeca.code}) na Posição ${posicao === 999 ? 'Livre' : posicao}.`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     fecharModalCadastro();
 
@@ -750,7 +748,6 @@ function abrirModalEditarPeca(idPeca) {
     document.getElementById('edit-peca-esperado').value = peca.expected;
     document.getElementById('edit-peca-atual').value    = peca.current;
     
-    // Carrega a posição para edição (ou vazio se for 999/livre)
     document.getElementById('edit-peca-posicao').value  = (peca.position && peca.position !== 999) ? peca.position : '';
     
     document.getElementById('edit-peca-imagem').value   = '';
@@ -828,22 +825,126 @@ function mostrarAlerta(titulo, mensagem) {
 function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
 // =========================================================================
-// GERADOR DE PEDIDO
+// NOVO GERADOR DE PEDIDO (FORMULÁRIO INTELIGENTE)
 // =========================================================================
 function gerarEmailPedido() {
-    const itens = [];
+    const containerItens = document.getElementById('formulario-pedido-itens');
+    containerItens.innerHTML = '';
+    let itensFaltando = [];
+
     database.drawers.forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
-            if (peca.current < peca.expected)
-                itens.push(`- ${peca.expected - peca.current} un. | ${peca.name} (Local: ${peca.code})`);
+            if (peca.current < peca.expected) {
+                itensFaltando.push({
+                    nome: peca.name,
+                    codigo: peca.code,
+                    falta: peca.expected - peca.current
+                });
+            }
         });
     });
-    if (!itens.length) return mostrarAlerta("Tudo em Ordem", "Não há peças faltando no gaveteiro neste momento.");
-    const nome = usuarioLogado ? usuarioLogado.nome : 'Manutenção';
-    document.getElementById('texto-pedido-gerado').value =
-        `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes para o nosso gaveteiro elétrico:\n\n${itens.join('\n')}\n\nFico no aguardo.\nObrigado,\n${nome}`;
+
+    if (itensFaltando.length === 0) return mostrarAlerta("Tudo em Ordem", "Não há peças faltando no gaveteiro neste momento.");
+
+    itensFaltando.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.style.border = '1px solid var(--border-color)';
+        div.style.padding = '15px';
+        div.style.marginBottom = '15px';
+        div.style.borderRadius = '8px';
+        div.style.backgroundColor = '#f8fafc';
+
+        div.innerHTML = `
+            <p style="font-weight: bold; margin-bottom: 12px; color: var(--cabinet-blue); font-size: 1.05rem;">
+                <i class="fa-solid fa-box-open"></i> ${item.falta} un. | ${item.nome} 
+                <span style="font-weight: normal; color: var(--text-secondary);">(Item: ${item.codigo || 'S/N'})</span>
+            </p>
+            
+            <div class="form-group row" style="margin-bottom: 10px;">
+                <div class="col">
+                    <label>Ordem de Serviço (OS):</label>
+                    <input type="text" id="os-${index}" placeholder="Ex: 12345678">
+                </div>
+                <div class="col">
+                    <label>Almoxarifado:</label>
+                    <select id="almo-${index}" onchange="window.toggleCompradoFora(${index})">
+                        <option value="Automação">Automação</option>
+                        <option value="Estoque">Estoque</option>
+                        <option value="Comprado Fora">Comprado Fora</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="extra-${index}" class="view-hidden" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;">
+                <div class="form-group row">
+                    <div class="col">
+                        <label>Fornecedor:</label>
+                        <input type="text" id="forn-${index}" placeholder="Nome do fornecedor">
+                    </div>
+                    <div class="col">
+                        <label>Unid. Medida:</label>
+                        <input type="text" id="unid-${index}" placeholder="Ex: PC, RL, CX">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Justificativa:</label>
+                    <input type="text" id="just-${index}" placeholder="Motivo da compra">
+                </div>
+            </div>
+        `;
+        containerItens.appendChild(div);
+    });
+
+    document.getElementById('formulario-pedido-itens').classList.remove('view-hidden');
+    document.getElementById('texto-pedido-gerado').classList.add('view-hidden');
+    document.getElementById('btn-gerar-texto-pedido').classList.remove('view-hidden');
+    document.getElementById('btn-copiar-pedido').classList.add('view-hidden');
+    document.getElementById('pedido-subtitle').innerText = "Preencha os detalhes de cada item para gerar a solicitação.";
+
+    window.itensFaltandoTemp = itensFaltando;
     document.getElementById('modal-pedido').classList.remove('view-hidden');
 }
+
+function toggleCompradoFora(index) {
+    const select = document.getElementById(`almo-${index}`).value;
+    const extraDiv = document.getElementById(`extra-${index}`);
+    if (select === 'Comprado Fora') {
+        extraDiv.classList.remove('view-hidden');
+    } else {
+        extraDiv.classList.add('view-hidden');
+    }
+}
+
+function processarFormularioPedido() {
+    const nomeSolicitante = usuarioLogado ? usuarioLogado.nome : 'Manutenção';
+    let textoFinal = `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes para o nosso gaveteiro elétrico:\n\n`;
+
+    window.itensFaltandoTemp.forEach((item, index) => {
+        const os = document.getElementById(`os-${index}`).value || 'Não informada';
+        const almo = document.getElementById(`almo-${index}`).value;
+
+        textoFinal += `- ${item.falta} un. | ${item.nome} (Item: ${item.codigo || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
+
+        if (almo === 'Comprado Fora') {
+            const forn = document.getElementById(`forn-${index}`).value || 'Não informado';
+            const unid = document.getElementById(`unid-${index}`).value || 'Não informada';
+            const just = document.getElementById(`just-${index}`).value || 'Não informada';
+            
+            textoFinal += `  > Detalhes Compra Externa - Fornecedor: ${forn} | UM: ${unid} | Justificativa: ${just}\n`;
+        }
+    });
+
+    textoFinal += `\nFico no aguardo.\nObrigado,\n${nomeSolicitante}`;
+
+    document.getElementById('texto-pedido-gerado').value = textoFinal;
+
+    document.getElementById('formulario-pedido-itens').classList.add('view-hidden');
+    document.getElementById('texto-pedido-gerado').classList.remove('view-hidden');
+    document.getElementById('btn-gerar-texto-pedido').classList.add('view-hidden');
+    document.getElementById('btn-copiar-pedido').classList.remove('view-hidden');
+    document.getElementById('pedido-subtitle').innerText = "Copie o texto pronto abaixo para enviar diretamente no seu Outlook ou Teams.";
+}
+
 function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
 
 function copiarTextoPedido() {
@@ -896,3 +997,5 @@ window.abrirModalEditarPeca      = abrirModalEditarPeca;
 window.abrirModalMoverPeca       = abrirModalMoverPeca;
 window.fecharModalMoverPeca      = fecharModalMoverPeca;
 window.confirmarMoverPeca        = confirmarMoverPeca;
+window.toggleCompradoFora        = toggleCompradoFora;
+window.processarFormularioPedido = processarFormularioPedido;
