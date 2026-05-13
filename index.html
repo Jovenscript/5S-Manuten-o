@@ -326,20 +326,17 @@
         </div>
     </div>
 
-    <!-- MODAL: MOVER PEÇA ENTRE GAVETAS -->
-<div id="modal-mover-peca" class="modal-overlay view-hidden">
+ <div id="modal-mover-peca" class="modal-overlay view-hidden">
     <div class="modal-content modal-pequeno">
-        <h3><i class="fa-solid fa-right-left"></i> Mover Peça</h3>
-        <p class="modal-subtitle">Selecione a gaveta de destino para <strong id="mover-peca-nome"></strong>.</p>
-        <div class="form-group" style="margin-top: 15px;">
-            <label>Gaveta de Destino:</label>
-            <select id="mover-destino-select" style="width:100%; padding:0.8rem; border:1px solid var(--border-color); border-radius:8px; font-size:1rem;"></select>
+        <h3>Mover Peça de Gaveta</h3>
+        <p id="mover-peca-nome" class="modal-subtitle" style="font-weight:bold;font-size:1rem;color:#0f172a;"></p>
+        <div class="form-group" style="margin-top:15px;">
+            <label>Mover para a Gaveta:</label>
+            <select id="mover-destino-select" style="width:100%;padding:0.8rem;border:1px solid #e2e8f0;border-radius:8px;font-size:1rem;"></select>
         </div>
-        <div class="modal-actions centralizado" style="margin-top:1.5rem;">
+        <div class="modal-actions centralizado">
             <button class="btn-cancel" onclick="fecharModalMoverPeca()">Cancelar</button>
-            <button class="btn-save" style="background:#7c3aed;" onclick="confirmarMoverPeca()">
-                <i class="fa-solid fa-check"></i> Confirmar Mudança
-            </button>
+            <button class="btn-save" onclick="confirmarMoverPeca()">Confirmar Mover</button>
         </div>
     </div>
 </div>
