@@ -295,7 +295,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 
 /* =========================================================================
-   FASE 3: DASHBOARD DE BUSCA COM CARROSSEL E GLASSMORPHISM (CENTRALIZADO)
+   DASHBOARD DE BUSCA (CARROSSEL DINÂMICO JS E GLASSMORPHISM)
 ========================================================================= */
 .dashboard-wrapper {
     min-height: calc(100vh - 70px);
