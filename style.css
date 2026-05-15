@@ -12,6 +12,7 @@
     --text-secondary: #64748b;
     --danger: #ef4444;
 
+    /* Cores de Status 5S */
     --status-verde: #10b981;
     --status-laranja: #f97316;
     --status-vermelho: #ef4444;
@@ -294,7 +295,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 
 /* =========================================================================
-   FASE 3: DASHBOARD DE BUSCA COM CARROSSEL E GLASSMORPHISM (CENTRALIZADO)
+   DASHBOARD DE BUSCA (CARROSSEL DINÂMICO JS E GLASSMORPHISM)
 ========================================================================= */
 .dashboard-wrapper {
     min-height: calc(100vh - 70px);
@@ -303,16 +304,11 @@ body:not(.is-admin) .admin-only { display: none !important; }
     align-items: center;
     padding: 2rem;
     position: relative;
+    /* Fundo controlado pelo JS */
     background-size: cover;
     background-position: center;
-    animation: carrosselFundo 20s infinite linear;
-}
-
-@keyframes carrosselFundo {
-    0% { background-image: url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=2069&auto=format&fit=crop'); }
-    33% { background-image: url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop'); }
-    66% { background-image: url('https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070&auto=format&fit=crop'); }
-    100% { background-image: url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=2069&auto=format&fit=crop'); }
+    /* Transição suave de 2s para o carrossel */
+    transition: background-image 2s ease-in-out;
 }
 
 .dashboard-overlay {
@@ -651,8 +647,9 @@ body:not(.is-admin) .admin-only { display: none !important; }
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-right: 10px;
+    margin-right: 5px;
     transition: all 0.2s;
+    z-index: 10;
 }
 
 .btn-edit-gaveta:hover { background: rgba(255, 255, 255, 0.3); }
@@ -676,6 +673,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
     border-radius: 50%; 
     border: 2px solid rgba(0,0,0,0.4); 
     flex-shrink: 0;
+    margin-left: auto;
 }
 
 .gstatus-light.verde { background-color: var(--status-verde); box-shadow: 0 0 10px var(--status-verde); }
@@ -684,7 +682,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .gstatus-light.vermelho { background-color: var(--status-vermelho); box-shadow: 0 0 10px var(--status-vermelho); }
 
 /* =========================================================================
-   DENTRO DA GAVETA E FASE 2: GRID E DIVISÓRIAS
+   DENTRO DA GAVETA E FASE 2: GRID DE ALTURA (GRID-ROW)
 ========================================================================= */
 .header-gaveta { 
     display: flex; 
@@ -736,6 +734,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .grid-pecas { 
     display: grid; 
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+    grid-auto-rows: minmax(min-content, max-content);
     gap: 1.5rem; 
     padding-bottom: 2rem; 
 }
@@ -749,7 +748,9 @@ body:not(.is-admin) .admin-only { display: none !important; }
     position: relative; 
     display: flex; 
     flex-direction: column; 
-    grid-column: span var(--span-size, 1);
+    
+    /* ALTERAÇÃO DA FASE 2: Agora estica na ALTURA (Linhas) em vez da largura */
+    grid-row: span var(--span-size, 1);
 }
 
 .card-top { 
@@ -815,7 +816,8 @@ body:not(.is-admin) .admin-only { display: none !important; }
 
 .card-image-box { 
     width: 100%; 
-    height: 160px; 
+    flex: 1; /* Estica a imagem se o card for maior na altura */
+    min-height: 160px; 
     background: #f8fafc; 
     border-radius: 8px; 
     margin-bottom: 1rem; 
@@ -1096,9 +1098,9 @@ body:not(.is-admin) .admin-only { display: none !important; }
    MEDIA QUERIES PARA MOBILE (CELULARES) - RESPONSIVIDADE COMPLETA
 ========================================================================= */
 @media (max-width: 768px) {
-    /* Desliga a var(--span-size) no celular para não quebrar a tela */
+    /* Desliga a var(--span-size) no celular para não esticar verticalmente também */
     .compartimento-card {
-        grid-column: span 1 !important;
+        grid-row: span 1 !important;
     }
 
     .menu-toggle-mobile { display: block; } 
@@ -1165,7 +1167,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
         font-size: 16px; 
     }
 
-    /* Ajuste fino pro fundo do dashboard preencher a tela mobile inteira */
     .dashboard-wrapper {
         padding: 1rem;
         min-height: calc(100vh - 60px);
