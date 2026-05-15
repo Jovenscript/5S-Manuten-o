@@ -295,7 +295,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 
 /* =========================================================================
-   DASHBOARD DE BUSCA (CARROSSEL DINÂMICO JS E GLASSMORPHISM)
+   FASE 3: DASHBOARD DE BUSCA COM CARROSSEL E GLASSMORPHISM (CENTRALIZADO)
 ========================================================================= */
 .dashboard-wrapper {
     min-height: calc(100vh - 70px);
@@ -304,10 +304,8 @@ body:not(.is-admin) .admin-only { display: none !important; }
     align-items: center;
     padding: 2rem;
     position: relative;
-    /* Fundo controlado pelo JS */
     background-size: cover;
     background-position: center;
-    /* Transição suave de 2s para o carrossel */
     transition: background-image 2s ease-in-out;
 }
 
@@ -748,8 +746,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     position: relative; 
     display: flex; 
     flex-direction: column; 
-    
-    /* ALTERAÇÃO DA FASE 2: Agora estica na ALTURA (Linhas) em vez da largura */
     grid-row: span var(--span-size, 1);
 }
 
@@ -816,7 +812,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 
 .card-image-box { 
     width: 100%; 
-    flex: 1; /* Estica a imagem se o card for maior na altura */
+    flex: 1; 
     min-height: 160px; 
     background: #f8fafc; 
     border-radius: 8px; 
@@ -1098,7 +1094,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
    MEDIA QUERIES PARA MOBILE (CELULARES) - RESPONSIVIDADE COMPLETA
 ========================================================================= */
 @media (max-width: 768px) {
-    /* Desliga a var(--span-size) no celular para não esticar verticalmente também */
     .compartimento-card {
         grid-row: span 1 !important;
     }
