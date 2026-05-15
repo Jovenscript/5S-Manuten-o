@@ -62,6 +62,11 @@ let pecaSendoMovidaId    = null;
 
 let usuarioAguardandoRedefinicao = null;
 
+// Variáveis do Carrossel de Imagens
+let carrosselInterval = null;
+let carrosselImagens  = [];
+let carrosselIndex    = 0;
+
 // =========================================================================
 // VALIDADOR DE SENHA FORTE (FASE 1)
 // =========================================================================
@@ -568,10 +573,13 @@ function mostrarTela(id) {
     if (scroll) scroll.scrollTo(0, 0);
 
     if (id === 'view-dashboard') {
+        iniciarCarrosselDashboard();
         setTimeout(() => {
             const inp = document.getElementById('input-busca-global');
             if (inp) inp.focus();
         }, 300);
+    } else {
+        pararCarrosselDashboard();
     }
 }
 
@@ -579,8 +587,54 @@ function voltarParaGavetas() { mostrarTela('view-gavetas'); }
 function sairDoSistema()     { location.reload(); }
 
 // =========================================================================
-// DASHBOARD, BUSCA GLOBAL E ARMÁRIO (FASE 3)
+// DASHBOARD, BUSCA GLOBAL, CARROSSEL E ARMÁRIO (FASE 3)
 // =========================================================================
+function atualizarImagensCarrossel() {
+    carrosselImagens = [];
+    database.drawers.forEach(gaveta => {
+        (database.items[gaveta.id] || []).forEach(peca => {
+            if (peca.image && peca.image.trim() !== '') {
+                carrosselImagens.push(peca.image);
+            }
+        });
+    });
+}
+
+function iniciarCarrosselDashboard() {
+    pararCarrosselDashboard();
+    atualizarImagensCarrossel();
+    
+    const wrapper = document.querySelector('.dashboard-wrapper');
+    if (!wrapper) return;
+
+    if (carrosselImagens.length === 0) {
+        wrapper.style.backgroundImage = 'none';
+        return;
+    }
+
+    if (carrosselIndex >= carrosselImagens.length) {
+        carrosselIndex = 0;
+    }
+
+    wrapper.style.backgroundImage = `url('${carrosselImagens[carrosselIndex]}')`;
+
+    // Troca a foto a cada 4.5 segundos
+    carrosselInterval = setInterval(() => {
+        carrosselIndex++;
+        if (carrosselIndex >= carrosselImagens.length) {
+            carrosselIndex = 0;
+        }
+        wrapper.style.backgroundImage = `url('${carrosselImagens[carrosselIndex]}')`;
+    }, 4500); 
+}
+
+function pararCarrosselDashboard() {
+    if (carrosselInterval) {
+        clearInterval(carrosselInterval);
+        carrosselInterval = null;
+    }
+}
+
 function buscarPecasGlobal() {
     const termo        = document.getElementById('input-busca-global').value.toLowerCase();
     const resultadosDiv = document.getElementById('resultados-busca-global');
@@ -637,6 +691,14 @@ function atualizarDashboard() {
     calcularKPIs();
     verificarEstoqueZerado();
     renderizarHistorico();
+    
+    // Atualiza o banco de imagens do carrossel se sofrer alteração do Firebase
+    atualizarImagensCarrossel();
+    const dashAtivo = document.getElementById('view-dashboard') && document.getElementById('view-dashboard').classList.contains('view-active');
+    if (dashAtivo && !carrosselInterval && carrosselImagens.length > 0) {
+        iniciarCarrosselDashboard();
+    }
+
     if (gavetaAtualAberta !== null) renderizarPecasDaGaveta(gavetaAtualAberta);
 }
 
@@ -1150,7 +1212,7 @@ function processarFormularioPedido() {
     let textoFinal = `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes para o nosso gaveteiro elétrico:\n\n`;
 
     window.itensFaltandoTemp.forEach((item, index) => {
-        const os   = document.getElementById(`os-${index}`).value   || 'Não informada';
+        const os   = document.getElementById(`os-${index}`).value    || 'Não informada';
         const almo = document.getElementById(`almo-${index}`).value;
 
         textoFinal += `- ${item.falta} un. | ${item.nome} (Item: ${item.codigo || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
