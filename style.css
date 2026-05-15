@@ -149,7 +149,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 
 /* =========================================================================
-   ESTRUTURA PRINCIPAL DO SISTEMA
+   ESTRUTURA PRINCIPAL DO SISTEMA E NAVEGAÇÃO
 ========================================================================= */
 #app-container.view-active { 
     display: flex; 
@@ -157,7 +157,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     width: 100%; 
 }
 
-/* Sidebar (Barra Lateral) */
 .sidebar { 
     width: 110px; 
     background: var(--sidebar-bg); 
@@ -218,7 +217,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     margin-bottom: 5px; 
 }
 
-/* Overlay do Menu Mobile */
 .menu-toggle-mobile { 
     display: none; 
     font-size: 1.5rem; 
@@ -239,7 +237,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
 
 .sidebar-overlay.open { display: block; }
 
-/* Área de Conteúdo */
 .content-area { 
     flex: 1; 
     display: flex; 
@@ -247,7 +244,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     overflow: hidden; 
 }
 
-/* Barra de Topo */
 .top-bar { 
     background: var(--main-bg); 
     height: 70px; 
@@ -292,60 +288,69 @@ body:not(.is-admin) .admin-only { display: none !important; }
 
 .main-padding { 
     flex: 1; 
-    padding: 2rem; 
+    /* Remove padding para o fundo do dashboard preencher tudo */
+    padding: 0; 
     overflow-y: auto; 
-    position: relative; /* para o background dinâmico do dashboard funcionar */
+    position: relative; 
+}
+
+/* Retorna o padding para as outras telas */
+#view-gavetas, #view-historico, #view-config, #view-compartimentos, #alerta-global-zerado {
+    padding: 2rem;
 }
 
 /* =========================================================================
-   FASE 3: DASHBOARD DE BUSCA (GLASSMORPHISM)
+   FASE 3: DASHBOARD DE BUSCA COM CARROSSEL E GLASSMORPHISM (CENTRALIZADO)
 ========================================================================= */
+/* Container ocupa todo o espaço com Flex para centralizar perfeitamente */
 .dashboard-wrapper {
-    min-height: calc(100vh - 120px);
+    min-height: calc(100vh - 70px); /* 70px da topbar */
     display: flex;
-    flex-direction: column;
+    justify-content: center;
     align-items: center;
-    border-radius: 12px;
-    padding: 4rem 1rem;
+    padding: 2rem;
     position: relative;
-    overflow: hidden;
-    /* Fundo tecnológico animado */
-    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    /* Fundo em carrossel usando CSS */
+    background-size: cover;
+    background-position: center;
+    animation: carrosselFundo 20s infinite linear;
 }
 
-/* Efeito de partículas/luzes no fundo para o dashboard */
-.dashboard-wrapper::before {
-    content: '';
+/* 3 Imagens industriais simulando um carrossel no fundo */
+@keyframes carrosselFundo {
+    0% { background-image: url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=2069&auto=format&fit=crop'); }
+    33% { background-image: url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop'); }
+    66% { background-image: url('https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070&auto=format&fit=crop'); }
+    100% { background-image: url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=2069&auto=format&fit=crop'); }
+}
+
+/* Camada escura por cima das fotos para dar leitura no painel de vidro */
+.dashboard-overlay {
     position: absolute;
-    top: -50%; left: -50%; width: 200%; height: 200%;
-    background: radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.15), transparent 60%);
-    animation: rotateBg 20s linear infinite;
-    pointer-events: none;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.65);
+    z-index: 1;
 }
 
-@keyframes rotateBg {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
+/* O Painel de Vidro Moderno */
 .glass-panel {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 20px;
     padding: 3rem;
     width: 100%;
-    max-width: 800px;
+    max-width: 750px;
     text-align: center;
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    z-index: 2;
+    z-index: 2; /* Fica acima do overlay escuro */
 }
 
 .search-box-container {
     position: relative;
     width: 100%;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 .search-icon {
@@ -354,25 +359,26 @@ body:not(.is-admin) .admin-only { display: none !important; }
     top: 50%;
     transform: translateY(-50%);
     font-size: 1.5rem;
-    color: #94a3b8;
+    color: #64748b;
 }
 
+/* A barra de pesquisa esticada */
 .search-input-glass {
     width: 100%;
-    padding: 1.5rem 1.5rem 1.5rem 60px;
+    padding: 1.2rem 1.2rem 1.2rem 60px;
     border-radius: 50px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    background: rgba(255, 255, 255, 0.85);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.9);
     font-size: 1.2rem;
     color: var(--text-primary);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     transition: all 0.3s ease;
     outline: none;
 }
 
 .search-input-glass:focus {
     background: #ffffff;
-    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.4);
+    box-shadow: 0 4px 25px rgba(56, 189, 248, 0.6);
     border-color: #38bdf8;
 }
 
@@ -380,18 +386,17 @@ body:not(.is-admin) .admin-only { display: none !important; }
     display: grid;
     grid-template-columns: 1fr;
     gap: 15px;
-    max-height: 400px;
+    max-height: 350px;
     overflow-y: auto;
-    padding-right: 10px;
+    padding-right: 5px;
 }
 
-/* Custom Scrollbar para o painel de resultados */
 .resultados-grid::-webkit-scrollbar { width: 8px; }
 .resultados-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 4px; }
-.resultados-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+.resultados-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 4px; }
 
 .resultado-card {
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.95);
     border-radius: 12px;
     padding: 1.2rem;
     display: flex;
@@ -405,7 +410,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 
 .resultado-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
     background: #ffffff;
 }
 
@@ -528,7 +533,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 
 /* =========================================================================
-   DASHBOARD (VISÃO GERAL DO ARMÁRIO) E ARMÁRIO VIRTUAL
+   VISÃO GERAL DO ARMÁRIO
 ========================================================================= */
 .relatorio-geral { 
     background: var(--main-bg); 
@@ -648,7 +653,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     text-align: left; 
 }
 
-/* Botões do ADM na Gaveta */
 .btn-edit-gaveta {
     background: rgba(255, 255, 255, 0.15);
     color: white;
@@ -668,7 +672,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     background: rgba(255, 255, 255, 0.3); 
 }
 
-/* Detalhe do puxador da gaveta */
 .btn-gaveta::after { 
     content: ""; 
     position: absolute; 
@@ -682,7 +685,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     box-shadow: 0 3px 5px rgba(0,0,0,0.4); 
 }
 
-/* Luzes indicadoras das gavetas */
 .gstatus-light { 
     width: 18px; 
     height: 18px; 
@@ -784,7 +786,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     font-size: 0.8rem; 
 }
 
-/* Botões do ADM no Card da Peça */
 .btn-edit-peca { 
     background: #e0f2fe; 
     color: #0284c7; 
@@ -1185,7 +1186,28 @@ body:not(.is-admin) .admin-only { display: none !important; }
         font-size: 16px; 
     }
 
-    .main-padding { padding: 1rem; }
+    /* Remove o padding do Dashboard no mobile para a imagem ficar na tela toda */
+    .dashboard-wrapper {
+        padding: 1rem;
+        min-height: calc(100vh - 60px);
+    }
+    
+    .glass-panel {
+        padding: 1.5rem;
+    }
+    
+    .glass-panel h2 {
+        font-size: 1.8rem !important;
+    }
+    
+    .search-input-glass {
+        padding: 1rem 1rem 1rem 50px;
+        font-size: 1rem;
+    }
+
+    #view-gavetas, #view-historico, #view-config, #view-compartimentos, #alerta-global-zerado {
+        padding: 1rem;
+    }
     
     .kpi-grid { 
         flex-direction: column; 
@@ -1221,7 +1243,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
         flex-direction: column; 
         gap: 10px; 
         text-align: center; 
-        padding: 1rem; 
     }
     
     #titulo-gaveta-aberta { 
