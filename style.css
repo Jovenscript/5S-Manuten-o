@@ -306,7 +306,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
     position: relative;
     background-size: cover;
     background-position: center;
-    transition: background-image 2s ease-in-out;
+    transition: background-image 1.5s ease-in-out; /* Animação suave entre fotos */
 }
 
 .dashboard-overlay {
