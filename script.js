@@ -60,6 +60,16 @@ let gavetaSendoEditadaId = null;
 let pecaSendoEditadaId   = null;
 let pecaSendoMovidaId    = null;
 
+let usuarioAguardandoRedefinicao = null;
+
+// =========================================================================
+// VALIDADOR DE SENHA FORTE (FASE 1)
+// =========================================================================
+function validarSenhaForte(senha) {
+    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    return regex.test(senha);
+}
+
 // =========================================================================
 // CLOUDINARY — UPLOAD DE IMAGEM
 // =========================================================================
@@ -114,7 +124,7 @@ async function salvarItensDaGaveta(idGaveta) {
 }
 
 // =========================================================================
-// INICIALIZAÇÃO, MIGRAÇÃO E SINCRONIZAÇÃO FIREBASE
+// INICIALIZAÇÃO E MIGRAÇÃO
 // =========================================================================
 window.onload = () => {
     iniciarSincronizacaoFirebase();
@@ -157,6 +167,9 @@ function setupListeners() {
                 if (p.requested   === undefined) p.requested   = false;
                 if (p.lastTakenBy === undefined) p.lastTakenBy = null;
                 if (p.position    === undefined) p.position    = 999; 
+                // FASE 2: Garantindo as chaves nas peças antigas
+                if (p.divisoria   === undefined) p.divisoria   = 'Geral'; 
+                if (p.size        === undefined) p.size        = 1; 
             });
             atualizarSeLogado();
         });
@@ -171,18 +184,18 @@ function atualizarSeLogado() {
 }
 
 async function migrarDadosLegados() {
-    if (localStorage.getItem('5s_migrado_v2')) return; 
+    if (localStorage.getItem('5s_migrado_v3')) return; 
 
     try {
         const legadoSnap = await getDoc(doc(db, "manutencao_5s", "dados_sistema"));
         const configSnap = await getDoc(doc(db, "manutencao_5s", "config"));
 
         if (!legadoSnap.exists() || configSnap.exists()) {
-            localStorage.setItem('5s_migrado_v2', 'true'); 
+            localStorage.setItem('5s_migrado_v3', 'true'); 
             return;
         }
 
-        console.log("Migrando dados legados para nova estrutura...");
+        console.log("Migrando dados legados...");
         const legado    = legadoSnap.data();
         const db_legado = legado.database || {};
 
@@ -197,12 +210,12 @@ async function migrarDadosLegados() {
 
         for (const gaveta of GAVETAS_PADRAO) {
             const itens = ((db_legado.items || {})[gaveta.id] || []).map(p => ({
-                ...p, image: null, position: 999
+                ...p, image: null, position: 999, divisoria: 'Geral', size: 1
             }));
             await setDoc(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), { items: itens });
         }
 
-        localStorage.setItem('5s_migrado_v2', 'true'); 
+        localStorage.setItem('5s_migrado_v3', 'true'); 
         console.log("Migração concluída.");
     } catch (e) {
         console.warn("Aviso na migração:", e);
@@ -210,7 +223,7 @@ async function migrarDadosLegados() {
 }
 
 // =========================================================================
-// EVENTOS E AUTORIZAÇÃO
+// EVENTOS, AUTORIZAÇÃO E LOGIN
 // =========================================================================
 function configurarEventosEnter() {
     const map = [
@@ -221,7 +234,8 @@ function configurarEventosEnter() {
         { inputId: 'conf-qtd-atual',    btnAcao: salvarConferencia    },
         { inputId: 'edit-gaveta-nome',  btnAcao: salvarNomeGaveta     },
         { inputId: 'novo-atual',        btnAcao: salvarNovoItem       },
-        { inputId: 'edit-peca-atual',   btnAcao: salvarEdicaoPeca     }
+        { inputId: 'edit-peca-atual',   btnAcao: salvarEdicaoPeca     },
+        { inputId: 'nova-senha-confirma', btnAcao: salvarSenhaObrigatoria }
     ];
     map.forEach(item => {
         const el = document.getElementById(item.inputId);
@@ -238,154 +252,10 @@ function autorizarDispositivo() {
         document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
         document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
     } else {
-        mostrarAlerta('Acesso Negado', 'Chave mestre incorreta. Solicite autorização ao Administrador da Manutenção.');
+        mostrarAlerta('Acesso Negado', 'Chave mestre incorreta.');
     }
 }
 
-// =========================================================================
-// BACKUP E PLANILHAS CSV
-// =========================================================================
-function fazerBackup() {
-    const data    = { database, usuarios: usuariosSalvos, historico: historicoLogs };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
-    const a       = document.createElement('a');
-    a.setAttribute("href", dataStr);
-    a.setAttribute("download", "backup_5s_manutencao_" + new Date().getTime() + ".json");
-    document.body.appendChild(a); a.click(); a.remove();
-    registrarLog("fez o download do arquivo de backup do sistema");
-}
-
-async function restaurarBackup(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const c = JSON.parse(e.target.result);
-            if (c.database)  database       = c.database;
-            if (c.usuarios)  usuariosSalvos = c.usuarios;
-            if (c.historico) historicoLogs  = c.historico;
-            await salvarConfig();
-            await salvarHistorico();
-            for (const g of database.drawers) await salvarItensDaGaveta(g.id);
-            mostrarAlerta('Sucesso', 'Backup restaurado com sucesso para a nuvem!');
-            registrarLog("restaurou um arquivo de backup no sistema");
-            atualizarDashboard();
-        } catch { mostrarAlerta('Erro', 'O arquivo selecionado é inválido ou está corrompido.'); }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
-}
-
-function exportarEstoqueCSV() {
-    let csv = "data:text/csv;charset=utf-8,\uFEFF";
-    csv += "Gaveta,Codigo_Local,Peca,Posicao,Padrao_5S,Fisica_Atual,Status\n";
-    database.drawers.forEach(gaveta => {
-        (database.items[gaveta.id] || []).forEach(peca => {
-            const s = getStatusText(getPecaStatus(peca));
-            const pos = (peca.position && peca.position !== 999) ? peca.position : "-";
-            csv += `"${gaveta.label} - ${gaveta.title}","${peca.code || ''}","${peca.name}",${pos},${peca.expected},${peca.current},"${s}"\n`;
-        });
-    });
-    baixarArquivoCSV(csv, "estoque_atual_5s.csv");
-    registrarLog("exportou a planilha Excel de Estoque");
-}
-
-function exportarHistoricoCSV() {
-    let csv = "data:text/csv;charset=utf-8,\uFEFF";
-    csv += "Data_Hora,Usuario,Acao\n";
-    historicoLogs.forEach(log => {
-        csv += `"${log.data}","${log.usuario}","${log.acao.replace(/"/g, '""')}"\n`;
-    });
-    baixarArquivoCSV(csv, "historico_atividades_5s.csv");
-    registrarLog("exportou a planilha Excel do Histórico");
-}
-
-function baixarArquivoCSV(content, filename) {
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(content));
-    link.setAttribute("download", filename);
-    document.body.appendChild(link); link.click(); link.remove();
-}
-
-// =========================================================================
-// LOGS
-// =========================================================================
-function registrarLog(acao) {
-    const dataAtual = new Date();
-    const dataFormatada = dataAtual.toLocaleDateString('pt-BR') + ' às ' + dataAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    historicoLogs.unshift({ id: Date.now(), usuario: usuarioLogado ? usuarioLogado.nome : 'Sistema', acao, data: dataFormatada });
-    if (historicoLogs.length > 500) historicoLogs.pop();
-    salvarHistorico();
-}
-
-function renderizarHistorico() {
-    const container = document.getElementById('lista-historico');
-    if (!container) return;
-    container.innerHTML = '';
-    if (historicoLogs.length === 0) {
-        container.innerHTML = '<p style="color:#64748b;text-align:center;padding:20px;">Nenhum registro encontrado ainda.</p>';
-        return;
-    }
-    historicoLogs.forEach(log => {
-        const div = document.createElement('div');
-        div.className = 'log-item';
-        div.innerHTML = `<div class="log-time"><i class="fa-regular fa-calendar"></i> ${log.data}</div><div class="log-text"><strong>${log.usuario}</strong> ${log.acao}</div>`;
-        container.appendChild(div);
-    });
-}
-
-// =========================================================================
-// NOTIFICAÇÕES
-// =========================================================================
-function solicitarPermissaoNotificacao() {
-    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-        Notification.requestPermission();
-    }
-}
-function enviarNotificacao(titulo, mensagem) {
-    if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(titulo, { body: mensagem, icon: "https://cdn-icons-png.flaticon.com/512/825/825503.png" });
-    }
-}
-
-// =========================================================================
-// MENU MOBILE E CORES
-// =========================================================================
-function toggleMenuMobile() {
-    document.getElementById('sidebar-menu').classList.toggle('open');
-    document.getElementById('mobile-overlay').classList.toggle('open');
-}
-
-function getPecaStatus(peca) {
-    if (peca.requested)               return 'amarelo';
-    if (peca.current === 0)           return 'vermelho';
-    if (peca.current < peca.expected) return 'laranja';
-    return 'verde';
-}
-
-function getGavetaStatus(pecas) {
-    if (!pecas || pecas.length === 0) return 'verde';
-    let v = false, l = false, a = false;
-    pecas.forEach(p => {
-        const s = getPecaStatus(p);
-        if (s === 'vermelho') v = true;
-        if (s === 'laranja')  l = true;
-        if (s === 'amarelo')  a = true;
-    });
-    if (v) return 'vermelho';
-    if (l) return 'laranja';
-    if (a) return 'amarelo';
-    return 'verde';
-}
-
-function getStatusText(status) {
-    return { verde: 'Estoque Cheio', amarelo: 'Requisitado', laranja: 'Poucas Peças', vermelho: 'Sem Estoque' }[status] || '';
-}
-
-// =========================================================================
-// LOGIN E USUÁRIOS
-// =========================================================================
 function alternarTelaLogin() {
     const fe = document.getElementById('form-entrar');
     const fr = document.getElementById('form-registrar');
@@ -402,8 +272,14 @@ function registrarUsuario() {
     const nome   = document.getElementById('reg-nome').value.trim();
     const cracha = document.getElementById('reg-cracha').value.trim();
     const senha  = document.getElementById('reg-senha').value.trim();
+    
     if (!nome || !cracha || !senha) return mostrarAlerta('Erro', 'Preencha todos os campos!');
-    if (usuariosSalvos.find(u => u.cracha === cracha)) return mostrarAlerta('Erro', 'Crachá já cadastrado! Volte ao login.');
+    if (usuariosSalvos.find(u => u.cracha === cracha)) return mostrarAlerta('Erro', 'Crachá já cadastrado!');
+    
+    if (!validarSenhaForte(senha)) {
+        return mostrarAlerta('Senha Fraca', 'A senha deve ter no mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo.');
+    }
+
     const novoUser = { nome, cracha, senha, role: 'USER' };
     usuariosSalvos.push(novoUser);
     salvarConfig();
@@ -414,13 +290,48 @@ function realizarLogin() {
     const id    = document.getElementById('input-login-id').value.trim();
     const senha = document.getElementById('input-login-senha').value.trim();
     if (!id || !senha) return mostrarAlerta('Erro', 'Preencha os dados de acesso.');
+    
     if (id === ADMIN_CREDENTIALS.login && senha === ADMIN_CREDENTIALS.senha) {
         aplicarLogin({ nome: 'Administrador', cracha: 'Admin', role: 'ADMIN' });
         return;
     }
+    
     const user = usuariosSalvos.find(u => u.cracha === id && u.senha === senha);
-    if (user) aplicarLogin(user);
-    else mostrarAlerta('Acesso Negado', 'Crachá ou Senha incorretos. Tente novamente.');
+    if (!user) return mostrarAlerta('Acesso Negado', 'Crachá ou Senha incorretos.');
+
+    if (!validarSenhaForte(user.senha)) {
+        usuarioAguardandoRedefinicao = user;
+        document.getElementById('modal-redefinir-senha').classList.remove('view-hidden');
+        return; 
+    }
+
+    aplicarLogin(user);
+}
+
+async function salvarSenhaObrigatoria() {
+    const novaSenha = document.getElementById('nova-senha-obrigatoria').value.trim();
+    const confirma = document.getElementById('nova-senha-confirma').value.trim();
+
+    if (novaSenha !== confirma) return mostrarAlerta('Erro', 'As senhas não coincidem.');
+    if (!validarSenhaForte(novaSenha)) return mostrarAlerta('Senha Fraca', 'A nova senha não atende aos requisitos.');
+
+    usuarioAguardandoRedefinicao.senha = novaSenha;
+    await salvarConfig();
+
+    document.getElementById('nova-senha-obrigatoria').value = '';
+    document.getElementById('nova-senha-confirma').value = '';
+    document.getElementById('modal-redefinir-senha').classList.add('view-hidden');
+
+    registrarLog(`atualizou a própria senha para o novo padrão corporativo.`);
+    aplicarLogin(usuarioAguardandoRedefinicao);
+    usuarioAguardandoRedefinicao = null;
+}
+
+function cancelarRedefinicaoSenha() {
+    usuarioAguardandoRedefinicao = null;
+    document.getElementById('nova-senha-obrigatoria').value = '';
+    document.getElementById('nova-senha-confirma').value = '';
+    document.getElementById('modal-redefinir-senha').classList.add('view-hidden');
 }
 
 function aplicarLogin(user) {
@@ -440,29 +351,93 @@ function aplicarLogin(user) {
     document.getElementById('reg-senha').value = '';
     solicitarPermissaoNotificacao();
     atualizarDashboard();
+    
+    // FASE 3: Ao logar, vai sempre direto para o Dashboard moderno!
+    mostrarTela('view-dashboard');
 }
 
 // =========================================================================
-// NAVEGAÇÃO
+// NAVEGAÇÃO E REGRAS DE LAYOUT
 // =========================================================================
 function mostrarTela(id) {
-    ['view-gavetas','view-compartimentos','view-historico','view-config'].forEach(v => {
+    ['view-dashboard','view-gavetas','view-compartimentos','view-historico','view-config'].forEach(v => {
         document.getElementById(v).classList.replace('view-active', 'view-hidden');
     });
+    
     document.getElementById(id).classList.replace('view-hidden', 'view-active');
+    
+    const links = document.querySelectorAll('.nav-item');
+    links.forEach(l => l.classList.remove('active'));
+    event && event.currentTarget ? event.currentTarget.classList.add('active') : null;
+
     document.getElementById('sidebar-menu').classList.remove('open');
     document.getElementById('mobile-overlay').classList.remove('open');
-    if (id === 'view-gavetas')   gavetaAtualAberta = null;
+    
+    if (id === 'view-gavetas' || id === 'view-dashboard') gavetaAtualAberta = null;
     if (id === 'view-historico') renderizarHistorico();
+    
     window.scrollTo(0, 0);
+    
+    // Foco automático na busca global se for o dashboard
+    if(id === 'view-dashboard') {
+        setTimeout(() => document.getElementById('input-busca-global').focus(), 300);
+    }
 }
 
 function voltarParaGavetas() { mostrarTela('view-gavetas'); }
 function sairDoSistema()     { location.reload(); }
 
 // =========================================================================
-// DASHBOARD E RENDERIZAÇÃO
+// DASHBOARD, BUSCA GLOBAL E ARMÁRIO (FASE 3)
 // =========================================================================
+function buscarPecasGlobal() {
+    const termo = document.getElementById('input-busca-global').value.toLowerCase();
+    const resultadosDiv = document.getElementById('resultados-busca-global');
+    resultadosDiv.innerHTML = '';
+    
+    if(termo.length < 2) {
+        resultadosDiv.classList.add('view-hidden');
+        return;
+    }
+    
+    let achados = [];
+    database.drawers.forEach(gaveta => {
+        (database.items[gaveta.id] || []).forEach(peca => {
+            if(peca.name.toLowerCase().includes(termo) || (peca.code && peca.code.toLowerCase().includes(termo))) {
+                achados.push({ gaveta, peca });
+            }
+        });
+    });
+
+    if(achados.length === 0) {
+        resultadosDiv.innerHTML = '<p style="color: white; padding: 20px;">Nenhum item encontrado.</p>';
+        resultadosDiv.classList.remove('view-hidden');
+        return;
+    }
+
+    achados.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'resultado-card';
+        div.onclick = () => {
+            document.getElementById('input-busca-global').value = '';
+            resultadosDiv.classList.add('view-hidden');
+            abrirGaveta(item.gaveta.id);
+        };
+        div.innerHTML = `
+            <div class="res-info">
+                <h4>${item.peca.name}</h4>
+                <p>Item: ${item.peca.code || 'S/N'} &nbsp;|&nbsp; <strong>${item.gaveta.label}</strong> (Div: ${item.peca.divisoria || 'Geral'} - Pos: ${item.peca.position === 999 ? 'Livre' : item.peca.position})</p>
+            </div>
+            <div class="res-tag">
+                <i class="fa-solid fa-box-open"></i> ${item.peca.current} un
+            </div>
+        `;
+        resultadosDiv.appendChild(div);
+    });
+    
+    resultadosDiv.classList.remove('view-hidden');
+}
+
 function atualizarDashboard() {
     renderArmarioVertical();
     calcularKPIs();
@@ -523,29 +498,8 @@ function renderArmarioVertical() {
     });
 }
 
-function abrirModalEditarGaveta(eventoClick, idGaveta) {
-    eventoClick.stopPropagation();
-    gavetaSendoEditadaId = idGaveta;
-    const gaveta = database.drawers.find(d => d.id === idGaveta);
-    document.getElementById('edit-gaveta-nome').value = gaveta.title;
-    document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
-    setTimeout(() => document.getElementById('edit-gaveta-nome').focus(), 100);
-}
-function fecharModalEditarGaveta() { document.getElementById('modal-editar-gaveta').classList.add('view-hidden'); }
-
-function salvarNomeGaveta() {
-    const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
-    if (!novoNome) return mostrarAlerta('Atenção', 'O nome da gaveta não pode ficar vazio.');
-    const gaveta     = database.drawers.find(d => d.id === gavetaSendoEditadaId);
-    const nomeAntigo = gaveta.title;
-    gaveta.title     = novoNome;
-    registrarLog(`alterou o nome da gaveta ${gaveta.label} de "${nomeAntigo}" para "${novoNome}"`);
-    salvarConfig();
-    fecharModalEditarGaveta();
-}
-
 // =========================================================================
-// DENTRO DA GAVETA (RENDERIZAÇÃO COM ORDENAÇÃO)
+// FASE 2: DENTRO DA GAVETA (RENDERIZAÇÃO COM DIVISÓRIAS E TAMANHO)
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
@@ -556,63 +510,95 @@ function abrirGaveta(idGaveta) {
 }
 
 function renderizarPecasDaGaveta(idGaveta) {
-    const grid  = document.getElementById('grid-pecas');
-    grid.innerHTML = '';
+    const mainContainer = document.getElementById('container-divisorias');
+    mainContainer.innerHTML = '';
     const pecasBrutas = database.items[idGaveta] || [];
 
     if (pecasBrutas.length === 0) {
-        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#64748b;font-size:1.1rem;padding:40px;">Nenhuma peça cadastrada nesta gaveta.</p>';
+        mainContainer.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.1rem; padding:40px;">Nenhuma peça cadastrada nesta gaveta.</p>';
         return;
     }
 
-    const pecasOrdenadas = [...pecasBrutas].sort((a, b) => (a.position || 999) - (b.position || 999));
+    // 1. Agrupar peças por Divisória
+    const grupos = {};
+    pecasBrutas.forEach(peca => {
+        const divi = (peca.divisoria || 'Geral').toUpperCase();
+        if(!grupos[divi]) grupos[divi] = [];
+        grupos[divi].push(peca);
+    });
 
-    pecasOrdenadas.forEach(peca => {
-        const statusPeca   = getPecaStatus(peca);
-        const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
-        const imgHtml      = peca.image ? `<img src="${peca.image}" alt="${peca.name}">` : `<i class="fa-solid fa-microchip"></i>`;
-        const retiradaHtml = peca.lastTakenBy
-            ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
-            
-        const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
+    // 2. Ordenar as Divisórias alfabeticamente
+    const nomesDivisorias = Object.keys(grupos).sort();
 
-        const div = document.createElement('div');
-        div.className = 'compartimento-card';
-        div.innerHTML = `
-            <div class="card-top">
-                <div>
-                    <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
-                    <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
-                    <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
+    // 3. Renderizar cada Divisória e seu respectivo Grid
+    nomesDivisorias.forEach(nomeDivisoria => {
+        
+        // Renderiza o Título da Divisória
+        const headerDivi = document.createElement('div');
+        headerDivi.className = 'divisoria-header';
+        headerDivi.innerHTML = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
+        mainContainer.appendChild(headerDivi);
+
+        // Cria o Grid dessa divisória
+        const gridDivi = document.createElement('div');
+        gridDivi.className = 'grid-pecas';
+        
+        // Ordena as peças da divisória por posição
+        const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
+
+        pecasOrdenadas.forEach(peca => {
+            const statusPeca   = getPecaStatus(peca);
+            const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
+            const imgHtml      = peca.image ? `<img src="${peca.image}" alt="${peca.name}">` : `<i class="fa-solid fa-microchip"></i>`;
+            const retiradaHtml = peca.lastTakenBy
+                ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
+                
+            const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
+            const displaySize = peca.size || 1;
+
+            const div = document.createElement('div');
+            div.className = 'compartimento-card';
+            // CSS Variable injected for the grid layout sizing
+            div.style.setProperty('--span-size', displaySize);
+
+            div.innerHTML = `
+                <div class="card-top">
+                    <div>
+                        <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
+                        <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
                 </div>
-                <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
-            </div>
-            <div class="card-title">${peca.name}</div>
-            <div class="card-image-box">${imgHtml}</div>
-            <div class="card-data-row">
-                <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
-                <div class="data-box">
-                    <span>Física Atual</span>
-                    <div class="quick-control">
-                        <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                        <strong style="color:${corQtd}">${peca.current}</strong>
-                        <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                <div class="card-title">${peca.name}</div>
+                <div class="card-image-box">${imgHtml}</div>
+                <div class="card-data-row">
+                    <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
+                    <div class="data-box">
+                        <span>Física Atual</span>
+                        <div class="quick-control">
+                            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                            <strong style="color:${corQtd}">${peca.current}</strong>
+                            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            ${retiradaHtml}
-            <div class="botoes-acao-card">
-                <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
-                    <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
-                </button>
-                <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
-                    <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
-                </button>
-                <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
-                    <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
-                </button>
-            </div>`;
-        grid.appendChild(div);
+                ${retiradaHtml}
+                <div class="botoes-acao-card">
+                    <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
+                        <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
+                    </button>
+                    <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
+                        <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
+                    </button>
+                    <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
+                        <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
+                    </button>
+                </div>`;
+            gridDivi.appendChild(div);
+        });
+
+        mainContainer.appendChild(gridDivi);
     });
 }
 
@@ -690,12 +676,14 @@ async function confirmarMoverPeca() {
 }
 
 // =========================================================================
-// GERENCIAMENTO DE PEÇAS E POSIÇÃO
+// GERENCIAMENTO DE PEÇAS E POSIÇÃO (ATUALIZADO FASE 2)
 // =========================================================================
 function abrirModalCadastro() {
     ['novo-codigo','novo-nome', 'novo-posicao'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('novo-esperado').value = '1';
     document.getElementById('novo-atual').value    = '0';
+    document.getElementById('novo-divisoria').value = 'Geral';
+    document.getElementById('novo-tamanho').value  = '1';
     document.getElementById('novo-imagem').value   = '';
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
     setTimeout(() => document.getElementById('novo-nome').focus(), 100);
@@ -708,6 +696,8 @@ async function salvarNovoItem() {
     const esperado = parseInt(document.getElementById('novo-esperado').value);
     const atual    = parseInt(document.getElementById('novo-atual').value);
     const posicao  = parseInt(document.getElementById('novo-posicao').value) || 999;
+    const divisoria = document.getElementById('novo-divisoria').value.trim() || 'Geral';
+    const tamanho  = parseInt(document.getElementById('novo-tamanho').value) || 1;
     const imgInput = document.getElementById('novo-imagem');
 
     if (!nome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
@@ -720,6 +710,8 @@ async function salvarNovoItem() {
         code: codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
         name: nome, expected: esperado, current: atual,
         position: posicao,
+        divisoria: divisoria,
+        size: tamanho,
         requested: false, lastTakenBy: null, image: null
     };
 
@@ -733,7 +725,7 @@ async function salvarNovoItem() {
     }
 
     database.items[gavetaAtualAberta].push(novaPeca);
-    registrarLog(`cadastrou a nova peça "${novaPeca.name}" (Item: ${novaPeca.code}) na Posição ${posicao === 999 ? 'Livre' : posicao}.`);
+    registrarLog(`cadastrou "${novaPeca.name}" na Divisória ${divisoria}.`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     fecharModalCadastro();
 
@@ -749,6 +741,8 @@ function abrirModalEditarPeca(idPeca) {
     document.getElementById('edit-peca-atual').value    = peca.current;
     
     document.getElementById('edit-peca-posicao').value  = (peca.position && peca.position !== 999) ? peca.position : '';
+    document.getElementById('edit-peca-divisoria').value = peca.divisoria || 'Geral';
+    document.getElementById('edit-peca-tamanho').value   = peca.size || 1;
     
     document.getElementById('edit-peca-imagem').value   = '';
     document.getElementById('modal-editar-peca').classList.remove('view-hidden');
@@ -762,6 +756,8 @@ async function salvarEdicaoPeca() {
     const novoEsperado = parseInt(document.getElementById('edit-peca-esperado').value);
     const novoAtual    = parseInt(document.getElementById('edit-peca-atual').value);
     const novaPosicao  = parseInt(document.getElementById('edit-peca-posicao').value) || 999;
+    const novaDivisoria = document.getElementById('edit-peca-divisoria').value.trim() || 'Geral';
+    const novoTamanho  = parseInt(document.getElementById('edit-peca-tamanho').value) || 1;
     const imgInput     = document.getElementById('edit-peca-imagem');
 
     if (!novoNome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
@@ -776,6 +772,8 @@ async function salvarEdicaoPeca() {
     peca.expected = novoEsperado;
     peca.current  = novoAtual;
     peca.position = novaPosicao;
+    peca.divisoria = novaDivisoria;
+    peca.size     = novoTamanho;
     
     if (peca.current >= peca.expected) peca.requested = false;
 
@@ -825,7 +823,7 @@ function mostrarAlerta(titulo, mensagem) {
 function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
 // =========================================================================
-// NOVO GERADOR DE PEDIDO (FORMULÁRIO INTELIGENTE)
+// GERADOR DE PEDIDO (FORMULÁRIO INTELIGENTE)
 // =========================================================================
 function gerarEmailPedido() {
     const containerItens = document.getElementById('formulario-pedido-itens');
@@ -999,3 +997,6 @@ window.fecharModalMoverPeca      = fecharModalMoverPeca;
 window.confirmarMoverPeca        = confirmarMoverPeca;
 window.toggleCompradoFora        = toggleCompradoFora;
 window.processarFormularioPedido = processarFormularioPedido;
+window.salvarSenhaObrigatoria    = salvarSenhaObrigatoria;
+window.cancelarRedefinicaoSenha  = cancelarRedefinicaoSenha;
+window.buscarPecasGlobal         = buscarPecasGlobal;
