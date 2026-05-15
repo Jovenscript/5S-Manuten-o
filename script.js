@@ -598,6 +598,15 @@ function atualizarImagensCarrossel() {
             }
         });
     });
+
+    // SISTEMA DE BACKUP: Se não houver nenhuma foto cadastrada no banco, utiliza estas 3 fotos industriais de alta qualidade
+    if (carrosselImagens.length === 0) {
+        carrosselImagens = [
+            'https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop',
+            'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070&auto=format&fit=crop',
+            'https://images.unsplash.com/photo-1631281956016-30c1e85cae92?q=80&w=2070&auto=format&fit=crop'
+        ];
+    }
 }
 
 function iniciarCarrosselDashboard() {
@@ -606,11 +615,6 @@ function iniciarCarrosselDashboard() {
     
     const wrapper = document.querySelector('.dashboard-wrapper');
     if (!wrapper) return;
-
-    if (carrosselImagens.length === 0) {
-        wrapper.style.backgroundImage = 'none';
-        return;
-    }
 
     if (carrosselIndex >= carrosselImagens.length) {
         carrosselIndex = 0;
