@@ -61,7 +61,6 @@ let pecaSendoEditadaId   = null;
 let pecaSendoMovidaId    = null;
 
 let usuarioAguardandoRedefinicao = null;
-let carrosselInterval = null;
 
 // =========================================================================
 // VALIDADOR DE SENHA FORTE (FASE 1)
@@ -69,6 +68,106 @@ let carrosselInterval = null;
 function validarSenhaForte(senha) {
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
     return regex.test(senha);
+}
+
+// =========================================================================
+// HELPERS DE STATUS
+// =========================================================================
+function getGavetaStatus(pecas) {
+    if (!pecas || pecas.length === 0) return 'verde';
+    const temZerado  = pecas.some(p => p.current === 0);
+    const temCritico = pecas.some(p => p.current > 0 && p.current < p.expected * 0.25);
+    const temBaixo   = pecas.some(p => p.current > 0 && p.current < p.expected * 0.5);
+    const temAlerta  = pecas.some(p => p.current < p.expected);
+    if (temZerado)  return 'vermelho';
+    if (temCritico) return 'laranja';
+    if (temBaixo)   return 'amarelo';
+    if (temAlerta)  return 'amarelo';
+    return 'verde';
+}
+
+function getPecaStatus(peca) {
+    if (peca.current === 0)                          return 'vermelho';
+    if (peca.current < peca.expected * 0.25)         return 'laranja';
+    if (peca.current < peca.expected * 0.5)          return 'amarelo';
+    if (peca.current < peca.expected)                return 'amarelo';
+    return 'verde';
+}
+
+function getStatusText(status) {
+    const map = {
+        verde:    'OK',
+        amarelo:  'Atenção',
+        laranja:  'Crítico',
+        vermelho: 'Zerado'
+    };
+    return map[status] || 'OK';
+}
+
+// =========================================================================
+// HISTÓRICO / LOGS
+// =========================================================================
+function registrarLog(acao) {
+    const agora = new Date();
+    const data  = agora.toLocaleDateString('pt-BR');
+    const hora  = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const nome  = usuarioLogado ? usuarioLogado.nome : 'Sistema';
+
+    historicoLogs.unshift({ data, hora, nome, acao });
+    if (historicoLogs.length > 200) historicoLogs = historicoLogs.slice(0, 200);
+    salvarHistorico();
+}
+
+function renderizarHistorico() {
+    const lista = document.getElementById('lista-historico');
+    if (!lista) return;
+    lista.innerHTML = '';
+
+    if (!historicoLogs || historicoLogs.length === 0) {
+        lista.innerHTML = '<p style="text-align:center;color:#64748b;padding:30px;">Nenhuma atividade registrada ainda.</p>';
+        return;
+    }
+
+    historicoLogs.forEach(log => {
+        const div = document.createElement('div');
+        div.className = 'log-item';
+        div.innerHTML = `
+            <span class="log-time">${log.data} ${log.hora}</span>
+            <span class="log-text"><strong>${log.nome}</strong> ${log.acao}</span>
+        `;
+        lista.appendChild(div);
+    });
+}
+
+// =========================================================================
+// NOTIFICAÇÕES (Web Push API)
+// =========================================================================
+function solicitarPermissaoNotificacao() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+    }
+}
+
+function enviarNotificacao(titulo, corpo) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        try {
+            new Notification(titulo, { body: corpo, icon: '/icon-192.png' });
+        } catch (e) {
+            // Ignora erros de notificação silenciosamente
+        }
+    }
+}
+
+// =========================================================================
+// MENU MOBILE
+// =========================================================================
+function toggleMenuMobile() {
+    const sidebar = document.getElementById('sidebar-menu');
+    const overlay = document.getElementById('mobile-overlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
 }
 
 // =========================================================================
@@ -87,7 +186,7 @@ async function uploadImagemCloudinary(file) {
     }
 
     const data = await response.json();
-    return data.secure_url; 
+    return data.secure_url;
 }
 
 // =========================================================================
@@ -125,7 +224,91 @@ async function salvarItensDaGaveta(idGaveta) {
 }
 
 // =========================================================================
-// INICIALIZAÇÃO E MIGRAÇÃO
+// BACKUP, RESTAURAR E EXPORTAR CSV
+// =========================================================================
+function fazerBackup() {
+    const payload = {
+        versao: 'v3',
+        geradoEm: new Date().toISOString(),
+        database,
+        usuarios: usuariosSalvos,
+        historico: historicoLogs
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `backup_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    registrarLog('gerou um arquivo de backup do sistema.');
+}
+
+function restaurarBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const dados = JSON.parse(e.target.result);
+            if (!dados.database || !dados.usuarios) {
+                return mostrarAlerta('Arquivo Inválido', 'O arquivo selecionado não é um backup válido do sistema.');
+            }
+            database       = dados.database;
+            usuariosSalvos = dados.usuarios;
+            historicoLogs  = dados.historico || [];
+
+            await salvarConfig();
+            await salvarHistorico();
+            for (const gaveta of GAVETAS_PADRAO) {
+                await salvarItensDaGaveta(gaveta.id);
+            }
+            registrarLog('restaurou o sistema a partir de um arquivo de backup.');
+            mostrarAlerta('Sucesso', 'Backup restaurado com sucesso! O sistema foi atualizado.');
+            atualizarDashboard();
+        } catch (err) {
+            mostrarAlerta('Erro de Leitura', 'Não foi possível ler o arquivo. Verifique se é um JSON válido.');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+function exportarEstoqueCSV() {
+    let csv = 'Gaveta;Label;Divisória;Código;Nome;Padrão 5S;Qtd Atual;Status;Requisitado\n';
+    database.drawers.forEach(gaveta => {
+        (database.items[gaveta.id] || []).forEach(p => {
+            const status = getStatusText(getPecaStatus(p));
+            csv += `"${gaveta.title}";"${gaveta.label}";"${p.divisoria || 'Geral'}";"${p.code || ''}";"${p.name}";${p.expected};${p.current};"${status}";"${p.requested ? 'Sim' : 'Não'}"\n`;
+        });
+    });
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `estoque_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    registrarLog('exportou o relatório de estoque em CSV.');
+}
+
+function exportarHistoricoCSV() {
+    let csv = 'Data;Hora;Usuário;Ação\n';
+    historicoLogs.forEach(log => {
+        csv += `"${log.data}";"${log.hora}";"${log.nome}";"${log.acao}"\n`;
+    });
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `historico_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    registrarLog('exportou o histórico de atividades em CSV.');
+}
+
+// =========================================================================
+// INICIALIZAÇÃO, MIGRAÇÃO E SINCRONIZAÇÃO FIREBASE
 // =========================================================================
 window.onload = () => {
     iniciarSincronizacaoFirebase();
@@ -167,9 +350,9 @@ function setupListeners() {
             database.items[gaveta.id].forEach(p => {
                 if (p.requested   === undefined) p.requested   = false;
                 if (p.lastTakenBy === undefined) p.lastTakenBy = null;
-                if (p.position    === undefined) p.position    = 999; 
-                if (p.divisoria   === undefined) p.divisoria   = 'Geral'; 
-                if (p.size        === undefined) p.size        = 1; 
+                if (p.position    === undefined) p.position    = 999;
+                if (p.divisoria   === undefined) p.divisoria   = 'Geral';
+                if (p.size        === undefined) p.size        = 1;
             });
             atualizarSeLogado();
         });
@@ -180,19 +363,18 @@ function atualizarSeLogado() {
     const container = document.getElementById('app-container');
     if (container && container.classList.contains('view-active')) {
         atualizarDashboard();
-        atualizarCarrosselBackground(); // Inicia o carrossel de fotos do banco
     }
 }
 
 async function migrarDadosLegados() {
-    if (localStorage.getItem('5s_migrado_v3')) return; 
+    if (localStorage.getItem('5s_migrado_v3')) return;
 
     try {
         const legadoSnap = await getDoc(doc(db, "manutencao_5s", "dados_sistema"));
         const configSnap = await getDoc(doc(db, "manutencao_5s", "config"));
 
         if (!legadoSnap.exists() || configSnap.exists()) {
-            localStorage.setItem('5s_migrado_v3', 'true'); 
+            localStorage.setItem('5s_migrado_v3', 'true');
             return;
         }
 
@@ -216,7 +398,7 @@ async function migrarDadosLegados() {
             await setDoc(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), { items: itens });
         }
 
-        localStorage.setItem('5s_migrado_v3', 'true'); 
+        localStorage.setItem('5s_migrado_v3', 'true');
         console.log("Migração concluída.");
     } catch (e) {
         console.warn("Aviso na migração:", e);
@@ -228,15 +410,15 @@ async function migrarDadosLegados() {
 // =========================================================================
 function configurarEventosEnter() {
     const map = [
-        { inputId: 'input-device-key',  btnAcao: autorizarDispositivo },
-        { inputId: 'input-login-id',    btnAcao: realizarLogin        },
-        { inputId: 'input-login-senha', btnAcao: realizarLogin        },
-        { inputId: 'reg-senha',         btnAcao: registrarUsuario     },
-        { inputId: 'conf-qtd-atual',    btnAcao: salvarConferencia    },
-        { inputId: 'edit-gaveta-nome',  btnAcao: salvarNomeGaveta     },
-        { inputId: 'novo-atual',        btnAcao: salvarNovoItem       },
-        { inputId: 'edit-peca-atual',   btnAcao: salvarEdicaoPeca     },
-        { inputId: 'nova-senha-confirma', btnAcao: salvarSenhaObrigatoria }
+        { inputId: 'input-device-key',    btnAcao: autorizarDispositivo   },
+        { inputId: 'input-login-id',      btnAcao: realizarLogin           },
+        { inputId: 'input-login-senha',   btnAcao: realizarLogin           },
+        { inputId: 'reg-senha',           btnAcao: registrarUsuario        },
+        { inputId: 'conf-qtd-atual',      btnAcao: salvarConferencia       },
+        { inputId: 'edit-gaveta-nome',    btnAcao: salvarNomeGaveta        },
+        { inputId: 'novo-atual',          btnAcao: salvarNovoItem          },
+        { inputId: 'edit-peca-atual',     btnAcao: salvarEdicaoPeca        },
+        { inputId: 'nova-senha-confirma', btnAcao: salvarSenhaObrigatoria  }
     ];
     map.forEach(item => {
         const el = document.getElementById(item.inputId);
@@ -273,10 +455,10 @@ function registrarUsuario() {
     const nome   = document.getElementById('reg-nome').value.trim();
     const cracha = document.getElementById('reg-cracha').value.trim();
     const senha  = document.getElementById('reg-senha').value.trim();
-    
+
     if (!nome || !cracha || !senha) return mostrarAlerta('Erro', 'Preencha todos os campos!');
     if (usuariosSalvos.find(u => u.cracha === cracha)) return mostrarAlerta('Erro', 'Crachá já cadastrado!');
-    
+
     if (!validarSenhaForte(senha)) {
         return mostrarAlerta('Senha Fraca', 'A senha deve ter no mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo.');
     }
@@ -291,19 +473,19 @@ function realizarLogin() {
     const id    = document.getElementById('input-login-id').value.trim();
     const senha = document.getElementById('input-login-senha').value.trim();
     if (!id || !senha) return mostrarAlerta('Erro', 'Preencha os dados de acesso.');
-    
+
     if (id === ADMIN_CREDENTIALS.login && senha === ADMIN_CREDENTIALS.senha) {
         aplicarLogin({ nome: 'Administrador', cracha: 'Admin', role: 'ADMIN' });
         return;
     }
-    
+
     const user = usuariosSalvos.find(u => u.cracha === id && u.senha === senha);
     if (!user) return mostrarAlerta('Acesso Negado', 'Crachá ou Senha incorretos.');
 
     if (!validarSenhaForte(user.senha)) {
         usuarioAguardandoRedefinicao = user;
         document.getElementById('modal-redefinir-senha').classList.remove('view-hidden');
-        return; 
+        return;
     }
 
     aplicarLogin(user);
@@ -311,7 +493,7 @@ function realizarLogin() {
 
 async function salvarSenhaObrigatoria() {
     const novaSenha = document.getElementById('nova-senha-obrigatoria').value.trim();
-    const confirma = document.getElementById('nova-senha-confirma').value.trim();
+    const confirma  = document.getElementById('nova-senha-confirma').value.trim();
 
     if (novaSenha !== confirma) return mostrarAlerta('Erro', 'As senhas não coincidem.');
     if (!validarSenhaForte(novaSenha)) return mostrarAlerta('Senha Fraca', 'A nova senha não atende aos requisitos.');
@@ -320,10 +502,10 @@ async function salvarSenhaObrigatoria() {
     await salvarConfig();
 
     document.getElementById('nova-senha-obrigatoria').value = '';
-    document.getElementById('nova-senha-confirma').value = '';
+    document.getElementById('nova-senha-confirma').value    = '';
     document.getElementById('modal-redefinir-senha').classList.add('view-hidden');
 
-    registrarLog(`atualizou a própria senha para o novo padrão corporativo.`);
+    registrarLog('atualizou a própria senha para o novo padrão corporativo.');
     aplicarLogin(usuarioAguardandoRedefinicao);
     usuarioAguardandoRedefinicao = null;
 }
@@ -331,7 +513,7 @@ async function salvarSenhaObrigatoria() {
 function cancelarRedefinicaoSenha() {
     usuarioAguardandoRedefinicao = null;
     document.getElementById('nova-senha-obrigatoria').value = '';
-    document.getElementById('nova-senha-confirma').value = '';
+    document.getElementById('nova-senha-confirma').value    = '';
     document.getElementById('modal-redefinir-senha').classList.add('view-hidden');
 }
 
@@ -339,6 +521,7 @@ function aplicarLogin(user) {
     usuarioLogado = user;
     document.getElementById('usuario-logado-nome').innerText   = user.nome;
     document.getElementById('usuario-logado-codigo').innerText = `Crachá: ${user.cracha}`;
+
     if (user.role === 'ADMIN') {
         document.body.classList.add('is-admin');
         document.getElementById('badge-admin').classList.remove('view-hidden');
@@ -346,10 +529,12 @@ function aplicarLogin(user) {
         document.body.classList.remove('is-admin');
         document.getElementById('badge-admin').classList.add('view-hidden');
     }
+
     document.getElementById('view-login').classList.replace('view-active', 'view-hidden');
     document.getElementById('app-container').classList.replace('view-hidden', 'view-active');
     document.getElementById('input-login-senha').value = '';
-    document.getElementById('reg-senha').value = '';
+    document.getElementById('reg-senha').value         = '';
+
     solicitarPermissaoNotificacao();
     atualizarDashboard();
     mostrarTela('view-dashboard');
@@ -359,28 +544,34 @@ function aplicarLogin(user) {
 // NAVEGAÇÃO
 // =========================================================================
 function mostrarTela(id) {
-    ['view-dashboard','view-gavetas','view-compartimentos','view-historico','view-config'].forEach(v => {
-        document.getElementById(v).classList.replace('view-active', 'view-hidden');
+    ['view-dashboard', 'view-gavetas', 'view-compartimentos', 'view-historico', 'view-config'].forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.classList.replace('view-active', 'view-hidden');
     });
-    
-    document.getElementById(id).classList.replace('view-hidden', 'view-active');
-    
-    const links = document.querySelectorAll('.nav-item');
-    links.forEach(l => l.classList.remove('active'));
-    if(event && event.currentTarget) {
+
+    const alvo = document.getElementById(id);
+    if (alvo) alvo.classList.replace('view-hidden', 'view-active');
+
+    // Atualiza nav-item ativo somente quando chamado por clique direto
+    document.querySelectorAll('.nav-item').forEach(l => l.classList.remove('active'));
+    if (typeof event !== 'undefined' && event && event.currentTarget && event.currentTarget.classList) {
         event.currentTarget.classList.add('active');
     }
 
     document.getElementById('sidebar-menu').classList.remove('open');
     document.getElementById('mobile-overlay').classList.remove('open');
-    
+
     if (id === 'view-gavetas' || id === 'view-dashboard') gavetaAtualAberta = null;
     if (id === 'view-historico') renderizarHistorico();
-    
-    document.getElementById('area-conteudo-scroll').scrollTo(0, 0);
-    
-    if(id === 'view-dashboard') {
-        setTimeout(() => document.getElementById('input-busca-global').focus(), 300);
+
+    const scroll = document.getElementById('area-conteudo-scroll');
+    if (scroll) scroll.scrollTo(0, 0);
+
+    if (id === 'view-dashboard') {
+        setTimeout(() => {
+            const inp = document.getElementById('input-busca-global');
+            if (inp) inp.focus();
+        }, 300);
     }
 }
 
@@ -388,68 +579,40 @@ function voltarParaGavetas() { mostrarTela('view-gavetas'); }
 function sairDoSistema()     { location.reload(); }
 
 // =========================================================================
-// DASHBOARD (BACKGROUND E BUSCA) E ARMÁRIO GERAL
+// DASHBOARD, BUSCA GLOBAL E ARMÁRIO (FASE 3)
 // =========================================================================
-
-// NOVA FUNÇÃO: Atualiza o fundo do dashboard com as imagens das peças cadastradas
-function atualizarCarrosselBackground() {
-    const bgElement = document.querySelector('.dashboard-wrapper');
-    if (!bgElement) return;
-
-    let imagensDisponiveis = [];
-    database.drawers.forEach(g => {
-        (database.items[g.id] || []).forEach(p => {
-            if (p.image) imagensDisponiveis.push(p.image);
-        });
-    });
-
-    if (imagensDisponiveis.length === 0) {
-        bgElement.style.backgroundImage = "url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=2069&auto=format&fit=crop')";
-        return;
-    }
-
-    if (carrosselInterval) clearInterval(carrosselInterval);
-
-    let index = 0;
-    bgElement.style.backgroundImage = `url('${imagensDisponiveis[index]}')`;
-    
-    if (imagensDisponiveis.length > 1) {
-        carrosselInterval = setInterval(() => {
-            index = (index + 1) % imagensDisponiveis.length;
-            bgElement.style.backgroundImage = `url('${imagensDisponiveis[index]}')`;
-        }, 5000); // Troca a imagem a cada 5 segundos
-    }
-}
-
 function buscarPecasGlobal() {
-    const termo = document.getElementById('input-busca-global').value.toLowerCase();
+    const termo        = document.getElementById('input-busca-global').value.toLowerCase();
     const resultadosDiv = document.getElementById('resultados-busca-global');
     resultadosDiv.innerHTML = '';
-    
-    if(termo.length < 2) {
+
+    if (termo.length < 2) {
         resultadosDiv.classList.add('view-hidden');
         return;
     }
-    
+
     let achados = [];
     database.drawers.forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
-            if(peca.name.toLowerCase().includes(termo) || (peca.code && peca.code.toLowerCase().includes(termo))) {
+            if (
+                peca.name.toLowerCase().includes(termo) ||
+                (peca.code && peca.code.toLowerCase().includes(termo))
+            ) {
                 achados.push({ gaveta, peca });
             }
         });
     });
 
-    if(achados.length === 0) {
+    if (achados.length === 0) {
         resultadosDiv.innerHTML = '<p style="color: white; text-shadow: 1px 1px 2px black; padding: 20px;">Nenhum item encontrado.</p>';
         resultadosDiv.classList.remove('view-hidden');
         return;
     }
 
     achados.forEach(item => {
-        const div = document.createElement('div');
+        const div     = document.createElement('div');
         div.className = 'resultado-card';
-        div.onclick = () => {
+        div.onclick   = () => {
             document.getElementById('input-busca-global').value = '';
             resultadosDiv.classList.add('view-hidden');
             abrirGaveta(item.gaveta.id);
@@ -465,7 +628,7 @@ function buscarPecasGlobal() {
         `;
         resultadosDiv.appendChild(div);
     });
-    
+
     resultadosDiv.classList.remove('view-hidden');
 }
 
@@ -483,6 +646,7 @@ function verificarEstoqueZerado() {
         (database.items[gaveta.id] || []).forEach(p => { if (p.current === 0) qtdZerados++; });
     });
     const banner = document.getElementById('alerta-global-zerado');
+    if (!banner) return;
     if (qtdZerados > 0) {
         banner.classList.remove('view-hidden');
         document.getElementById('texto-alerta-zerado').innerHTML =
@@ -495,6 +659,7 @@ function verificarEstoqueZerado() {
 function calcularKPIs() {
     let alerts = 0;
     const lista = document.getElementById('kpi-lista-gavetas');
+    if (!lista) return;
     lista.innerHTML = '';
     database.drawers.forEach(gaveta => {
         const pecas  = database.items[gaveta.id] || [];
@@ -505,29 +670,23 @@ function calcularKPIs() {
         lista.appendChild(div);
         if (status !== 'verde') alerts++;
     });
-    document.getElementById('kpi-pendencias-count').innerText = alerts;
+    const kpiEl = document.getElementById('kpi-pendencias-count');
+    if (kpiEl) kpiEl.innerText = alerts;
 }
 
 function renderArmarioVertical() {
     const chassi = document.getElementById('menu-gavetas');
+    if (!chassi) return;
     chassi.innerHTML = '';
     database.drawers.forEach(gaveta => {
         const status = getGavetaStatus(database.items[gaveta.id] || []);
-        const div    = document.createElement('div');
+        const div    = document.createElement('button');
         div.className = 'btn-gaveta';
         div.onclick   = () => abrirGaveta(gaveta.id);
         div.innerHTML = `
             <div class="gaveta-content">
                 <span class="gnumber">${gaveta.label}</span>
                 <span class="glabel">${gaveta.title}</span>
-                
-                <button class="btn-edit-gaveta admin-only" onclick="window.moverGaveta(event, ${gaveta.id}, -1)" title="Subir Gaveta">
-                    <i class="fa-solid fa-arrow-up"></i>
-                </button>
-                <button class="btn-edit-gaveta admin-only" onclick="window.moverGaveta(event, ${gaveta.id}, 1)" title="Descer Gaveta">
-                    <i class="fa-solid fa-arrow-down"></i>
-                </button>
-                
                 <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
                     <i class="fa-solid fa-pen"></i>
                 </button>
@@ -538,49 +697,7 @@ function renderArmarioVertical() {
 }
 
 // =========================================================================
-// GESTÃO DE GAVETAS (REORDENAR E EDITAR)
-// =========================================================================
-function moverGaveta(evento, idGaveta, direcao) {
-    evento.stopPropagation(); 
-    const indexAtual = database.drawers.findIndex(d => d.id === idGaveta);
-    if (indexAtual < 0) return;
-    
-    const novoIndex = indexAtual + direcao;
-    if (novoIndex < 0 || novoIndex >= database.drawers.length) return; // Se já está no topo ou fim
-    
-    // Troca de posições
-    const temp = database.drawers[indexAtual];
-    database.drawers[indexAtual] = database.drawers[novoIndex];
-    database.drawers[novoIndex] = temp;
-    
-    registrarLog(`alterou a ordem física da gaveta ${temp.label}`);
-    salvarConfig(); // Salva no Firebase a nova ordem
-    renderArmarioVertical();
-}
-
-function abrirModalEditarGaveta(eventoClick, idGaveta) {
-    eventoClick.stopPropagation();
-    gavetaSendoEditadaId = idGaveta;
-    const gaveta = database.drawers.find(d => d.id === idGaveta);
-    document.getElementById('edit-gaveta-nome').value = gaveta.title;
-    document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
-    setTimeout(() => document.getElementById('edit-gaveta-nome').focus(), 100);
-}
-function fecharModalEditarGaveta() { document.getElementById('modal-editar-gaveta').classList.add('view-hidden'); }
-
-function salvarNomeGaveta() {
-    const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
-    if (!novoNome) return mostrarAlerta('Atenção', 'O nome da gaveta não pode ficar vazio.');
-    const gaveta     = database.drawers.find(d => d.id === gavetaSendoEditadaId);
-    const nomeAntigo = gaveta.title;
-    gaveta.title     = novoNome;
-    registrarLog(`alterou o nome da gaveta ${gaveta.label} de "${nomeAntigo}" para "${novoNome}"`);
-    salvarConfig();
-    fecharModalEditarGaveta();
-}
-
-// =========================================================================
-// DENTRO DA GAVETA (RENDERIZAÇÃO COM DIVISÓRIAS E ALTURA)
+// FASE 2: DENTRO DA GAVETA (DIVISÓRIAS E GRID POR TAMANHO)
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
@@ -592,6 +709,7 @@ function abrirGaveta(idGaveta) {
 
 function renderizarPecasDaGaveta(idGaveta) {
     const mainContainer = document.getElementById('container-divisorias');
+    if (!mainContainer) return;
     mainContainer.innerHTML = '';
     const pecasBrutas = database.items[idGaveta] || [];
 
@@ -603,37 +721,38 @@ function renderizarPecasDaGaveta(idGaveta) {
     const grupos = {};
     pecasBrutas.forEach(peca => {
         const divi = (peca.divisoria || 'Geral').toUpperCase();
-        if(!grupos[divi]) grupos[divi] = [];
+        if (!grupos[divi]) grupos[divi] = [];
         grupos[divi].push(peca);
     });
 
     const nomesDivisorias = Object.keys(grupos).sort();
 
     nomesDivisorias.forEach(nomeDivisoria => {
-        const headerDivi = document.createElement('div');
-        headerDivi.className = 'divisoria-header';
-        headerDivi.innerHTML = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
+        const headerDivi      = document.createElement('div');
+        headerDivi.className  = 'divisoria-header';
+        headerDivi.innerHTML  = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
         mainContainer.appendChild(headerDivi);
 
-        const gridDivi = document.createElement('div');
-        gridDivi.className = 'grid-pecas';
-        
+        const gridDivi      = document.createElement('div');
+        gridDivi.className  = 'grid-pecas';
+
         const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
 
         pecasOrdenadas.forEach(peca => {
             const statusPeca   = getPecaStatus(peca);
             const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
-            const imgHtml      = peca.image ? `<img src="${peca.image}" alt="${peca.name}">` : `<i class="fa-solid fa-microchip"></i>`;
+            const imgHtml      = peca.image
+                ? `<img src="${peca.image}" alt="${peca.name}">`
+                : `<i class="fa-solid fa-microchip"></i>`;
             const retiradaHtml = peca.lastTakenBy
-                ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
-                
-            const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
-            const displaySize = peca.size || 1;
+                ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>`
+                : '';
 
-            const div = document.createElement('div');
-            div.className = 'compartimento-card';
-            
-            // FASE 2: Injetando a variável para controlar as LINHAS (altura) do grid
+            const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
+            const displaySize     = peca.size || 1;
+
+            const div      = document.createElement('div');
+            div.className  = 'compartimento-card';
             div.style.setProperty('--span-size', displaySize);
 
             div.innerHTML = `
@@ -679,6 +798,7 @@ function renderizarPecasDaGaveta(idGaveta) {
 
 function ajusteRapidoEstoque(idPeca, delta) {
     const peca  = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
+    if (!peca) return;
     let novaQtd = Math.max(0, peca.current + delta);
     if (delta < 0 && peca.current > 0) {
         peca.lastTakenBy = usuarioLogado.nome;
@@ -694,6 +814,7 @@ function ajusteRapidoEstoque(idPeca, delta) {
 
 function alternarStatusRequisitado(idPeca) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
+    if (!peca) return;
     peca.requested = !peca.requested;
     registrarLog(`${peca.requested ? 'marcou como REQUISITADO' : 'removeu o status requisitado de'} a peça "${peca.name}"`);
     salvarItensDaGaveta(gavetaAtualAberta);
@@ -701,6 +822,7 @@ function alternarStatusRequisitado(idPeca) {
 
 function excluirPeca(idPeca) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
+    if (!peca) return;
     if (confirm(`Tem certeza que deseja excluir a peça "${peca.name}" da gaveta?`)) {
         database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== idPeca);
         registrarLog(`excluiu a peça "${peca.name}" do sistema`);
@@ -719,9 +841,9 @@ function abrirModalMoverPeca(idPeca) {
     select.innerHTML = '';
     database.drawers.forEach(gaveta => {
         if (gaveta.id === gavetaAtualAberta) return;
-        const option = document.createElement('option');
-        option.value    = gaveta.id;
-        option.innerText = `${gaveta.label} — ${gaveta.title}`;
+        const option      = document.createElement('option');
+        option.value      = gaveta.id;
+        option.innerText  = `${gaveta.label} — ${gaveta.title}`;
         select.appendChild(option);
     });
     document.getElementById('modal-mover-peca').classList.remove('view-hidden');
@@ -733,10 +855,10 @@ function fecharModalMoverPeca() {
 }
 
 async function confirmarMoverPeca() {
-    const destinoId      = parseInt(document.getElementById('mover-destino-select').value);
-    const gavetaOrigem   = database.drawers.find(d => d.id === gavetaAtualAberta);
-    const gavetaDestino  = database.drawers.find(d => d.id === destinoId);
-    const peca           = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoMovidaId);
+    const destinoId     = parseInt(document.getElementById('mover-destino-select').value);
+    const gavetaOrigem  = database.drawers.find(d => d.id === gavetaAtualAberta);
+    const gavetaDestino = database.drawers.find(d => d.id === destinoId);
+    const peca          = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoMovidaId);
 
     database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== pecaSendoMovidaId);
     if (!database.items[destinoId]) database.items[destinoId] = [];
@@ -750,30 +872,57 @@ async function confirmarMoverPeca() {
     fecharModalMoverPeca();
 }
 
+function abrirModalEditarGaveta(eventoClick, idGaveta) {
+    eventoClick.stopPropagation();
+    gavetaSendoEditadaId = idGaveta;
+    const gaveta = database.drawers.find(d => d.id === idGaveta);
+    document.getElementById('edit-gaveta-nome').value = gaveta.title;
+    document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
+    setTimeout(() => document.getElementById('edit-gaveta-nome').focus(), 100);
+}
+
+function fecharModalEditarGaveta() {
+    document.getElementById('modal-editar-gaveta').classList.add('view-hidden');
+}
+
+function salvarNomeGaveta() {
+    const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
+    if (!novoNome) return mostrarAlerta('Atenção', 'O nome da gaveta não pode ficar vazio.');
+    const gaveta     = database.drawers.find(d => d.id === gavetaSendoEditadaId);
+    const nomeAntigo = gaveta.title;
+    gaveta.title     = novoNome;
+    registrarLog(`alterou o nome da gaveta ${gaveta.label} de "${nomeAntigo}" para "${novoNome}"`);
+    salvarConfig();
+    fecharModalEditarGaveta();
+}
+
 // =========================================================================
-// GERENCIAMENTO DE PEÇAS E POSIÇÃO
+// GERENCIAMENTO DE PEÇAS
 // =========================================================================
 function abrirModalCadastro() {
-    ['novo-codigo','novo-nome', 'novo-posicao'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('novo-esperado').value = '1';
-    document.getElementById('novo-atual').value    = '0';
+    ['novo-codigo', 'novo-nome', 'novo-posicao'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('novo-esperado').value  = '1';
+    document.getElementById('novo-atual').value     = '0';
     document.getElementById('novo-divisoria').value = 'Geral';
-    document.getElementById('novo-tamanho').value  = '1';
-    document.getElementById('novo-imagem').value   = '';
+    document.getElementById('novo-tamanho').value   = '1';
+    document.getElementById('novo-imagem').value    = '';
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
     setTimeout(() => document.getElementById('novo-nome').focus(), 100);
 }
-function fecharModalCadastro() { document.getElementById('modal-cadastro').classList.add('view-hidden'); }
+
+function fecharModalCadastro() {
+    document.getElementById('modal-cadastro').classList.add('view-hidden');
+}
 
 async function salvarNovoItem() {
-    const codigo   = document.getElementById('novo-codigo').value.trim();
-    const nome     = document.getElementById('novo-nome').value.trim();
-    const esperado = parseInt(document.getElementById('novo-esperado').value);
-    const atual    = parseInt(document.getElementById('novo-atual').value);
-    const posicao  = parseInt(document.getElementById('novo-posicao').value) || 999;
+    const codigo    = document.getElementById('novo-codigo').value.trim();
+    const nome      = document.getElementById('novo-nome').value.trim();
+    const esperado  = parseInt(document.getElementById('novo-esperado').value);
+    const atual     = parseInt(document.getElementById('novo-atual').value);
+    const posicao   = parseInt(document.getElementById('novo-posicao').value) || 999;
     const divisoria = document.getElementById('novo-divisoria').value.trim() || 'Geral';
-    const tamanho  = parseInt(document.getElementById('novo-tamanho').value) || 1;
-    const imgInput = document.getElementById('novo-imagem');
+    const tamanho   = parseInt(document.getElementById('novo-tamanho').value) || 1;
+    const imgInput  = document.getElementById('novo-imagem');
 
     if (!nome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
 
@@ -781,13 +930,17 @@ async function salvarNovoItem() {
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
 
     const novaPeca = {
-        id: Date.now(),
-        code: codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
-        name: nome, expected: esperado, current: atual,
-        position: posicao,
-        divisoria: divisoria,
-        size: tamanho,
-        requested: false, lastTakenBy: null, image: null
+        id:          Date.now(),
+        code:        codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
+        name:        nome,
+        expected:    esperado,
+        current:     atual,
+        position:    posicao,
+        divisoria:   divisoria,
+        size:        tamanho,
+        requested:   false,
+        lastTakenBy: null,
+        image:       null
     };
 
     if (imgInput.files && imgInput.files[0]) {
@@ -810,30 +963,32 @@ async function salvarNovoItem() {
 function abrirModalEditarPeca(idPeca) {
     pecaSendoEditadaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
-    document.getElementById('edit-peca-codigo').value   = peca.code || '';
-    document.getElementById('edit-peca-nome').value     = peca.name;
-    document.getElementById('edit-peca-esperado').value = peca.expected;
-    document.getElementById('edit-peca-atual').value    = peca.current;
-    
-    document.getElementById('edit-peca-posicao').value  = (peca.position && peca.position !== 999) ? peca.position : '';
+    if (!peca) return;
+    document.getElementById('edit-peca-codigo').value    = peca.code    || '';
+    document.getElementById('edit-peca-nome').value      = peca.name;
+    document.getElementById('edit-peca-esperado').value  = peca.expected;
+    document.getElementById('edit-peca-atual').value     = peca.current;
+    document.getElementById('edit-peca-posicao').value   = (peca.position && peca.position !== 999) ? peca.position : '';
     document.getElementById('edit-peca-divisoria').value = peca.divisoria || 'Geral';
     document.getElementById('edit-peca-tamanho').value   = peca.size || 1;
-    
-    document.getElementById('edit-peca-imagem').value   = '';
+    document.getElementById('edit-peca-imagem').value    = '';
     document.getElementById('modal-editar-peca').classList.remove('view-hidden');
     setTimeout(() => document.getElementById('edit-peca-nome').focus(), 100);
 }
-function fecharModalEditarPeca() { document.getElementById('modal-editar-peca').classList.add('view-hidden'); }
+
+function fecharModalEditarPeca() {
+    document.getElementById('modal-editar-peca').classList.add('view-hidden');
+}
 
 async function salvarEdicaoPeca() {
-    const novoCodigo   = document.getElementById('edit-peca-codigo').value.trim();
-    const novoNome     = document.getElementById('edit-peca-nome').value.trim();
-    const novoEsperado = parseInt(document.getElementById('edit-peca-esperado').value);
-    const novoAtual    = parseInt(document.getElementById('edit-peca-atual').value);
-    const novaPosicao  = parseInt(document.getElementById('edit-peca-posicao').value) || 999;
+    const novoCodigo    = document.getElementById('edit-peca-codigo').value.trim();
+    const novoNome      = document.getElementById('edit-peca-nome').value.trim();
+    const novoEsperado  = parseInt(document.getElementById('edit-peca-esperado').value);
+    const novoAtual     = parseInt(document.getElementById('edit-peca-atual').value);
+    const novaPosicao   = parseInt(document.getElementById('edit-peca-posicao').value) || 999;
     const novaDivisoria = document.getElementById('edit-peca-divisoria').value.trim() || 'Geral';
-    const novoTamanho  = parseInt(document.getElementById('edit-peca-tamanho').value) || 1;
-    const imgInput     = document.getElementById('edit-peca-imagem');
+    const novoTamanho   = parseInt(document.getElementById('edit-peca-tamanho').value) || 1;
+    const imgInput      = document.getElementById('edit-peca-imagem');
 
     if (!novoNome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
     if (isNaN(novoEsperado) || isNaN(novoAtual)) return mostrarAlerta('Erro', 'Valores numéricos inválidos.');
@@ -841,15 +996,15 @@ async function salvarEdicaoPeca() {
     const btnSalvar = document.querySelector('#modal-editar-peca .btn-save');
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
 
-    const peca    = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
-    peca.code     = novoCodigo;
-    peca.name     = novoNome;
-    peca.expected = novoEsperado;
-    peca.current  = novoAtual;
-    peca.position = novaPosicao;
-    peca.divisoria = novaDivisoria;
-    peca.size     = novoTamanho;
-    
+    const peca      = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
+    peca.code       = novoCodigo;
+    peca.name       = novoNome;
+    peca.expected   = novoEsperado;
+    peca.current    = novoAtual;
+    peca.position   = novaPosicao;
+    peca.divisoria  = novaDivisoria;
+    peca.size       = novoTamanho;
+
     if (peca.current >= peca.expected) peca.requested = false;
 
     if (imgInput.files && imgInput.files[0]) {
@@ -871,17 +1026,22 @@ async function salvarEdicaoPeca() {
 function abrirModalConferencia(idPeca) {
     pecaSendoConferidaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
+    if (!peca) return;
     document.getElementById('conf-nome-peca').innerText = peca.name;
     document.getElementById('conf-qtd-atual').value     = peca.current;
     document.getElementById('modal-conferencia').classList.remove('view-hidden');
     setTimeout(() => document.getElementById('conf-qtd-atual').focus(), 100);
 }
-function fecharModalConferencia() { document.getElementById('modal-conferencia').classList.add('view-hidden'); }
+
+function fecharModalConferencia() {
+    document.getElementById('modal-conferencia').classList.add('view-hidden');
+}
 
 function salvarConferencia() {
     const novaQtd = parseInt(document.getElementById('conf-qtd-atual').value);
     if (isNaN(novaQtd) || novaQtd < 0) return mostrarAlerta('Valor Inválido', 'A quantidade deve ser um número igual ou maior que zero.');
     const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoConferidaId);
+    if (!peca) return;
     if (novaQtd !== peca.current) registrarLog(`alterou a contagem de "${peca.name}" de ${peca.current} para ${novaQtd}`);
     if (novaQtd < peca.current) peca.lastTakenBy = usuarioLogado.nome;
     peca.current = novaQtd;
@@ -895,7 +1055,10 @@ function mostrarAlerta(titulo, mensagem) {
     document.getElementById('alerta-mensagem').innerText = mensagem;
     document.getElementById('modal-alerta').classList.remove('view-hidden');
 }
-function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
+
+function fecharAlerta() {
+    document.getElementById('modal-alerta').classList.add('view-hidden');
+}
 
 // =========================================================================
 // GERADOR DE PEDIDO DE COMPRA
@@ -908,11 +1071,7 @@ function gerarEmailPedido() {
     database.drawers.forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
             if (peca.current < peca.expected) {
-                itensFaltando.push({
-                    nome: peca.name,
-                    codigo: peca.code,
-                    falta: peca.expected - peca.current
-                });
+                itensFaltando.push({ nome: peca.name, codigo: peca.code, falta: peca.expected - peca.current });
             }
         });
     });
@@ -921,18 +1080,17 @@ function gerarEmailPedido() {
 
     itensFaltando.forEach((item, index) => {
         const div = document.createElement('div');
-        div.style.border = '1px solid var(--border-color)';
-        div.style.padding = '15px';
-        div.style.marginBottom = '15px';
-        div.style.borderRadius = '8px';
+        div.style.border          = '1px solid var(--border-color)';
+        div.style.padding         = '15px';
+        div.style.marginBottom    = '15px';
+        div.style.borderRadius    = '8px';
         div.style.backgroundColor = '#f8fafc';
 
         div.innerHTML = `
             <p style="font-weight: bold; margin-bottom: 12px; color: var(--cabinet-blue); font-size: 1.05rem;">
-                <i class="fa-solid fa-box-open"></i> ${item.falta} un. | ${item.nome} 
+                <i class="fa-solid fa-box-open"></i> ${item.falta} un. | ${item.nome}
                 <span style="font-weight: normal; color: var(--text-secondary);">(Item: ${item.codigo || 'S/N'})</span>
             </p>
-            
             <div class="form-group row" style="margin-bottom: 10px;">
                 <div class="col">
                     <label>Ordem de Serviço (OS):</label>
@@ -947,7 +1105,6 @@ function gerarEmailPedido() {
                     </select>
                 </div>
             </div>
-            
             <div id="extra-${index}" class="view-hidden" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;">
                 <div class="form-group row">
                     <div class="col">
@@ -979,7 +1136,7 @@ function gerarEmailPedido() {
 }
 
 function toggleCompradoFora(index) {
-    const select = document.getElementById(`almo-${index}`).value;
+    const select   = document.getElementById(`almo-${index}`).value;
     const extraDiv = document.getElementById(`extra-${index}`);
     if (select === 'Comprado Fora') {
         extraDiv.classList.remove('view-hidden');
@@ -993,7 +1150,7 @@ function processarFormularioPedido() {
     let textoFinal = `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes para o nosso gaveteiro elétrico:\n\n`;
 
     window.itensFaltandoTemp.forEach((item, index) => {
-        const os = document.getElementById(`os-${index}`).value || 'Não informada';
+        const os   = document.getElementById(`os-${index}`).value   || 'Não informada';
         const almo = document.getElementById(`almo-${index}`).value;
 
         textoFinal += `- ${item.falta} un. | ${item.nome} (Item: ${item.codigo || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
@@ -1002,7 +1159,6 @@ function processarFormularioPedido() {
             const forn = document.getElementById(`forn-${index}`).value || 'Não informado';
             const unid = document.getElementById(`unid-${index}`).value || 'Não informada';
             const just = document.getElementById(`just-${index}`).value || 'Não informada';
-            
             textoFinal += `  > Detalhes Compra Externa - Fornecedor: ${forn} | UM: ${unid} | Justificativa: ${just}\n`;
         }
     });
@@ -1010,7 +1166,6 @@ function processarFormularioPedido() {
     textoFinal += `\nFico no aguardo.\nObrigado,\n${nomeSolicitante}`;
 
     document.getElementById('texto-pedido-gerado').value = textoFinal;
-
     document.getElementById('formulario-pedido-itens').classList.add('view-hidden');
     document.getElementById('texto-pedido-gerado').classList.remove('view-hidden');
     document.getElementById('btn-gerar-texto-pedido').classList.add('view-hidden');
@@ -1018,22 +1173,24 @@ function processarFormularioPedido() {
     document.getElementById('pedido-subtitle').innerText = "Copie o texto pronto abaixo para enviar diretamente no seu Outlook ou Teams.";
 }
 
-function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
+function fecharModalPedido() {
+    document.getElementById('modal-pedido').classList.add('view-hidden');
+}
 
 function copiarTextoPedido() {
-    const ta = document.getElementById('texto-pedido-gerado');
+    const ta  = document.getElementById('texto-pedido-gerado');
     ta.select();
     document.execCommand('copy');
     const btn  = event.currentTarget;
     const orig = btn.innerHTML;
-    btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
+    btn.innerHTML             = `<i class="fa-solid fa-check"></i> Copiado!`;
     btn.style.backgroundColor = 'var(--status-verde)';
-    registrarLog(`copiou a lista de pedido de peças para envio.`);
+    registrarLog('copiou a lista de pedido de peças para envio.');
     setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = 'var(--drawer-blue)'; }, 2000);
 }
 
 // =========================================================================
-// EXPOSIÇÃO GLOBAL DE FUNÇÕES (MÓDULO)
+// EXPOSIÇÃO GLOBAL DE FUNÇÕES (NECESSÁRIO POR SER type="module")
 // =========================================================================
 window.toggleMenuMobile          = toggleMenuMobile;
 window.autorizarDispositivo      = autorizarDispositivo;
@@ -1051,10 +1208,13 @@ window.voltarParaGavetas         = voltarParaGavetas;
 window.abrirModalCadastro        = abrirModalCadastro;
 window.fecharModalCadastro       = fecharModalCadastro;
 window.salvarNovoItem            = salvarNovoItem;
+window.abrirModalEditarPeca      = abrirModalEditarPeca;
 window.fecharModalEditarPeca     = fecharModalEditarPeca;
 window.salvarEdicaoPeca          = salvarEdicaoPeca;
+window.abrirModalConferencia     = abrirModalConferencia;
 window.fecharModalConferencia    = fecharModalConferencia;
 window.salvarConferencia         = salvarConferencia;
+window.abrirModalEditarGaveta    = abrirModalEditarGaveta;
 window.fecharModalEditarGaveta   = fecharModalEditarGaveta;
 window.salvarNomeGaveta          = salvarNomeGaveta;
 window.fecharModalPedido         = fecharModalPedido;
@@ -1064,7 +1224,6 @@ window.abrirGaveta               = abrirGaveta;
 window.ajusteRapidoEstoque       = ajusteRapidoEstoque;
 window.alternarStatusRequisitado = alternarStatusRequisitado;
 window.excluirPeca               = excluirPeca;
-window.abrirModalEditarPeca      = abrirModalEditarPeca;
 window.abrirModalMoverPeca       = abrirModalMoverPeca;
 window.fecharModalMoverPeca      = fecharModalMoverPeca;
 window.confirmarMoverPeca        = confirmarMoverPeca;
@@ -1073,4 +1232,3 @@ window.processarFormularioPedido = processarFormularioPedido;
 window.salvarSenhaObrigatoria    = salvarSenhaObrigatoria;
 window.cancelarRedefinicaoSenha  = cancelarRedefinicaoSenha;
 window.buscarPecasGlobal         = buscarPecasGlobal;
-window.moverGaveta               = moverGaveta;
