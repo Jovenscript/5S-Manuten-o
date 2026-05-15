@@ -12,11 +12,10 @@
     --text-secondary: #64748b;
     --danger: #ef4444;
 
-    /* Cores de Status 5S */
-    --status-verde: #10b981;    /* Estoque Cheio */
-    --status-laranja: #f97316;  /* Poucas Peças */
-    --status-vermelho: #ef4444; /* Sem Estoque */
-    --status-amarelo: #eab308;  /* Requisitado */
+    --status-verde: #10b981;
+    --status-laranja: #f97316;
+    --status-vermelho: #ef4444;
+    --status-amarelo: #eab308;
 }
 
 /* =========================================================================
@@ -36,9 +35,6 @@ body {
     overflow: hidden; 
 }
 
-/* =========================================================================
-   CLASSES UTILITÁRIAS E CONTROLE DE EXIBIÇÃO
-========================================================================= */
 .view-hidden { display: none !important; }
 
 .view-active { 
@@ -288,13 +284,11 @@ body:not(.is-admin) .admin-only { display: none !important; }
 
 .main-padding { 
     flex: 1; 
-    /* Remove padding para o fundo do dashboard preencher tudo */
     padding: 0; 
     overflow-y: auto; 
     position: relative; 
 }
 
-/* Retorna o padding para as outras telas */
 #view-gavetas, #view-historico, #view-config, #view-compartimentos, #alerta-global-zerado {
     padding: 2rem;
 }
@@ -302,21 +296,18 @@ body:not(.is-admin) .admin-only { display: none !important; }
 /* =========================================================================
    FASE 3: DASHBOARD DE BUSCA COM CARROSSEL E GLASSMORPHISM (CENTRALIZADO)
 ========================================================================= */
-/* Container ocupa todo o espaço com Flex para centralizar perfeitamente */
 .dashboard-wrapper {
-    min-height: calc(100vh - 70px); /* 70px da topbar */
+    min-height: calc(100vh - 70px);
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 2rem;
     position: relative;
-    /* Fundo em carrossel usando CSS */
     background-size: cover;
     background-position: center;
     animation: carrosselFundo 20s infinite linear;
 }
 
-/* 3 Imagens industriais simulando um carrossel no fundo */
 @keyframes carrosselFundo {
     0% { background-image: url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=2069&auto=format&fit=crop'); }
     33% { background-image: url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop'); }
@@ -324,7 +315,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     100% { background-image: url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=2069&auto=format&fit=crop'); }
 }
 
-/* Camada escura por cima das fotos para dar leitura no painel de vidro */
 .dashboard-overlay {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -332,7 +322,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     z-index: 1;
 }
 
-/* O Painel de Vidro Moderno */
 .glass-panel {
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(15px);
@@ -344,7 +333,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
     max-width: 750px;
     text-align: center;
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    z-index: 2; /* Fica acima do overlay escuro */
+    z-index: 2; 
 }
 
 .search-box-container {
@@ -362,7 +351,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     color: #64748b;
 }
 
-/* A barra de pesquisa esticada */
 .search-input-glass {
     width: 100%;
     padding: 1.2rem 1.2rem 1.2rem 60px;
@@ -601,7 +589,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .kpi-status-item.laranja { color: var(--status-laranja); }
 .kpi-status-item.vermelho { color: var(--status-vermelho); }
 
-/* Armário e Gavetas */
 .cabinet-vertical { 
     display: flex; 
     flex-direction: column; 
@@ -668,9 +655,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
     transition: all 0.2s;
 }
 
-.btn-edit-gaveta:hover { 
-    background: rgba(255, 255, 255, 0.3); 
-}
+.btn-edit-gaveta:hover { background: rgba(255, 255, 255, 0.3); }
 
 .btn-gaveta::after { 
     content: ""; 
@@ -734,7 +719,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     min-width: 200px; 
 }
 
-/* Título Separador da Divisória */
 .divisoria-header {
     background: #e2e8f0;
     color: var(--drawer-blue);
@@ -751,7 +735,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
 
 .grid-pecas { 
     display: grid; 
-    /* A base do grid é dinâmica. Se couber mais colunas, ele cria. */
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
     gap: 1.5rem; 
     padding-bottom: 2rem; 
@@ -766,7 +749,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     position: relative; 
     display: flex; 
     flex-direction: column; 
-    /* Esta variável vem injetada do JS para esticar o card no Grid do PC */
     grid-column: span var(--span-size, 1);
 }
 
@@ -884,7 +866,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     font-weight: 800; 
 }
 
-/* Controle Rápido (+ e -) */
 .quick-control { 
     display: flex; 
     align-items: center; 
@@ -919,7 +900,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     text-align: center; 
 }
 
-/* Rastreabilidade (Último a pegar) */
 .last-taken-info { 
     background: #f8fafc; 
     color: var(--text-secondary); 
@@ -932,7 +912,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     border: 1px dashed #cbd5e1; 
 }
 
-/* Botões do Card */
 .botoes-acao-card { 
     display: flex; 
     flex-direction: column; 
@@ -1186,7 +1165,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
         font-size: 16px; 
     }
 
-    /* Remove o padding do Dashboard no mobile para a imagem ficar na tela toda */
+    /* Ajuste fino pro fundo do dashboard preencher a tela mobile inteira */
     .dashboard-wrapper {
         padding: 1rem;
         min-height: calc(100vh - 60px);
