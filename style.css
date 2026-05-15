@@ -304,15 +304,16 @@ body:not(.is-admin) .admin-only { display: none !important; }
     align-items: center;
     padding: 2rem;
     position: relative;
+    background-color: var(--sidebar-bg); /* Fundo base para evitar flashes brancos */
     background-size: cover;
     background-position: center;
-    transition: background-image 1.5s ease-in-out; /* Animação suave entre fotos */
+    transition: background-image 1.5s ease-in-out;
 }
 
 .dashboard-overlay {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(15, 23, 42, 0.65);
+    background: rgba(15, 23, 42, 0.45); /* Reduzido de 0.65 para 0.45 para a foto aparecer bem */
     z-index: 1;
 }
 
