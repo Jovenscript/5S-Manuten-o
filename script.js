@@ -352,7 +352,7 @@ function aplicarLogin(user) {
     solicitarPermissaoNotificacao();
     atualizarDashboard();
     
-    // FASE 3: Ao logar, vai sempre direto para o Dashboard moderno!
+    // FASE 3: Vai direto para o Dashboard!
     mostrarTela('view-dashboard');
 }
 
@@ -378,10 +378,8 @@ function mostrarTela(id) {
     if (id === 'view-gavetas' || id === 'view-dashboard') gavetaAtualAberta = null;
     if (id === 'view-historico') renderizarHistorico();
     
-    // Rola para o topo corretamente considerando o layout preenchido
     document.getElementById('area-conteudo-scroll').scrollTo(0, 0);
     
-    // Foco automático na busca global se for o dashboard
     if(id === 'view-dashboard') {
         setTimeout(() => document.getElementById('input-busca-global').focus(), 300);
     }
@@ -522,7 +520,6 @@ function renderizarPecasDaGaveta(idGaveta) {
         return;
     }
 
-    // 1. Agrupar peças por Divisória
     const grupos = {};
     pecasBrutas.forEach(peca => {
         const divi = (peca.divisoria || 'Geral').toUpperCase();
@@ -530,23 +527,17 @@ function renderizarPecasDaGaveta(idGaveta) {
         grupos[divi].push(peca);
     });
 
-    // 2. Ordenar as Divisórias alfabeticamente
     const nomesDivisorias = Object.keys(grupos).sort();
 
-    // 3. Renderizar cada Divisória e seu respectivo Grid
     nomesDivisorias.forEach(nomeDivisoria => {
-        
-        // Renderiza o Título da Divisória
         const headerDivi = document.createElement('div');
         headerDivi.className = 'divisoria-header';
         headerDivi.innerHTML = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
         mainContainer.appendChild(headerDivi);
 
-        // Cria o Grid dessa divisória
         const gridDivi = document.createElement('div');
         gridDivi.className = 'grid-pecas';
         
-        // Ordena as peças da divisória por posição
         const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
 
         pecasOrdenadas.forEach(peca => {
