@@ -124,7 +124,7 @@ async function salvarItensDaGaveta(idGaveta) {
 }
 
 // =========================================================================
-// INICIALIZAÇÃO E MIGRAÇÃO
+// INICIALIZAÇÃO, MIGRAÇÃO E SINCRONIZAÇÃO FIREBASE
 // =========================================================================
 window.onload = () => {
     iniciarSincronizacaoFirebase();
@@ -223,7 +223,7 @@ async function migrarDadosLegados() {
 }
 
 // =========================================================================
-// EVENTOS, AUTORIZAÇÃO E LOGIN
+// EVENTOS E AUTORIZAÇÃO
 // =========================================================================
 function configurarEventosEnter() {
     const map = [
@@ -368,7 +368,9 @@ function mostrarTela(id) {
     
     const links = document.querySelectorAll('.nav-item');
     links.forEach(l => l.classList.remove('active'));
-    event && event.currentTarget ? event.currentTarget.classList.add('active') : null;
+    if(event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    }
 
     document.getElementById('sidebar-menu').classList.remove('open');
     document.getElementById('mobile-overlay').classList.remove('open');
@@ -376,7 +378,8 @@ function mostrarTela(id) {
     if (id === 'view-gavetas' || id === 'view-dashboard') gavetaAtualAberta = null;
     if (id === 'view-historico') renderizarHistorico();
     
-    window.scrollTo(0, 0);
+    // Rola para o topo corretamente considerando o layout preenchido
+    document.getElementById('area-conteudo-scroll').scrollTo(0, 0);
     
     // Foco automático na busca global se for o dashboard
     if(id === 'view-dashboard') {
@@ -410,7 +413,7 @@ function buscarPecasGlobal() {
     });
 
     if(achados.length === 0) {
-        resultadosDiv.innerHTML = '<p style="color: white; padding: 20px;">Nenhum item encontrado.</p>';
+        resultadosDiv.innerHTML = '<p style="color: white; text-shadow: 1px 1px 2px black; padding: 20px;">Nenhum item encontrado.</p>';
         resultadosDiv.classList.remove('view-hidden');
         return;
     }
@@ -558,7 +561,6 @@ function renderizarPecasDaGaveta(idGaveta) {
 
             const div = document.createElement('div');
             div.className = 'compartimento-card';
-            // CSS Variable injected for the grid layout sizing
             div.style.setProperty('--span-size', displaySize);
 
             div.innerHTML = `
@@ -675,8 +677,29 @@ async function confirmarMoverPeca() {
     fecharModalMoverPeca();
 }
 
+function abrirModalEditarGaveta(eventoClick, idGaveta) {
+    eventoClick.stopPropagation();
+    gavetaSendoEditadaId = idGaveta;
+    const gaveta = database.drawers.find(d => d.id === idGaveta);
+    document.getElementById('edit-gaveta-nome').value = gaveta.title;
+    document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
+    setTimeout(() => document.getElementById('edit-gaveta-nome').focus(), 100);
+}
+function fecharModalEditarGaveta() { document.getElementById('modal-editar-gaveta').classList.add('view-hidden'); }
+
+function salvarNomeGaveta() {
+    const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
+    if (!novoNome) return mostrarAlerta('Atenção', 'O nome da gaveta não pode ficar vazio.');
+    const gaveta     = database.drawers.find(d => d.id === gavetaSendoEditadaId);
+    const nomeAntigo = gaveta.title;
+    gaveta.title     = novoNome;
+    registrarLog(`alterou o nome da gaveta ${gaveta.label} de "${nomeAntigo}" para "${novoNome}"`);
+    salvarConfig();
+    fecharModalEditarGaveta();
+}
+
 // =========================================================================
-// GERENCIAMENTO DE PEÇAS E POSIÇÃO (ATUALIZADO FASE 2)
+// GERENCIAMENTO DE PEÇAS E POSIÇÃO
 // =========================================================================
 function abrirModalCadastro() {
     ['novo-codigo','novo-nome', 'novo-posicao'].forEach(id => document.getElementById(id).value = '');
@@ -823,7 +846,7 @@ function mostrarAlerta(titulo, mensagem) {
 function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
 // =========================================================================
-// GERADOR DE PEDIDO (FORMULÁRIO INTELIGENTE)
+// GERADOR DE PEDIDO DE COMPRA
 // =========================================================================
 function gerarEmailPedido() {
     const containerItens = document.getElementById('formulario-pedido-itens');
