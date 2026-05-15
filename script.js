@@ -125,7 +125,7 @@ async function salvarItensDaGaveta(idGaveta) {
 }
 
 // =========================================================================
-// INICIALIZAÇÃO, MIGRAÇÃO E SINCRONIZAÇÃO FIREBASE
+// INICIALIZAÇÃO E MIGRAÇÃO
 // =========================================================================
 window.onload = () => {
     iniciarSincronizacaoFirebase();
@@ -180,7 +180,7 @@ function atualizarSeLogado() {
     const container = document.getElementById('app-container');
     if (container && container.classList.contains('view-active')) {
         atualizarDashboard();
-        atualizarCarrosselBackground(); // Inicia o carrossel de fotos do banco
+        atualizarCarrosselBackground();
     }
 }
 
@@ -389,7 +389,7 @@ function voltarParaGavetas() { mostrarTela('view-gavetas'); }
 function sairDoSistema()     { location.reload(); }
 
 // =========================================================================
-// DASHBOARD (BACKGROUND E BUSCA) E ARMÁRIO GERAL
+// DASHBOARD, BUSCA GLOBAL E ARMÁRIO
 // =========================================================================
 
 function atualizarCarrosselBackground() {
@@ -477,6 +477,32 @@ function atualizarDashboard() {
     if (gavetaAtualAberta !== null) renderizarPecasDaGaveta(gavetaAtualAberta);
 }
 
+function getPecaStatus(peca) {
+    if (peca.requested)               return 'amarelo';
+    if (peca.current === 0)           return 'vermelho';
+    if (peca.current < peca.expected) return 'laranja';
+    return 'verde';
+}
+
+function getGavetaStatus(pecas) {
+    if (!pecas || pecas.length === 0) return 'verde';
+    let v = false, l = false, a = false;
+    pecas.forEach(p => {
+        const s = getPecaStatus(p);
+        if (s === 'vermelho') v = true;
+        if (s === 'laranja')  l = true;
+        if (s === 'amarelo')  a = true;
+    });
+    if (v) return 'vermelho';
+    if (l) return 'laranja';
+    if (a) return 'amarelo';
+    return 'verde';
+}
+
+function getStatusText(status) {
+    return { verde: 'Estoque Cheio', amarelo: 'Requisitado', laranja: 'Poucas Peças', vermelho: 'Sem Estoque' }[status] || '';
+}
+
 function verificarEstoqueZerado() {
     let qtdZerados = 0;
     database.drawers.forEach(gaveta => {
@@ -541,9 +567,6 @@ function renderArmarioVertical() {
     });
 }
 
-// =========================================================================
-// GESTÃO DE GAVETAS (REORDENAR E EDITAR)
-// =========================================================================
 function moverGaveta(evento, idGaveta, direcao) {
     evento.stopPropagation(); 
     const indexAtual = database.drawers.findIndex(d => d.id === idGaveta);
@@ -583,7 +606,7 @@ function salvarNomeGaveta() {
 }
 
 // =========================================================================
-// DENTRO DA GAVETA (RENDERIZAÇÃO COM DIVISÓRIAS E ALTURA)
+// DENTRO DA GAVETA
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
