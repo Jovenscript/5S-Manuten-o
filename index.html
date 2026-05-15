@@ -55,6 +55,9 @@
                 <div class="form-group">
                     <label for="reg-senha">Crie uma Senha</label>
                     <input type="password" id="reg-senha" placeholder="Sua senha secreta">
+                    <small style="display:block; margin-top:5px; color:var(--text-secondary); font-size:0.75rem; line-height: 1.2;">
+                        Mín. 8 caracteres, contendo 1 maiúscula, 1 minúscula, 1 número e 1 símbolo.
+                    </small>
                 </div>
                 <button class="btn-login btn-registrar" onclick="window.registrarUsuario()">Cadastrar e Entrar</button>
                 <p class="link-toggle" onclick="window.alternarTelaLogin()">Já possui cadastro? Voltar ao login</p>
@@ -67,7 +70,11 @@
         <nav class="sidebar" id="sidebar-menu">
             <div class="logo">5S</div>
             <div class="nav-items">
-                <div class="nav-item active" onclick="window.mostrarTela('view-gavetas')">
+                <div class="nav-item active" onclick="window.mostrarTela('view-dashboard')">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <span>Início</span>
+                </div>
+                <div class="nav-item" onclick="window.mostrarTela('view-gavetas')">
                     <i class="fa-solid fa-house"></i>
                     <span>Armário</span>
                 </div>
@@ -108,13 +115,31 @@
                 </div>
             </header>
 
-            <div class="main-padding">
+            <div class="main-padding" id="area-conteudo-scroll">
+                
                 <div id="alerta-global-zerado" class="alerta-global view-hidden">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem;"></i>
                     <span id="texto-alerta-zerado"><strong>Atenção:</strong> Existem itens com estoque ZERADO no armário!</span>
                 </div>
 
-                <section id="view-gavetas" class="view-active">
+                <section id="view-dashboard" class="view-active">
+                    <div class="dashboard-wrapper">
+                        <div class="glass-panel">
+                            <h2 style="color: white; font-size: 2rem; margin-bottom: 10px; text-shadow: 1px 1px 5px rgba(0,0,0,0.5);">O que você procura hoje?</h2>
+                            <p style="color: #cbd5e1; margin-bottom: 30px; font-size: 1.1rem; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">Busque componentes em todos os compartimentos do sistema.</p>
+                            
+                            <div class="search-box-container">
+                                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                <input type="text" id="input-busca-global" class="search-input-glass" oninput="window.buscarPecasGlobal()" placeholder="Digite o nome, código ou local do item...">
+                            </div>
+
+                            <div id="resultados-busca-global" class="resultados-grid view-hidden">
+                                </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="view-gavetas" class="view-hidden">
                     <div class="relatorio-geral">
                         <h3>Visão Geral do Armário</h3>
                         <div class="kpi-grid">
@@ -189,7 +214,7 @@
                         </button>
                     </div>
                     
-                    <div id="grid-pecas" class="grid-pecas">
+                    <div id="container-divisorias">
                         </div>
                 </section>
             </div>
@@ -203,7 +228,7 @@
             
             <div class="form-group row">
                 <div class="col">
-                    <label>Código/Local (Opcional):</label>
+                    <label>Item/Local (Opcional):</label>
                     <input type="text" id="novo-codigo" placeholder="Ex: G2-01">
                 </div>
                 <div class="col">
@@ -211,6 +236,7 @@
                     <input type="text" id="novo-nome" placeholder="Ex: Contatora">
                 </div>
             </div>
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Padrão 5S (Qtd Ideal):</label>
@@ -221,6 +247,18 @@
                     <input type="number" id="novo-atual" min="0" value="0">
                 </div>
             </div>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Divisória (Letra/Nome):</label>
+                    <input type="text" id="novo-divisoria" placeholder="Ex: A, B, Geral..." value="Geral">
+                </div>
+                <div class="col">
+                    <label>Tamanho Físico (Grade):</label>
+                    <input type="number" id="novo-tamanho" placeholder="Largura (1, 2, 3...)" min="1" value="1">
+                </div>
+            </div>
+
             <div class="form-group row">
                 <div class="col">
                     <label>Ordem na Gaveta (Ex: 1, 2, 3...):</label>
@@ -246,7 +284,7 @@
             
             <div class="form-group row">
                 <div class="col">
-                    <label>Código/Local:</label>
+                    <label>Item/Local:</label>
                     <input type="text" id="edit-peca-codigo">
                 </div>
                 <div class="col">
@@ -254,6 +292,7 @@
                     <input type="text" id="edit-peca-nome">
                 </div>
             </div>
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Padrão 5S (Qtd Ideal):</label>
@@ -264,6 +303,18 @@
                     <input type="number" id="edit-peca-atual" min="0">
                 </div>
             </div>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Divisória (Letra/Nome):</label>
+                    <input type="text" id="edit-peca-divisoria" placeholder="Ex: A, B, Geral...">
+                </div>
+                <div class="col">
+                    <label>Tamanho Físico (Grade):</label>
+                    <input type="number" id="edit-peca-tamanho" placeholder="Largura (1, 2, 3...)" min="1">
+                </div>
+            </div>
+
             <div class="form-group row">
                 <div class="col">
                     <label>Ordem na Gaveta (Ex: 1, 2, 3...):</label>
@@ -333,6 +384,35 @@
                 <button id="btn-copiar-pedido" class="btn-save btn-copiar view-hidden" onclick="window.copiarTextoPedido()">
                     <i class="fa-solid fa-copy"></i> Copiar Mensagem
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-redefinir-senha" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3 style="color: var(--status-vermelho);"><i class="fa-solid fa-shield-halved"></i> Atualização de Segurança</h3>
+            <p class="modal-subtitle" style="margin-top: 10px;">Sua senha atual não atende aos novos requisitos corporativos de segurança. Por favor, crie uma nova senha forte para acessar o sistema.</p>
+            
+            <ul style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px; padding-left: 20px;">
+                <li>No mínimo 8 caracteres</li>
+                <li>Pelo menos uma letra maiúscula</li>
+                <li>Pelo menos uma letra minúscula</li>
+                <li>Pelo menos um número</li>
+                <li>Pelo menos um símbolo especial (@, !, #, $, etc.)</li>
+            </ul>
+
+            <div class="form-group">
+                <label>Nova Senha Forte:</label>
+                <input type="password" id="nova-senha-obrigatoria" placeholder="Digite a nova senha">
+            </div>
+            <div class="form-group">
+                <label>Confirme a Nova Senha:</label>
+                <input type="password" id="nova-senha-confirma" placeholder="Repita a senha">
+            </div>
+            
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="window.cancelarRedefinicaoSenha()">Cancelar Login</button>
+                <button class="btn-save" onclick="window.salvarSenhaObrigatoria()">Salvar e Entrar</button>
             </div>
         </div>
     </div>
