@@ -125,7 +125,6 @@
                 <section id="view-dashboard" class="view-active">
                     <div class="dashboard-wrapper">
                         <div class="dashboard-overlay"></div>
-                        
                         <div class="glass-panel">
                             <h2 style="color: white; font-size: 2.5rem; margin-bottom: 15px; text-shadow: 2px 2px 8px rgba(0,0,0,0.8);">O que você procura hoje?</h2>
                             <p style="color: #e2e8f0; margin-bottom: 35px; font-size: 1.2rem; text-shadow: 1px 1px 4px rgba(0,0,0,0.8);">Busque componentes em todos os compartimentos do sistema.</p>
@@ -135,8 +134,7 @@
                                 <input type="text" id="input-busca-global" class="search-input-glass" oninput="window.buscarPecasGlobal()" placeholder="Digite o nome ou local do item...">
                             </div>
 
-                            <div id="resultados-busca-global" class="resultados-grid view-hidden">
-                            </div>
+                            <div id="resultados-busca-global" class="resultados-grid view-hidden"></div>
                         </div>
                     </div>
                 </section>
@@ -151,13 +149,10 @@
                                     <p>Gavetas com<br>Alertas</p>
                                 </div>
                             </div>
-                            <div class="kpi-status-list" id="kpi-lista-gavetas">
-                                </div>
+                            <div class="kpi-status-list" id="kpi-lista-gavetas"></div>
                         </div>
                     </div>
-
-                    <div class="cabinet-vertical" id="menu-gavetas">
-                        </div>
+                    <div class="cabinet-vertical" id="menu-gavetas"></div>
                 </section>
 
                 <section id="view-historico" class="view-hidden">
@@ -165,43 +160,27 @@
                         <h2><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Atividades</h2>
                     </div>
                     <p class="subtitulo-historico">Acompanhe todas as retiradas, adições e modificações feitas no sistema.</p>
-                    
-                    <div id="lista-historico" class="historico-lista">
-                        </div>
+                    <div id="lista-historico" class="historico-lista"></div>
                 </section>
 
                 <section id="view-config" class="view-hidden">
-                    <div class="header-gaveta">
-                        <h2><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2>
-                    </div>
-                    
+                    <div class="header-gaveta"><h2><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2></div>
                     <div class="config-grid">
                         <div class="config-card">
                             <h3><i class="fa-solid fa-database"></i> Backup do Sistema</h3>
                             <p>Baixe todos os dados salvos ou restaure um arquivo de backup anterior para o sistema.</p>
-                            
                             <div class="config-buttons">
-                                <button class="btn-save" onclick="window.fazerBackup()">
-                                    <i class="fa-solid fa-download"></i> Baixar Arquivo
-                                </button>
-                                <button class="btn-cancel" onclick="document.getElementById('input-restore').click()">
-                                    <i class="fa-solid fa-upload"></i> Restaurar
-                                </button>
+                                <button class="btn-save" onclick="window.fazerBackup()"><i class="fa-solid fa-download"></i> Baixar Arquivo</button>
+                                <button class="btn-cancel" onclick="document.getElementById('input-restore').click()"><i class="fa-solid fa-upload"></i> Restaurar</button>
                                 <input type="file" id="input-restore" style="display: none;" accept=".json" onchange="window.restaurarBackup(event)">
                             </div>
                         </div>
-
                         <div class="config-card">
                             <h3><i class="fa-solid fa-file-excel"></i> Planilhas Excel (CSV)</h3>
                             <p>Exporte o relatório atualizado do estoque do armário ou baixe os registros do histórico.</p>
-                            
                             <div class="config-buttons">
-                                <button class="btn-save" style="background-color: #10b981;" onclick="window.exportarEstoqueCSV()">
-                                    <i class="fa-solid fa-boxes-stacked"></i> Estoque
-                                </button>
-                                <button class="btn-save" style="background-color: #3b82f6;" onclick="window.exportarHistoricoCSV()">
-                                    <i class="fa-solid fa-clock-rotate-left"></i> Histórico
-                                </button>
+                                <button class="btn-save" style="background-color: #10b981;" onclick="window.exportarEstoqueCSV()"><i class="fa-solid fa-boxes-stacked"></i> Estoque</button>
+                                <button class="btn-save" style="background-color: #3b82f6;" onclick="window.exportarHistoricoCSV()"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
                             </div>
                         </div>
                     </div>
@@ -215,9 +194,7 @@
                             <i class="fa-solid fa-plus"></i> Nova Peça
                         </button>
                     </div>
-                    
-                    <div id="container-divisorias">
-                    </div>
+                    <div id="container-divisorias"></div>
                 </section>
             </div>
         </div>
@@ -256,8 +233,8 @@
                     <input type="text" id="novo-divisoria" placeholder="Ex: A, B, Geral..." value="Geral">
                 </div>
                 <div class="col">
-                    <label>Tamanho Físico (Grade):</label>
-                    <input type="number" id="novo-tamanho" placeholder="Largura (1, 2, 3...)" min="1" value="1">
+                    <label>Altura Física (Linhas):</label>
+                    <input type="number" id="novo-tamanho" placeholder="Altura (1, 2, 3...)" min="1" value="1">
                 </div>
             </div>
 
@@ -312,8 +289,8 @@
                     <input type="text" id="edit-peca-divisoria" placeholder="Ex: A, B, Geral...">
                 </div>
                 <div class="col">
-                    <label>Tamanho Físico (Grade):</label>
-                    <input type="number" id="edit-peca-tamanho" placeholder="Largura (1, 2, 3...)" min="1">
+                    <label>Altura Física (Linhas):</label>
+                    <input type="number" id="edit-peca-tamanho" placeholder="Altura (1, 2, 3...)" min="1">
                 </div>
             </div>
 
