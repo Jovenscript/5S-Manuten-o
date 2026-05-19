@@ -775,7 +775,12 @@ function renderizarPecasDaGaveta(idGaveta) {
         pecasOrdenadas.forEach(peca => {
             const statusPeca   = getPecaStatus(peca);
             const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
-            const imgHtml      = peca.image ? `<img src="${peca.image}" alt="${peca.name}">` : `<i class="fa-solid fa-microchip"></i>`;
+            
+            // FOTO COM CONFIGURAÇÃO PARA NÃO CORTAR (Solução 2)
+            const imgHtml      = peca.image 
+                ? `<img src="${peca.image}" alt="${peca.name}" style="max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply;">` 
+                : `<i class="fa-solid fa-microchip" style="font-size: 3rem; color: #94a3b8;"></i>`;
+                
             const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
 
             const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
@@ -783,7 +788,12 @@ function renderizarPecasDaGaveta(idGaveta) {
 
             const div      = document.createElement('div');
             div.className  = 'compartimento-card';
+            
+            // Adicionado flex-direction column e height 100% para o layout fluido funcionar perfeitamente
             div.style.setProperty('--span-size', displaySize);
+            div.style.display = 'flex';
+            div.style.flexDirection = 'column';
+            div.style.height = '100%';
 
             div.innerHTML = `
                 <div class="card-top">
@@ -795,30 +805,37 @@ function renderizarPecasDaGaveta(idGaveta) {
                     </div>
                     <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
                 </div>
+                
                 <div class="card-title">${peca.name}</div>
-                <div class="card-image-box">${imgHtml}</div>
-                <div class="card-data-row">
-                    <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
-                    <div class="data-box">
-                        <span>Física Atual</span>
-                        <div class="quick-control">
-                            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                            <strong style="color:${corQtd}">${peca.current}</strong>
-                            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                
+                <div class="card-image-box" style="flex: 1; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 10px 0; display: flex; align-items: center; justify-content: center; min-height: 140px; padding: 10px; overflow: hidden;">
+                    ${imgHtml}
+                </div>
+                
+                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+                    <div class="card-data-row">
+                        <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
+                        <div class="data-box">
+                            <span>Física Atual</span>
+                            <div class="quick-control">
+                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                                <strong style="color:${corQtd}">${peca.current}</strong>
+                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                            </div>
                         </div>
                     </div>
-                </div>
-                ${retiradaHtml}
-                <div class="botoes-acao-card">
-                    <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
-                        <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
-                    </button>
-                    <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
-                        <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
-                    </button>
-                    <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
-                        <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
-                    </button>
+                    ${retiradaHtml}
+                    <div class="botoes-acao-card">
+                        <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
+                            <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
+                        </button>
+                        <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
+                            <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
+                        </button>
+                        <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
+                            <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
+                        </button>
+                    </div>
                 </div>`;
             
             // Lógica Drag and Drop de Peças (Somente ADMIN)
