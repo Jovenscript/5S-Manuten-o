@@ -1,5 +1,4 @@
-// FIX: variável era 'urlsToCache' (não existia) — corrigido para ASSETS_TO_CACHE
-const CACHE_NAME = '5s-manutencao-v3';
+const CACHE_NAME = '5s-manutencao-v4';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -15,8 +14,8 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('5S Manutenção: arquivos em cache armazenados.');
-                return cache.addAll(ASSETS_TO_CACHE); // FIX: era urlsToCache
+                console.log('5S Manutenção: Arquivos armazenados em cache.');
+                return cache.addAll(ASSETS_TO_CACHE);
             })
     );
 });
