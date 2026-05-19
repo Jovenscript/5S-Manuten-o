@@ -655,10 +655,9 @@ body:not(.is-admin) .admin-only { display: none !important; }
     width: 100%; 
     color: white; 
     text-shadow: 1px 1px 2px rgba(0,0,0,0.6); 
-    pointer-events: none; /* Previne problemas de drag and drop nos filhos */
+    pointer-events: none; 
 }
 
-/* Reativa pointer-events para botões dentro da gaveta */
 .gaveta-content .btn-edit-gaveta, .gaveta-content .drag-handle {
     pointer-events: auto;
 }
@@ -798,6 +797,27 @@ body:not(.is-admin) .admin-only { display: none !important; }
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
+/* Efeitos Drag and Drop PEÇAS */
+.compartimento-card.dragging {
+    opacity: 0.5;
+    border: 2px dashed #38bdf8;
+    transform: scale(0.98);
+}
+.compartimento-card.drag-over {
+    border: 2px solid #38bdf8;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+}
+
+.drag-handle-item {
+    cursor: grab;
+    color: #94a3b8;
+    margin-right: 10px;
+    font-size: 1.2rem;
+    transition: color 0.2s;
+}
+
+.drag-handle-item:hover { color: #38bdf8; }
+
 .compartimento-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 8px 15px rgba(0,0,0,0.1);
@@ -808,6 +828,11 @@ body:not(.is-admin) .admin-only { display: none !important; }
     justify-content: space-between; 
     align-items: center; 
     margin-bottom: 1rem; 
+}
+
+.card-top > div {
+    display: flex;
+    align-items: center;
 }
 
 .card-local { 
