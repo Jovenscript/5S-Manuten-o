@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>5S Manutenção - Gaveteiro Elétrico</title>
+    
+    <!-- Configurações PWA e Mobile -->
+    <meta name="theme-color" content="#1e3a5f">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+    
+    <!-- Estilos e Ícones -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -152,6 +159,9 @@
                             <div class="kpi-status-list" id="kpi-lista-gavetas"></div>
                         </div>
                     </div>
+                    <p class="admin-only" style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9rem;">
+                        <i class="fa-solid fa-info-circle"></i> Como admin, você pode clicar e arrastar as gavetas abaixo para reorganizar a ordem do armário.
+                    </p>
                     <div class="cabinet-vertical" id="menu-gavetas"></div>
                 </section>
 
@@ -200,6 +210,7 @@
         </div>
     </main>
 
+    <!-- Modais (Cadastro, Edição, Conferência, Pedidos, etc.) -->
     <div id="modal-cadastro" class="modal-overlay view-hidden">
         <div class="modal-content">
             <h3>Cadastrar Novo Componente</h3>
@@ -420,6 +431,7 @@
         </div>
     </div>
 
+    <!-- Script Principal -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
