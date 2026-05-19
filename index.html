@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>5S Manutenção - Gaveteiro Elétrico</title>
     
-    <!-- Configurações PWA e Mobile -->
     <meta name="theme-color" content="#1e3a5f">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192x192.png">
     
-    <!-- Estilos e Ícones -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -204,13 +202,15 @@
                             <i class="fa-solid fa-plus"></i> Nova Peça
                         </button>
                     </div>
+                    <p class="admin-only" style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem; text-align: center;">
+                        <i class="fa-solid fa-info-circle"></i> Segure e arraste as peças pelos pontinhos para reorganizá-las ou mudar de divisória.
+                    </p>
                     <div id="container-divisorias"></div>
                 </section>
             </div>
         </div>
     </main>
 
-    <!-- Modais (Cadastro, Edição, Conferência, Pedidos, etc.) -->
     <div id="modal-cadastro" class="modal-overlay view-hidden">
         <div class="modal-content">
             <h3>Cadastrar Novo Componente</h3>
