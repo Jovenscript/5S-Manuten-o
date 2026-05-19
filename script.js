@@ -64,6 +64,7 @@ let usuarioAguardandoRedefinicao = null;
 
 // Drag and Drop
 let draggedDrawerIndex = null;
+let draggedPecaId      = null;
 
 // Variáveis do Carrossel de Imagens
 let carrosselInterval = null;
@@ -328,7 +329,6 @@ async function iniciarSincronizacaoFirebase() {
             database.drawers = d.drawers  || [...GAVETAS_PADRAO];
             usuariosSalvos   = d.usuarios || [];
             database.drawers.forEach(g => { if (!database.items[g.id]) database.items[g.id] = []; });
-            // Registra listeners dinamicamente para as gavetas
             registrarListenersGavetas();
         } else {
             salvarConfig();
@@ -674,7 +674,7 @@ function renderArmarioVertical() {
         
         div.innerHTML = `
             <div class="gaveta-content">
-                <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste para reordenar" style="cursor: grab; font-size: 1.2rem; color: rgba(255,255,255,0.5);"></i>
+                <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste para reordenar a gaveta" style="cursor: grab; font-size: 1.2rem; color: rgba(255,255,255,0.5);"></i>
                 <span class="gnumber">${gaveta.label}</span>
                 <span class="glabel">${gaveta.title}</span>
                 <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
@@ -683,39 +683,33 @@ function renderArmarioVertical() {
                 <div class="gstatus-light ${status}"></div>
             </div>`;
 
-        // Evento de clique para abrir a gaveta (ignorando ícones de ação)
         div.onclick = (e) => {
             if (e.target.closest('.btn-edit-gaveta') || e.target.closest('.drag-handle')) return;
             abrirGaveta(gaveta.id);
         };
 
-        // Lógica de Drag and Drop (Apenas Admin)
         if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
             div.draggable = true;
             
             div.ondragstart = (e) => {
                 draggedDrawerIndex = index;
                 e.dataTransfer.effectAllowed = 'move';
-                // Usando setTimeout para a classe não afetar o "fantasma" do drag imediatamente
                 setTimeout(() => div.classList.add('dragging'), 0);
             };
 
             div.ondragover = (e) => {
-                e.preventDefault(); // Necessário para permitir o drop
+                e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
                 div.classList.add('drag-over');
             };
 
-            div.ondragleave = () => {
-                div.classList.remove('drag-over');
-            };
+            div.ondragleave = () => { div.classList.remove('drag-over'); };
 
             div.ondrop = async (e) => {
                 e.preventDefault();
                 div.classList.remove('drag-over');
                 if (draggedDrawerIndex === null || draggedDrawerIndex === index) return;
 
-                // Troca as posições no array
                 const gavetaArrastada = database.drawers[draggedDrawerIndex];
                 database.drawers.splice(draggedDrawerIndex, 1);
                 database.drawers.splice(index, 0, gavetaArrastada);
@@ -723,7 +717,7 @@ function renderArmarioVertical() {
                 registrarLog(`reordenou a ${gavetaArrastada.label} para a nova posição no armário.`);
                 
                 await salvarConfig();
-                renderArmarioVertical(); // Re-renderiza o painel
+                renderArmarioVertical(); 
             };
 
             div.ondragend = () => {
@@ -737,7 +731,7 @@ function renderArmarioVertical() {
 }
 
 // =========================================================================
-// INTERIOR DA GAVETA
+// INTERIOR DA GAVETA E DRAG AND DROP DAS PEÇAS
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
@@ -794,6 +788,7 @@ function renderizarPecasDaGaveta(idGaveta) {
             div.innerHTML = `
                 <div class="card-top">
                     <div>
+                        <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
                         <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
                         <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
@@ -825,6 +820,75 @@ function renderizarPecasDaGaveta(idGaveta) {
                         <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
                     </button>
                 </div>`;
+            
+            // Lógica Drag and Drop de Peças (Somente ADMIN)
+            if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
+                div.draggable = true;
+
+                div.ondragstart = (e) => {
+                    // Impede o arrasto se estiver interagindo com um botão rápido
+                    if(e.target.closest('.btn-quick') || e.target.closest('button')) {
+                        e.preventDefault();
+                        return;
+                    }
+                    draggedPecaId = peca.id;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => div.classList.add('dragging'), 0);
+                };
+
+                div.ondragover = (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    div.classList.add('drag-over');
+                };
+
+                div.ondragleave = () => { div.classList.remove('drag-over'); };
+
+                div.ondrop = async (e) => {
+                    e.preventDefault();
+                    div.classList.remove('drag-over');
+                    
+                    if (!draggedPecaId || draggedPecaId === peca.id) return;
+
+                    let itensGaveta = database.items[gavetaAtualAberta];
+                    
+                    const pecaArrastada = itensGaveta.find(p => p.id === draggedPecaId);
+                    const pecaAlvo = peca; // A peça onde o drop aconteceu
+
+                    if(!pecaArrastada || !pecaAlvo) return;
+
+                    // Atualiza a divisória caso o usuário tenha arrastado para outra
+                    pecaArrastada.divisoria = pecaAlvo.divisoria;
+
+                    // Filtra todos os itens da divisória ALVO e os ordena pela posição atual
+                    let divisoriaItems = itensGaveta.filter(p => p.divisoria === pecaAlvo.divisoria).sort((a, b) => (a.position || 999) - (b.position || 999));
+                    
+                    // Remove a peça arrastada desse array temporário (para não duplicar)
+                    divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
+                    
+                    // Descobre em qual índice do array a peça alvo está agora
+                    const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
+                    
+                    // Insere a peça arrastada no lugar exato da peça alvo
+                    divisoriaItems.splice(novoIndexAlvo, 0, pecaArrastada);
+
+                    // Refaz a numeração sequencial (1, 2, 3...) para todas as peças da divisória
+                    divisoriaItems.forEach((p, index) => {
+                        p.position = index + 1;
+                    });
+
+                    registrarLog(`reordenou a peça "${pecaArrastada.name}" na gaveta`);
+                    
+                    await salvarItensDaGaveta(gavetaAtualAberta);
+                    renderizarPecasDaGaveta(gavetaAtualAberta); // Atualiza apenas a gaveta atual
+                };
+
+                div.ondragend = () => {
+                    div.classList.remove('dragging');
+                    draggedPecaId = null;
+                };
+            }
+
             gridDivi.appendChild(div);
         });
         mainContainer.appendChild(gridDivi);
