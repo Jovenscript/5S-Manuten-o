@@ -16,6 +16,7 @@
 
     <div id="mobile-overlay" class="sidebar-overlay" onclick="window.toggleMenuMobile()"></div>
 
+    <!-- TELA DE AUTORIZAÇÃO DO DISPOSITIVO -->
     <section id="view-device-auth" class="view-active lock-screen">
         <div class="login-container lock-container">
             <i class="fa-solid fa-lock lock-icon"></i>
@@ -30,6 +31,7 @@
         </div>
     </section>
 
+    <!-- TELA DE LOGIN / REGISTRO -->
     <section id="view-login" class="view-hidden">
         <div class="login-container">
             <h2>Sistema de Manutenção 5S</h2>
@@ -70,6 +72,7 @@
         </div>
     </section>
 
+    <!-- APLICAÇÃO PRINCIPAL -->
     <main id="app-container" class="view-hidden">
         
         <nav class="sidebar" id="sidebar-menu">
@@ -122,11 +125,13 @@
 
             <div class="main-padding" id="area-conteudo-scroll">
                 
+                <!-- ALERTA GLOBAL DE ESTOQUE ZERADO -->
                 <div id="alerta-global-zerado" class="alerta-global view-hidden">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem;"></i>
                     <span id="texto-alerta-zerado"><strong>Atenção:</strong> Existem itens com estoque ZERADO no armário!</span>
                 </div>
 
+                <!-- VIEW: DASHBOARD DE BUSCA -->
                 <section id="view-dashboard" class="view-active">
                     <div class="dashboard-wrapper">
                         <div class="dashboard-overlay"></div>
@@ -144,6 +149,7 @@
                     </div>
                 </section>
 
+                <!-- VIEW: ARMÁRIO / LISTA DE GAVETAS -->
                 <section id="view-gavetas" class="view-hidden">
                     <div class="relatorio-geral">
                         <h3>Visão Geral do Armário</h3>
@@ -163,6 +169,7 @@
                     <div class="cabinet-vertical" id="menu-gavetas"></div>
                 </section>
 
+                <!-- VIEW: HISTÓRICO DE ATIVIDADES -->
                 <section id="view-historico" class="view-hidden">
                     <div class="header-gaveta">
                         <h2><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Atividades</h2>
@@ -171,6 +178,7 @@
                     <div id="lista-historico" class="historico-lista"></div>
                 </section>
 
+                <!-- VIEW: CONFIGURAÇÕES (SOMENTE ADMIN) -->
                 <section id="view-config" class="view-hidden">
                     <div class="header-gaveta"><h2><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2></div>
                     <div class="config-grid">
@@ -194,6 +202,7 @@
                     </div>
                 </section>
 
+                <!-- VIEW: INTERIOR DA GAVETA (GRID INDUSTRIAL) -->
                 <section id="view-compartimentos" class="view-hidden">
                     <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%;">
                         <button class="btn-voltar" onclick="window.voltarParaGavetas()">⬅ Voltar</button>
@@ -207,10 +216,12 @@
                     </p>
                     <div id="container-divisorias"></div>
                 </section>
+
             </div>
         </div>
     </main>
 
+    <!-- MODAL: CADASTRAR NOVA PEÇA -->
     <div id="modal-cadastro" class="modal-overlay view-hidden">
         <div class="modal-content">
             <h3>Cadastrar Novo Componente</h3>
@@ -244,8 +255,8 @@
                     <input type="text" id="novo-divisoria" placeholder="Ex: A, B, Geral..." value="Geral">
                 </div>
                 <div class="col">
-                    <label>Altura Física (Linhas):</label>
-                    <input type="number" id="novo-tamanho" placeholder="Altura (1, 2, 3...)" min="1" value="1">
+                    <label>Altura Física (Slots):</label>
+                    <input type="number" id="novo-tamanho" placeholder="Ex: 1, 2, 3, 6, 10..." min="1" value="1">
                 </div>
             </div>
 
@@ -267,6 +278,7 @@
         </div>
     </div>
 
+    <!-- MODAL: EDITAR PEÇA -->
     <div id="modal-editar-peca" class="modal-overlay view-hidden">
         <div class="modal-content">
             <h3>Editar Componente</h3>
@@ -300,8 +312,8 @@
                     <input type="text" id="edit-peca-divisoria" placeholder="Ex: A, B, Geral...">
                 </div>
                 <div class="col">
-                    <label>Altura Física (Linhas):</label>
-                    <input type="number" id="edit-peca-tamanho" placeholder="Altura (1, 2, 3...)" min="1">
+                    <label>Altura Física (Slots):</label>
+                    <input type="number" id="edit-peca-tamanho" placeholder="Ex: 1, 2, 3, 6, 10..." min="1">
                 </div>
             </div>
 
@@ -323,6 +335,7 @@
         </div>
     </div>
 
+    <!-- MODAL: CONTAGEM FÍSICA -->
     <div id="modal-conferencia" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno">
             <h3 id="conf-nome-peca">Nome da Peça</h3>
@@ -340,6 +353,7 @@
         </div>
     </div>
 
+    <!-- MODAL: RENOMEAR GAVETA -->
     <div id="modal-editar-gaveta" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno">
             <h3>Editar Nome da Gaveta</h3>
@@ -354,6 +368,7 @@
         </div>
     </div>
 
+    <!-- MODAL: PEDIDO DE PEÇAS -->
     <div id="modal-pedido" class="modal-overlay view-hidden">
         <div class="modal-content modal-largo">
             <h3>Solicitação de Compra</h3>
@@ -378,6 +393,7 @@
         </div>
     </div>
 
+    <!-- MODAL: REDEFINIR SENHA OBRIGATÓRIA -->
     <div id="modal-redefinir-senha" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno">
             <h3 style="color: var(--status-vermelho);"><i class="fa-solid fa-shield-halved"></i> Atualização de Segurança</h3>
@@ -407,6 +423,7 @@
         </div>
     </div>
 
+    <!-- MODAL: ALERTA GENÉRICO -->
     <div id="modal-alerta" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno text-center">
             <i class="fa-solid fa-circle-exclamation icone-alerta-grande"></i>
@@ -416,6 +433,7 @@
         </div>
     </div>
 
+    <!-- MODAL: MOVER PEÇA DE GAVETA -->
     <div id="modal-mover-peca" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno">
             <h3>Mover Peça de Gaveta</h3>
