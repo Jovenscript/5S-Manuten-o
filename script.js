@@ -694,6 +694,7 @@ function renderArmarioVertical() {
             div.ondragstart = (e) => {
                 draggedDrawerIndex = index;
                 e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', index); // Fundamental para não bugar Firefox/Safari
                 setTimeout(() => div.classList.add('dragging'), 0);
             };
 
@@ -703,7 +704,11 @@ function renderArmarioVertical() {
                 div.classList.add('drag-over');
             };
 
-            div.ondragleave = () => { div.classList.remove('drag-over'); };
+            div.ondragleave = (e) => {
+                if (!div.contains(e.relatedTarget)) {
+                    div.classList.remove('drag-over');
+                }
+            };
 
             div.ondrop = async (e) => {
                 e.preventDefault();
@@ -776,9 +781,9 @@ function renderizarPecasDaGaveta(idGaveta) {
             const statusPeca   = getPecaStatus(peca);
             const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
             
-            // Tratamento simplificado das imagens usando classes CSS
+            // Adicionado draggable="false" para a imagem não roubar o clique do card inteiro
             const imgHtml      = peca.image 
-                ? `<img src="${peca.image}" alt="${peca.name}" class="peca-img">` 
+                ? `<img src="${peca.image}" alt="${peca.name}" class="peca-img" draggable="false">` 
                 : `<i class="fa-solid fa-microchip peca-icon-placeholder"></i>`;
                 
             const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
@@ -789,7 +794,6 @@ function renderizarPecasDaGaveta(idGaveta) {
             const isSpanning      = displaySize > 1;
 
             const div      = document.createElement('div');
-            // Adiciona classe de expansão somente se for uma peça maior que o padrão
             div.className  = `compartimento-card ${isSpanning ? 'expandido' : ''}`;
             div.style.setProperty('--span-size', displaySize);
 
@@ -848,6 +852,7 @@ function renderizarPecasDaGaveta(idGaveta) {
                     }
                     draggedPecaId = peca.id;
                     e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', peca.id); // Fundamental para não bugar Firefox/Safari
                     setTimeout(() => div.classList.add('dragging'), 0);
                 };
 
@@ -857,7 +862,12 @@ function renderizarPecasDaGaveta(idGaveta) {
                     div.classList.add('drag-over');
                 };
 
-                div.ondragleave = () => { div.classList.remove('drag-over'); };
+                div.ondragleave = (e) => {
+                    // Evita o efeito "piscar" quando passa o mouse por cima das bordas da imagem ou botões
+                    if (!div.contains(e.relatedTarget)) {
+                        div.classList.remove('drag-over');
+                    }
+                };
 
                 div.ondrop = async (e) => {
                     e.preventDefault();
@@ -883,9 +893,10 @@ function renderizarPecasDaGaveta(idGaveta) {
                     
                     // Descobre em qual índice do array a peça alvo está agora
                     const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
+                    const insertIndex = novoIndexAlvo !== -1 ? novoIndexAlvo : divisoriaItems.length;
                     
                     // Insere a peça arrastada no lugar exato da peça alvo
-                    divisoriaItems.splice(novoIndexAlvo, 0, pecaArrastada);
+                    divisoriaItems.splice(insertIndex, 0, pecaArrastada);
 
                     // Refaz a numeração sequencial (1, 2, 3...) para todas as peças da divisória
                     divisoriaItems.forEach((p, index) => {
