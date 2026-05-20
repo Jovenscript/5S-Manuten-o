@@ -269,7 +269,7 @@ function restaurarBackup(event) {
         try {
             const dados = JSON.parse(e.target.result);
             if (!dados.database || !dados.usuarios) return mostrarAlerta('Arquivo Inválido', 'O arquivo selecionado não é um backup válido.');
-            
+
             database       = dados.database;
             usuariosSalvos = dados.usuarios;
             historicoLogs  = dados.historico || [];
@@ -620,7 +620,7 @@ function atualizarDashboard() {
     calcularKPIs();
     verificarEstoqueZerado();
     renderizarHistorico();
-    
+
     atualizarImagensCarrossel();
     const dashAtivo = document.getElementById('view-dashboard') && document.getElementById('view-dashboard').classList.contains('view-active');
     if (dashAtivo && !carrosselInterval && carrosselImagens.length > 0) iniciarCarrosselDashboard();
@@ -671,7 +671,7 @@ function renderArmarioVertical() {
         const status = getGavetaStatus(database.items[gaveta.id] || []);
         const div = document.createElement('div');
         div.className = 'btn-gaveta';
-        
+
         div.innerHTML = `
             <div class="gaveta-content">
                 <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste para reordenar a gaveta" style="cursor: grab; font-size: 1.2rem; color: rgba(255,255,255,0.5);"></i>
@@ -690,11 +690,10 @@ function renderArmarioVertical() {
 
         if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
             div.draggable = true;
-            
+
             div.ondragstart = (e) => {
                 draggedDrawerIndex = index;
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', index);
                 setTimeout(() => div.classList.add('dragging'), 0);
             };
 
@@ -704,11 +703,7 @@ function renderArmarioVertical() {
                 div.classList.add('drag-over');
             };
 
-            div.ondragleave = (e) => {
-                if (!div.contains(e.relatedTarget)) {
-                    div.classList.remove('drag-over');
-                }
-            };
+            div.ondragleave = () => { div.classList.remove('drag-over'); };
 
             div.ondrop = async (e) => {
                 e.preventDefault();
@@ -720,7 +715,7 @@ function renderArmarioVertical() {
                 database.drawers.splice(index, 0, gavetaArrastada);
 
                 registrarLog(`reordenou a ${gavetaArrastada.label} para a nova posição no armário.`);
-                
+
                 await salvarConfig();
                 renderArmarioVertical(); 
             };
@@ -736,7 +731,7 @@ function renderArmarioVertical() {
 }
 
 // =========================================================================
-// INTERIOR DA GAVETA: GRID REAL (5 COLUNAS) E LAYOUT LIMPO COM OVERLAY
+// INTERIOR DA GAVETA E DRAG AND DROP DAS PEÇAS
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
@@ -772,7 +767,6 @@ function renderizarPecasDaGaveta(idGaveta) {
         headerDivi.innerHTML  = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
         mainContainer.appendChild(headerDivi);
 
-        // O novo CSS Grid com 5 colunas reais é aplicado na classe 'grid-pecas'
         const gridDivi      = document.createElement('div');
         gridDivi.className  = 'grid-pecas';
 
@@ -781,88 +775,90 @@ function renderizarPecasDaGaveta(idGaveta) {
         pecasOrdenadas.forEach(peca => {
             const statusPeca   = getPecaStatus(peca);
             const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
-            
-            const imgHtml = peca.image 
-                ? `<img src="${peca.image}" alt="${peca.name}" class="peca-img" draggable="false">` 
-                : `<i class="fa-solid fa-microchip peca-icon-placeholder"></i>`;
-                
-            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-clean">Último a retirar: ${peca.lastTakenBy}</div>` : '';
+
+
+            const imgHtml      = peca.image 
+                ? `<img src="${peca.image}" alt="${peca.name}" style="max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply;">` 
+                : `<i class="fa-solid fa-microchip" style="font-size: 3rem; color: #94a3b8;"></i>`;
+
+            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
 
             const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
             const displaySize     = peca.size || 1;
+
+            // VERIFICA SE A PEÇA É GIGANTE OU NORMAL
+            const isSpanning      = displaySize > 1;
+
+            const div      = document.createElement('div');
+            div.className  = 'compartimento-card';
             
-            const div = document.createElement('div');
-            div.className = 'compartimento-card';
-            // CSS Variables repassam ao Grid o número exato de espaços verticais (rows) a ocupar
             div.style.setProperty('--span-size', displaySize);
+            div.style.display = 'flex';
+            div.style.flexDirection = 'column';
+            div.style.height = '100%';
 
-            // NOVO HTML LIMPO (Visão Padrão + Overlay)
+            // A MÁGICA ACONTECE AQUI:
+            // Se for peça grande (Manopla), a caixa de imagem estica (flex: 1) pra preencher o buraco.
+            // Se for peça normal (Sinaleiro), a caixa fica travada em 140px pra não deformar a linha toda!
+            const imgBoxStyle = isSpanning 
+                ? 'flex: 1; min-height: 140px;' 
+                : 'height: 140px; flex-shrink: 0;';
+
             div.innerHTML = `
-                <div class="card-padrao">
-                    <div class="card-header-clean">
-                        <span class="pos-badge" title="Posição">#${displayPosition}</span>
-                        <span class="status-indicator ${statusPeca}" title="Status: ${getStatusText(statusPeca)}"></span>
+                <div class="card-top">
+                    <div>
+                        <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
+                        <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
+                        <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
                     </div>
-                    
-                    <div class="card-image-clean">
-                        ${imgHtml}
-                    </div>
-                    
-                    <div class="card-info-clean">
-                        <div class="codigo-clean">${peca.code || 'S/N'}</div>
-                        <div class="nome-clean">${peca.name}</div>
-                    </div>
-                    
-                    <div class="card-qtd-clean">
-                        <span class="qtd-atual" style="color:${corQtd}">${peca.current}</span>
-                        <span class="qtd-divisor">/</span>
-                        <span class="qtd-ideal">${peca.expected}</span>
-                    </div>
+                    <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
                 </div>
-
-                <div class="card-overlay-acoes">
-                    <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
-                    
-                    <div class="quick-control" style="margin-bottom: 10px;">
-                        <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                        <strong>${peca.current}</strong>
-                        <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                
+                <div class="card-title">${peca.name}</div>
+                
+                <div class="card-image-box" style="${imgBoxStyle} background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 10px 0; display: flex; align-items: center; justify-content: center; padding: 10px; overflow: hidden;">
+                    ${imgHtml}
+                </div>
+                
+                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+                    <div class="card-data-row">
+                        <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
+                        <div class="data-box">
+                            <span>Física Atual</span>
+                            <div class="quick-control">
+                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                                <strong style="color:${corQtd}">${peca.current}</strong>
+                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <button class="btn-acao-clean" onclick="window.abrirModalConferencia(${peca.id})">
-                        <i class="fa-solid fa-clipboard-check"></i> Contagem Exata
-                    </button>
-                    
-                    <button class="btn-acao-clean ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
-                        <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Requisitar Peça'}
-                    </button>
-                    
-                    <button class="btn-acao-clean admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
-                        <i class="fa-solid fa-right-left"></i> Mover Gaveta
-                    </button>
-
-                    <div class="admin-actions-clean admin-only">
-                        <button class="btn-edit-peca" title="Editar Peça" onclick="window.abrirModalEditarPeca(${peca.id})"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn-excluir" title="Excluir Peça" onclick="window.excluirPeca(${peca.id})"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                    
                     ${retiradaHtml}
-                </div>
-            `;
-            
+                    <div class="botoes-acao-card">
+                        <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
+                            <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
+                        </button>
+                        <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
+                            <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
+                        </button>
+                        <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
+                            <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
+                        </button>
+                    </div>
+                </div>`;
+
             // Lógica Drag and Drop de Peças (Somente ADMIN)
             if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
                 div.draggable = true;
 
                 div.ondragstart = (e) => {
-                    // Impede o arrasto se o usuário clicar num botão rápido
+                    // Impede o arrasto se estiver interagindo com um botão rápido
                     if(e.target.closest('.btn-quick') || e.target.closest('button')) {
                         e.preventDefault();
                         return;
                     }
                     draggedPecaId = peca.id;
                     e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', peca.id);
                     setTimeout(() => div.classList.add('dragging'), 0);
                 };
 
@@ -872,39 +868,45 @@ function renderizarPecasDaGaveta(idGaveta) {
                     div.classList.add('drag-over');
                 };
 
-                div.ondragleave = (e) => {
-                    if (!div.contains(e.relatedTarget)) {
-                        div.classList.remove('drag-over');
-                    }
-                };
+                div.ondragleave = () => { div.classList.remove('drag-over'); };
 
                 div.ondrop = async (e) => {
                     e.preventDefault();
                     div.classList.remove('drag-over');
-                    
+
                     if (!draggedPecaId || draggedPecaId === peca.id) return;
 
                     let itensGaveta = database.items[gavetaAtualAberta];
+
                     const pecaArrastada = itensGaveta.find(p => p.id === draggedPecaId);
-                    const pecaAlvo = peca; 
+                    const pecaAlvo = peca; // A peça onde o drop aconteceu
 
                     if(!pecaArrastada || !pecaAlvo) return;
 
+                    // Atualiza a divisória caso o usuário tenha arrastado para outra
                     pecaArrastada.divisoria = pecaAlvo.divisoria;
 
+                    // Filtra todos os itens da divisória ALVO e os ordena pela posição atual
                     let divisoriaItems = itensGaveta.filter(p => p.divisoria === pecaAlvo.divisoria).sort((a, b) => (a.position || 999) - (b.position || 999));
-                    divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
-                    
-                    const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
-                    const insertIndex = novoIndexAlvo !== -1 ? novoIndexAlvo : divisoriaItems.length;
-                    
-                    divisoriaItems.splice(insertIndex, 0, pecaArrastada);
 
-                    divisoriaItems.forEach((p, index) => { p.position = index + 1; });
+                    // Remove a peça arrastada desse array temporário (para não duplicar)
+                    divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
+
+                    // Descobre em qual índice do array a peça alvo está agora
+                    const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
+
+                    // Insere a peça arrastada no lugar exato da peça alvo
+                    divisoriaItems.splice(novoIndexAlvo, 0, pecaArrastada);
+
+                    // Refaz a numeração sequencial (1, 2, 3...) para todas as peças da divisória
+                    divisoriaItems.forEach((p, index) => {
+                        p.position = index + 1;
+                    });
 
                     registrarLog(`reordenou a peça "${pecaArrastada.name}" na gaveta`);
+
                     await salvarItensDaGaveta(gavetaAtualAberta);
-                    renderizarPecasDaGaveta(gavetaAtualAberta); 
+                    renderizarPecasDaGaveta(gavetaAtualAberta); // Atualiza apenas a gaveta atual
                 };
 
                 div.ondragend = () => {
@@ -919,7 +921,6 @@ function renderizarPecasDaGaveta(idGaveta) {
     });
 }
 
-// RESTANTE DO CÓDIGO PERMANECE INALTERADO!
 function ajusteRapidoEstoque(idPeca, delta) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
@@ -954,6 +955,9 @@ function excluirPeca(idPeca) {
     }
 }
 
+// =========================================================================
+// MOVER PEÇA ENTRE GAVETAS
+// =========================================================================
 function abrirModalMoverPeca(idPeca) {
     pecaSendoMovidaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
@@ -1015,6 +1019,9 @@ function salvarNomeGaveta() {
     fecharModalEditarGaveta();
 }
 
+// =========================================================================
+// GERENCIAMENTO DE PEÇAS
+// =========================================================================
 function abrirModalCadastro() {
     ['novo-codigo', 'novo-nome', 'novo-posicao'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('novo-esperado').value  = '1';
@@ -1152,6 +1159,9 @@ function mostrarAlerta(titulo, mensagem) {
 
 function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
+// =========================================================================
+// GERADOR DE PEDIDO DE COMPRA
+// =========================================================================
 function gerarEmailPedido() {
     const containerItens = document.getElementById('formulario-pedido-itens');
     containerItens.innerHTML = '';
@@ -1273,7 +1283,7 @@ function copiarTextoPedido() {
 }
 
 // =========================================================================
-// EXPOSIÇÃO GLOBAL DE FUNÇÕES
+// EXPOSIÇÃO GLOBAL DE FUNÇÕES (NECESSÁRIO POR SER type="module")
 // =========================================================================
 window.toggleMenuMobile          = toggleMenuMobile;
 window.autorizarDispositivo      = autorizarDispositivo;
