@@ -694,7 +694,7 @@ function renderArmarioVertical() {
             div.ondragstart = (e) => {
                 draggedDrawerIndex = index;
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', index); // Fundamental para não bugar Firefox/Safari
+                e.dataTransfer.setData('text/plain', index);
                 setTimeout(() => div.classList.add('dragging'), 0);
             };
 
@@ -736,7 +736,7 @@ function renderArmarioVertical() {
 }
 
 // =========================================================================
-// INTERIOR DA GAVETA E DRAG AND DROP DAS PEÇAS
+// INTERIOR DA GAVETA: GRID REAL (5 COLUNAS) E LAYOUT LIMPO COM OVERLAY
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
@@ -772,6 +772,7 @@ function renderizarPecasDaGaveta(idGaveta) {
         headerDivi.innerHTML  = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
         mainContainer.appendChild(headerDivi);
 
+        // O novo CSS Grid com 5 colunas reais é aplicado na classe 'grid-pecas'
         const gridDivi      = document.createElement('div');
         gridDivi.className  = 'grid-pecas';
 
@@ -781,78 +782,87 @@ function renderizarPecasDaGaveta(idGaveta) {
             const statusPeca   = getPecaStatus(peca);
             const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
             
-            // Adicionado draggable="false" para a imagem não roubar o clique do card inteiro
-            const imgHtml      = peca.image 
+            const imgHtml = peca.image 
                 ? `<img src="${peca.image}" alt="${peca.name}" class="peca-img" draggable="false">` 
                 : `<i class="fa-solid fa-microchip peca-icon-placeholder"></i>`;
                 
-            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
+            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-clean">Último a retirar: ${peca.lastTakenBy}</div>` : '';
 
             const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
             const displaySize     = peca.size || 1;
             
-            const isSpanning      = displaySize > 1;
-
-            const div      = document.createElement('div');
-            div.className  = `compartimento-card ${isSpanning ? 'expandido' : ''}`;
+            const div = document.createElement('div');
+            div.className = 'compartimento-card';
+            // CSS Variables repassam ao Grid o número exato de espaços verticais (rows) a ocupar
             div.style.setProperty('--span-size', displaySize);
 
+            // NOVO HTML LIMPO (Visão Padrão + Overlay)
             div.innerHTML = `
-                <div class="card-top">
-                    <div>
-                        <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
-                        <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
-                        <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
+                <div class="card-padrao">
+                    <div class="card-header-clean">
+                        <span class="pos-badge" title="Posição">#${displayPosition}</span>
+                        <span class="status-indicator ${statusPeca}" title="Status: ${getStatusText(statusPeca)}"></span>
                     </div>
-                    <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
-                </div>
-                
-                <div class="card-title">${peca.name}</div>
-                
-                <div class="card-image-box">
-                    ${imgHtml}
-                </div>
-                
-                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
-                    <div class="card-data-row">
-                        <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
-                        <div class="data-box">
-                            <span>Física Atual</span>
-                            <div class="quick-control">
-                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                                <strong style="color:${corQtd}">${peca.current}</strong>
-                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
-                            </div>
-                        </div>
+                    
+                    <div class="card-image-clean">
+                        ${imgHtml}
                     </div>
+                    
+                    <div class="card-info-clean">
+                        <div class="codigo-clean">${peca.code || 'S/N'}</div>
+                        <div class="nome-clean">${peca.name}</div>
+                    </div>
+                    
+                    <div class="card-qtd-clean">
+                        <span class="qtd-atual" style="color:${corQtd}">${peca.current}</span>
+                        <span class="qtd-divisor">/</span>
+                        <span class="qtd-ideal">${peca.expected}</span>
+                    </div>
+                </div>
+
+                <div class="card-overlay-acoes">
+                    <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
+                    
+                    <div class="quick-control" style="margin-bottom: 10px;">
+                        <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                        <strong>${peca.current}</strong>
+                        <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    
+                    <button class="btn-acao-clean" onclick="window.abrirModalConferencia(${peca.id})">
+                        <i class="fa-solid fa-clipboard-check"></i> Contagem Exata
+                    </button>
+                    
+                    <button class="btn-acao-clean ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
+                        <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Requisitar Peça'}
+                    </button>
+                    
+                    <button class="btn-acao-clean admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
+                        <i class="fa-solid fa-right-left"></i> Mover Gaveta
+                    </button>
+
+                    <div class="admin-actions-clean admin-only">
+                        <button class="btn-edit-peca" title="Editar Peça" onclick="window.abrirModalEditarPeca(${peca.id})"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-excluir" title="Excluir Peça" onclick="window.excluirPeca(${peca.id})"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    
                     ${retiradaHtml}
-                    <div class="botoes-acao-card">
-                        <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
-                            <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
-                        </button>
-                        <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
-                            <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
-                        </button>
-                        <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
-                            <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
-                        </button>
-                    </div>
-                </div>`;
+                </div>
+            `;
             
             // Lógica Drag and Drop de Peças (Somente ADMIN)
             if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
                 div.draggable = true;
 
                 div.ondragstart = (e) => {
-                    // Impede o arrasto se estiver interagindo com um botão rápido
+                    // Impede o arrasto se o usuário clicar num botão rápido
                     if(e.target.closest('.btn-quick') || e.target.closest('button')) {
                         e.preventDefault();
                         return;
                     }
                     draggedPecaId = peca.id;
                     e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', peca.id); // Fundamental para não bugar Firefox/Safari
+                    e.dataTransfer.setData('text/plain', peca.id);
                     setTimeout(() => div.classList.add('dragging'), 0);
                 };
 
@@ -863,7 +873,6 @@ function renderizarPecasDaGaveta(idGaveta) {
                 };
 
                 div.ondragleave = (e) => {
-                    // Evita o efeito "piscar" quando passa o mouse por cima das bordas da imagem ou botões
                     if (!div.contains(e.relatedTarget)) {
                         div.classList.remove('drag-over');
                     }
@@ -876,37 +885,26 @@ function renderizarPecasDaGaveta(idGaveta) {
                     if (!draggedPecaId || draggedPecaId === peca.id) return;
 
                     let itensGaveta = database.items[gavetaAtualAberta];
-                    
                     const pecaArrastada = itensGaveta.find(p => p.id === draggedPecaId);
-                    const pecaAlvo = peca; // A peça onde o drop aconteceu
+                    const pecaAlvo = peca; 
 
                     if(!pecaArrastada || !pecaAlvo) return;
 
-                    // Atualiza a divisória caso o usuário tenha arrastado para outra
                     pecaArrastada.divisoria = pecaAlvo.divisoria;
 
-                    // Filtra todos os itens da divisória ALVO e os ordena pela posição atual
                     let divisoriaItems = itensGaveta.filter(p => p.divisoria === pecaAlvo.divisoria).sort((a, b) => (a.position || 999) - (b.position || 999));
-                    
-                    // Remove a peça arrastada desse array temporário (para não duplicar)
                     divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
                     
-                    // Descobre em qual índice do array a peça alvo está agora
                     const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
                     const insertIndex = novoIndexAlvo !== -1 ? novoIndexAlvo : divisoriaItems.length;
                     
-                    // Insere a peça arrastada no lugar exato da peça alvo
                     divisoriaItems.splice(insertIndex, 0, pecaArrastada);
 
-                    // Refaz a numeração sequencial (1, 2, 3...) para todas as peças da divisória
-                    divisoriaItems.forEach((p, index) => {
-                        p.position = index + 1;
-                    });
+                    divisoriaItems.forEach((p, index) => { p.position = index + 1; });
 
                     registrarLog(`reordenou a peça "${pecaArrastada.name}" na gaveta`);
-                    
                     await salvarItensDaGaveta(gavetaAtualAberta);
-                    renderizarPecasDaGaveta(gavetaAtualAberta); // Atualiza apenas a gaveta atual
+                    renderizarPecasDaGaveta(gavetaAtualAberta); 
                 };
 
                 div.ondragend = () => {
@@ -921,6 +919,7 @@ function renderizarPecasDaGaveta(idGaveta) {
     });
 }
 
+// RESTANTE DO CÓDIGO PERMANECE INALTERADO!
 function ajusteRapidoEstoque(idPeca, delta) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
@@ -955,9 +954,6 @@ function excluirPeca(idPeca) {
     }
 }
 
-// =========================================================================
-// MOVER PEÇA ENTRE GAVETAS
-// =========================================================================
 function abrirModalMoverPeca(idPeca) {
     pecaSendoMovidaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
@@ -1019,9 +1015,6 @@ function salvarNomeGaveta() {
     fecharModalEditarGaveta();
 }
 
-// =========================================================================
-// GERENCIAMENTO DE PEÇAS
-// =========================================================================
 function abrirModalCadastro() {
     ['novo-codigo', 'novo-nome', 'novo-posicao'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('novo-esperado').value  = '1';
@@ -1159,9 +1152,6 @@ function mostrarAlerta(titulo, mensagem) {
 
 function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
-// =========================================================================
-// GERADOR DE PEDIDO DE COMPRA
-// =========================================================================
 function gerarEmailPedido() {
     const containerItens = document.getElementById('formulario-pedido-itens');
     containerItens.innerHTML = '';
@@ -1283,7 +1273,7 @@ function copiarTextoPedido() {
 }
 
 // =========================================================================
-// EXPOSIÇÃO GLOBAL DE FUNÇÕES (NECESSÁRIO POR SER type="module")
+// EXPOSIÇÃO GLOBAL DE FUNÇÕES
 // =========================================================================
 window.toggleMenuMobile          = toggleMenuMobile;
 window.autorizarDispositivo      = autorizarDispositivo;
