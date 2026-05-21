@@ -783,65 +783,89 @@ function renderizarPecasDaGaveta(idGaveta) {
             const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
 
             const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
-            const displaySize     = peca.size || 1;
+            const tamanhoReal     = Math.max(parseInt(peca.size) || 1, 1);
+
+            // Detecta espaços vazios: peças nomeadas "vazio" representam compartimentos físicos sem peça
+            const isVazio = (peca.name || '').trim().toLowerCase() === 'vazio';
+
+            // Para garantir que TODOS os cards apareçam com imagem + botões visíveis:
+            // clampamos o span mínimo em 6 linhas (~420px, suficiente pro card completo).
+            // Espaços "vazio" usam o tamanho real (podem ser pequenos, ex: span 1 ou 2).
+            const MIN_SPAN_VISIVEL = 6;
+            const spanFinal = isVazio ? tamanhoReal : Math.max(tamanhoReal, MIN_SPAN_VISIVEL);
 
             const div      = document.createElement('div');
-            div.className  = 'compartimento-card';
+            div.className  = isVazio ? 'compartimento-card slot-vazio' : 'compartimento-card';
 
             // ALTURA FÍSICA: a peça ocupa "span N" linhas de 60px da colmeia.
-            // (1 = encaixe pequeno ... 10 = encaixe gigante). Aceita QUALQUER valor.
-            div.style.setProperty('--span-size', displaySize);
+            // (Cards reais: mínimo 6 pra tudo aparecer; grandes = tamanho real maior).
+            // (Vazios: tamanho real sem clamp, pra mostrar o buraco físico exato).
+            div.style.setProperty('--span-size', spanFinal);
             div.style.display       = 'flex';
             div.style.flexDirection = 'column';
             div.style.height        = '100%';
             div.style.minHeight     = '0';
 
-            // A caixa de imagem agora SEMPRE preenche o espaço livre do encaixe:
-            // em peça baixa ela encolhe, em peça alta ela estica, sem deformar.
-            const imgBoxStyle = 'flex: 1 1 auto; min-height: 0;';
-
-            div.innerHTML = `
-                <div class="card-top">
-                    <div>
-                        <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
-                        <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
-                        <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
+            if (isVazio) {
+                // Renderizar espaço vazio: compartimento físico sem peça (dashed translúcido)
+                div.innerHTML = `
+                    <div class="slot-vazio-top">
+                        <span class="card-local">📌 Pos: ${displayPosition}</span>
+                        <span style="display:flex; gap:4px;">
+                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                        </span>
                     </div>
-                    <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
-                </div>
-                
-                <div class="card-title">${peca.name}</div>
-                
-                <div class="card-image-box" style="${imgBoxStyle} background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 6px 0; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden;">
-                    ${imgHtml}
-                </div>
-                
-                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
-                    <div class="card-data-row">
-                        <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
-                        <div class="data-box">
-                            <span>Física Atual</span>
-                            <div class="quick-control">
-                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                                <strong style="color:${corQtd}">${peca.current}</strong>
-                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                    <div class="slot-vazio-corpo">
+                        <i class="fa-solid fa-box-open"></i>
+                        <span>Espaço vazio</span>
+                    </div>`;
+            } else {
+                // Card normal: com imagem, botões, tudo visível (span clampado em 6 mínimo)
+                const imgBoxStyle = 'flex: 1 1 auto; min-height: 0;';
+                div.innerHTML = `
+                    <div class="card-top">
+                        <div>
+                            <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
+                            <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
+                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
+                    </div>
+                    
+                    <div class="card-title">${peca.name}</div>
+                    
+                    <div class="card-image-box" style="${imgBoxStyle} background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 6px 0; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden;">
+                        ${imgHtml}
+                    </div>
+                    
+                    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+                        <div class="card-data-row">
+                            <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
+                            <div class="data-box">
+                                <span>Física Atual</span>
+                                <div class="quick-control">
+                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                                    <strong style="color:${corQtd}">${peca.current}</strong>
+                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    ${retiradaHtml}
-                    <div class="botoes-acao-card">
-                        <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
-                            <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
-                        </button>
-                        <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
-                            <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
-                        </button>
-                        <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
-                            <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
-                        </button>
-                    </div>
-                </div>`;
+                        ${retiradaHtml}
+                        <div class="botoes-acao-card">
+                            <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
+                                <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
+                            </button>
+                            <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
+                                <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
+                            </button>
+                            <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
+                                <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
+                            </button>
+                        </div>
+                    </div>`;
+            }
 
             // Lógica Drag and Drop de Peças (Somente ADMIN)
             if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
