@@ -234,7 +234,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .gaveteiro-grid { 
     display: grid; 
     grid-template-columns: repeat(5, 1fr); 
-    grid-auto-rows: 180px; /* Aumentado para 180px por linha/span - Os cards terão muito espaço */
+    grid-auto-rows: 250px; /* Aumentado para 180px por linha/span - Os cards terão muito espaço */
     grid-auto-flow: dense; 
     gap: 15px; 
     background: #cbd5e1; /* Cor de metal da gaveta */
