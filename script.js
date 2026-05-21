@@ -628,7 +628,7 @@ function renderizarPecasDaGaveta(idGaveta) {
         mainContainer.appendChild(headerDivi);
 
         const gridDivi = document.createElement('div');
-        gridDivi.className = 'gaveteiro-grid'; // CSS Grid Industrial (5 Colunas, Auto-Rows: 60px, Dense)
+        gridDivi.className = 'gaveteiro-grid'; // CSS Grid Industrial (5 Colunas, Auto-Rows: 180px, Dense)
 
         const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
 
@@ -643,20 +643,20 @@ function renderizarPecasDaGaveta(idGaveta) {
 
             const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
             
-            // O sistema não limita o tamanho do span! Fallback para 3 caso seja peça antiga sem 'size'
-            const displaySize = peca.size || 3;
+            // ATENÇÃO AQUI: Como a altura base agora é GIGANTE (180px),
+            // a imensa maioria das peças será tamanho 1. 
+            // Se a peça não tiver tamanho definido no BD, força ser 1 para não bugar.
+            const displaySize = peca.size || 1;
 
             const div = document.createElement('div');
             div.className = 'compartimento-card';
             
-            // CSS Dinâmico: A altura da peça dita quantas 'linhas de 60px' ela ocupa na colmeia
+            // CSS Dinâmico: A altura da peça dita quantas 'linhas' ela ocupa na colmeia
             div.style.gridRow = `span ${displaySize}`;
 
             // Adiciona um listener pra forçar ativação do menu no toque do celular
             div.onclick = () => { div.classList.toggle('active-touch'); };
 
-            // ESTRUTURA LIMPA: Apenas dados essenciais aparecem por padrão.
-            // Ações ficam escondidas no '.card-overlay-acoes' via CSS Hover
             div.innerHTML = `
                 <div class="card-padrao">
                     <div class="card-header-clean">
@@ -709,7 +709,6 @@ function renderizarPecasDaGaveta(idGaveta) {
                 </div>
             `;
             
-            // Drag and Drop (ADMIN) mantendo a mesma lógica robusta já existente
             if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
                 div.draggable = true;
 
@@ -771,7 +770,6 @@ function renderizarPecasDaGaveta(idGaveta) {
     });
 }
 
-// RESTANTE DO CÓDIGO PERMANECE INALTERADO!
 function ajusteRapidoEstoque(idPeca, delta) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
@@ -872,7 +870,7 @@ function abrirModalCadastro() {
     document.getElementById('novo-esperado').value  = '1';
     document.getElementById('novo-atual').value     = '0';
     document.getElementById('novo-divisoria').value = 'Geral';
-    document.getElementById('novo-tamanho').value   = '3'; // Default para 3
+    document.getElementById('novo-tamanho').value   = '1'; // Default base mudou para 1 já que a altura agora é 180px
     document.getElementById('novo-imagem').value    = '';
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
     setTimeout(() => document.getElementById('novo-nome').focus(), 100);
@@ -887,7 +885,7 @@ async function salvarNovoItem() {
     const atual     = parseInt(document.getElementById('novo-atual').value);
     const posicao   = parseInt(document.getElementById('novo-posicao').value) || 999;
     const divisoria = document.getElementById('novo-divisoria').value.trim() || 'Geral';
-    const tamanho   = parseInt(document.getElementById('novo-tamanho').value) || 3;
+    const tamanho   = parseInt(document.getElementById('novo-tamanho').value) || 1;
     const imgInput  = document.getElementById('novo-imagem');
 
     if (!nome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
@@ -925,7 +923,7 @@ function abrirModalEditarPeca(idPeca) {
     document.getElementById('edit-peca-atual').value     = peca.current;
     document.getElementById('edit-peca-posicao').value   = (peca.position && peca.position !== 999) ? peca.position : '';
     document.getElementById('edit-peca-divisoria').value = peca.divisoria || 'Geral';
-    document.getElementById('edit-peca-tamanho').value   = peca.size || 3;
+    document.getElementById('edit-peca-tamanho').value   = peca.size || 1;
     document.getElementById('edit-peca-imagem').value    = '';
     document.getElementById('modal-editar-peca').classList.remove('view-hidden');
     setTimeout(() => document.getElementById('edit-peca-nome').focus(), 100);
@@ -940,7 +938,7 @@ async function salvarEdicaoPeca() {
     const novoAtual     = parseInt(document.getElementById('edit-peca-atual').value);
     const novaPosicao   = parseInt(document.getElementById('edit-peca-posicao').value) || 999;
     const novaDivisoria = document.getElementById('edit-peca-divisoria').value.trim() || 'Geral';
-    const novoTamanho   = parseInt(document.getElementById('edit-peca-tamanho').value) || 3;
+    const novoTamanho   = parseInt(document.getElementById('edit-peca-tamanho').value) || 1;
     const imgInput      = document.getElementById('edit-peca-imagem');
 
     if (!novoNome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
