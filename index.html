@@ -195,17 +195,14 @@
                 </section>
 
                 <section id="view-compartimentos" class="view-hidden">
-                    <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%;">
+                    <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%; border-bottom: 2px solid var(--drawer-blue);">
                         <button class="btn-voltar" onclick="window.voltarParaGavetas()">⬅ Voltar</button>
-                        <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1;">Gaveta X</h2>
+                        <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1; margin: 0;">Gaveta X</h2>
                         <button class="btn-add-item admin-only" onclick="window.abrirModalCadastro()">
                             <i class="fa-solid fa-plus"></i> Nova Peça
                         </button>
                     </div>
-                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem; text-align: center;">
-                        <i class="fa-solid fa-hand-pointer"></i> Passe o mouse (ou toque) na peça para ver as opções e alterar o estoque.
-                    </p>
-                    <div id="container-divisorias"></div>
+                    <div id="container-divisorias" style="width: 100%;"></div>
                 </section>
             </div>
         </div>
@@ -245,7 +242,7 @@
                 </div>
                 <div class="col">
                     <label>Tamanho (Unidades de Encaixe/Span):</label>
-                    <input type="number" id="novo-tamanho" placeholder="Altura (1, 2, 3...)" min="1" value="3">
+                    <input type="number" id="novo-tamanho" placeholder="Altura (1, 2, 3...)" min="1" value="1">
                 </div>
             </div>
 
