@@ -62,9 +62,11 @@ let pecaSendoMovidaId    = null;
 
 let usuarioAguardandoRedefinicao = null;
 
+// Drag and Drop
 let draggedDrawerIndex = null;
 let draggedPecaId      = null;
 
+// Variáveis do Carrossel de Imagens
 let carrosselInterval = null;
 let carrosselImagens  = [];
 let carrosselIndex    = 0;
@@ -86,10 +88,15 @@ window.onload = () => {
 
 function iniciarPWA() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('PWA Service Worker registrado com sucesso.', reg.scope))
+            .catch(err => console.error('Erro ao registrar Service Worker PWA:', err));
     }
 }
 
+// =========================================================================
+// VALIDADOR DE SENHA FORTE
+// =========================================================================
 function validarSenhaForte(senha) {
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
     return regex.test(senha);
@@ -142,41 +149,64 @@ function renderizarHistorico() {
     const lista = document.getElementById('lista-historico');
     if (!lista) return;
     lista.innerHTML = '';
+
     if (!historicoLogs || historicoLogs.length === 0) {
         lista.innerHTML = '<p style="text-align:center;color:#64748b;padding:30px;">Nenhuma atividade registrada ainda.</p>';
         return;
     }
+
     historicoLogs.forEach(log => {
         const div = document.createElement('div');
         div.className = 'log-item';
-        div.innerHTML = `<span class="log-time">${log.data} ${log.hora}</span><span class="log-text"><strong>${log.nome}</strong> ${log.acao}</span>`;
+        div.innerHTML = `
+            <span class="log-time">${log.data} ${log.hora}</span>
+            <span class="log-text"><strong>${log.nome}</strong> ${log.acao}</span>
+        `;
         lista.appendChild(div);
     });
 }
 
+// =========================================================================
+// NOTIFICAÇÕES (Web Push API)
+// =========================================================================
 function solicitarPermissaoNotificacao() {
     if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+    if (Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+    }
 }
 
 function enviarNotificacao(titulo, corpo) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
-        try { new Notification(titulo, { body: corpo, icon: '/icon-192x192.png' }); } catch (e) {}
+        try { new Notification(titulo, { body: corpo, icon: 'icon-192x192.png' }); } 
+        catch (e) {}
     }
 }
 
+// =========================================================================
+// MENU MOBILE
+// =========================================================================
 function toggleMenuMobile() {
-    document.getElementById('sidebar-menu').classList.toggle('open');
-    document.getElementById('mobile-overlay').classList.toggle('open');
+    const sidebar = document.getElementById('sidebar-menu');
+    const overlay = document.getElementById('mobile-overlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
 }
 
+// =========================================================================
+// CLOUDINARY — UPLOAD DE IMAGEM
+// =========================================================================
 async function uploadImagemCloudinary(file) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
     const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-    if (!response.ok) throw new Error(`Cloudinary Error`);
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Cloudinary: ${response.status} — ${err}`);
+    }
     const data = await response.json();
     return data.secure_url;
 }
@@ -185,27 +215,50 @@ async function uploadImagemCloudinary(file) {
 // FIRESTORE
 // =========================================================================
 async function salvarConfig() {
-    try { await setDoc(doc(db, "manutencao_5s", "config"), { drawers: database.drawers, usuarios: usuariosSalvos }); } 
-    catch (e) { mostrarAlerta("Erro", "Não foi possível salvar config."); }
+    try {
+        await setDoc(doc(db, "manutencao_5s", "config"), {
+            drawers:  database.drawers,
+            usuarios: usuariosSalvos
+        });
+    } catch (e) {
+        console.error("Erro ao salvar config:", e);
+        mostrarAlerta("Erro de Conexão", "Não foi possível salvar a configuração na nuvem.");
+    }
 }
 
 async function salvarHistorico() {
-    try { await setDoc(doc(db, "manutencao_5s", "historico"), { logs: historicoLogs }); } catch (e) {}
+    try {
+        await setDoc(doc(db, "manutencao_5s", "historico"), { logs: historicoLogs });
+    } catch (e) {
+        console.error("Erro ao salvar histórico:", e);
+    }
 }
 
 async function salvarItensDaGaveta(idGaveta) {
-    try { await setDoc(doc(db, "manutencao_5s", `itens_g${idGaveta}`), { items: database.items[idGaveta] || [] }); } 
-    catch (e) { mostrarAlerta("Erro", "Não foi possível salvar itens."); }
+    try {
+        await setDoc(doc(db, "manutencao_5s", `itens_g${idGaveta}`), {
+            items: database.items[idGaveta] || []
+        });
+    } catch (e) {
+        console.error(`Erro ao salvar gaveta ${idGaveta}:`, e);
+        mostrarAlerta("Erro de Conexão", "Não foi possível salvar os itens na nuvem.");
+    }
 }
 
+// =========================================================================
+// BACKUP, RESTAURAR E EXPORTAR CSV
+// =========================================================================
 function fazerBackup() {
-    const payload = { versao: 'v3', geradoEm: new Date().toISOString(), database, usuarios: usuariosSalvos, historico: historicoLogs };
+    const payload = {
+        versao: 'v3', geradoEm: new Date().toISOString(),
+        database, usuarios: usuariosSalvos, historico: historicoLogs
+    };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url; a.download = `backup_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.json`;
     a.click(); URL.revokeObjectURL(url);
-    registrarLog('gerou um arquivo de backup.');
+    registrarLog('gerou um arquivo de backup do sistema.');
 }
 
 function restaurarBackup(event) {
@@ -215,14 +268,23 @@ function restaurarBackup(event) {
     reader.onload = async (e) => {
         try {
             const dados = JSON.parse(e.target.result);
-            if (!dados.database || !dados.usuarios) return mostrarAlerta('Erro', 'Backup inválido.');
-            database = dados.database; usuariosSalvos = dados.usuarios; historicoLogs = dados.historico || [];
-            await salvarConfig(); await salvarHistorico();
-            for (const gaveta of database.drawers) await salvarItensDaGaveta(gaveta.id);
-            registrarLog('restaurou o backup.');
-            mostrarAlerta('Sucesso', 'Backup restaurado com sucesso!');
+            if (!dados.database || !dados.usuarios) return mostrarAlerta('Arquivo Inválido', 'O arquivo selecionado não é um backup válido.');
+
+            database       = dados.database;
+            usuariosSalvos = dados.usuarios;
+            historicoLogs  = dados.historico || [];
+
+            await salvarConfig();
+            await salvarHistorico();
+            for (const gaveta of database.drawers) {
+                await salvarItensDaGaveta(gaveta.id);
+            }
+            registrarLog('restaurou o sistema a partir de um arquivo de backup.');
+            mostrarAlerta('Sucesso', 'Backup restaurado com sucesso! O sistema foi atualizado.');
             atualizarDashboard();
-        } catch (err) { mostrarAlerta('Erro', 'Arquivo corrompido.'); }
+        } catch (err) {
+            mostrarAlerta('Erro de Leitura', 'Não foi possível ler o arquivo. Verifique se é um JSON válido.');
+        }
     };
     reader.readAsText(file);
     event.target.value = '';
@@ -241,20 +303,25 @@ function exportarEstoqueCSV() {
     const a    = document.createElement('a');
     a.href     = url; a.download = `estoque_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
     a.click(); URL.revokeObjectURL(url);
-    registrarLog('exportou o estoque em CSV.');
+    registrarLog('exportou o relatório de estoque em CSV.');
 }
 
 function exportarHistoricoCSV() {
     let csv = 'Data;Hora;Usuário;Ação\n';
-    historicoLogs.forEach(log => { csv += `"${log.data}";"${log.hora}";"${log.nome}";"${log.acao}"\n`; });
+    historicoLogs.forEach(log => {
+        csv += `"${log.data}";"${log.hora}";"${log.nome}";"${log.acao}"\n`;
+    });
     const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url; a.download = `historico_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
     a.click(); URL.revokeObjectURL(url);
-    registrarLog('exportou histórico em CSV.');
+    registrarLog('exportou o histórico de atividades em CSV.');
 }
 
+// =========================================================================
+// SINCRONIZAÇÃO FIREBASE
+// =========================================================================
 async function iniciarSincronizacaoFirebase() {
     onSnapshot(doc(db, "manutencao_5s", "config"), (snap) => {
         if (snap.exists()) {
@@ -294,7 +361,9 @@ function registrarListenersGavetas() {
 
 function atualizarSeLogado() {
     const container = document.getElementById('app-container');
-    if (container && container.classList.contains('view-active')) atualizarDashboard();
+    if (container && container.classList.contains('view-active')) {
+        atualizarDashboard();
+    }
 }
 
 // =========================================================================
@@ -326,23 +395,33 @@ function autorizarDispositivo() {
         localStorage.setItem('5s_device_authorized', 'true');
         document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
         document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
-    } else { mostrarAlerta('Acesso Negado', 'Chave mestre incorreta.'); }
+    } else {
+        mostrarAlerta('Acesso Negado', 'Chave mestre incorreta.');
+    }
 }
 
 function alternarTelaLogin() {
     const fe = document.getElementById('form-entrar');
     const fr = document.getElementById('form-registrar');
-    if (fe.classList.contains('view-hidden')) { fe.classList.replace('view-hidden', 'view-active'); fr.classList.replace('view-active', 'view-hidden'); } 
-    else { fe.classList.replace('view-active', 'view-hidden'); fr.classList.replace('view-hidden', 'view-active'); }
+    if (fe.classList.contains('view-hidden')) {
+        fe.classList.replace('view-hidden', 'view-active');
+        fr.classList.replace('view-active', 'view-hidden');
+    } else {
+        fe.classList.replace('view-active', 'view-hidden');
+        fr.classList.replace('view-hidden', 'view-active');
+    }
 }
 
 function registrarUsuario() {
-    const nome = document.getElementById('reg-nome').value.trim();
+    const nome   = document.getElementById('reg-nome').value.trim();
     const cracha = document.getElementById('reg-cracha').value.trim();
-    const senha = document.getElementById('reg-senha').value.trim();
+    const senha  = document.getElementById('reg-senha').value.trim();
+
     if (!nome || !cracha || !senha) return mostrarAlerta('Erro', 'Preencha todos os campos!');
     if (usuariosSalvos.find(u => u.cracha === cracha)) return mostrarAlerta('Erro', 'Crachá já cadastrado!');
-    if (!validarSenhaForte(senha)) return mostrarAlerta('Senha Fraca', 'Mínimo 8 caracteres, maiúscula, minúscula, número e símbolo.');
+
+    if (!validarSenhaForte(senha)) return mostrarAlerta('Senha Fraca', 'A senha deve ter no mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo.');
+
     const novoUser = { nome, cracha, senha, role: 'USER' };
     usuariosSalvos.push(novoUser);
     salvarConfig();
@@ -350,15 +429,18 @@ function registrarUsuario() {
 }
 
 function realizarLogin() {
-    const id = document.getElementById('input-login-id').value.trim();
+    const id    = document.getElementById('input-login-id').value.trim();
     const senha = document.getElementById('input-login-senha').value.trim();
-    if (!id || !senha) return mostrarAlerta('Erro', 'Preencha os dados.');
+    if (!id || !senha) return mostrarAlerta('Erro', 'Preencha os dados de acesso.');
+
     if (id === ADMIN_CREDENTIALS.login && senha === ADMIN_CREDENTIALS.senha) {
         aplicarLogin({ nome: 'Administrador', cracha: 'Admin', role: 'ADMIN' });
         return;
     }
+
     const user = usuariosSalvos.find(u => u.cracha === id && u.senha === senha);
-    if (!user) return mostrarAlerta('Acesso Negado', 'Dados incorretos.');
+    if (!user) return mostrarAlerta('Acesso Negado', 'Crachá ou Senha incorretos.');
+
     if (!validarSenhaForte(user.senha)) {
         usuarioAguardandoRedefinicao = user;
         document.getElementById('modal-redefinir-senha').classList.remove('view-hidden');
@@ -370,27 +452,32 @@ function realizarLogin() {
 async function salvarSenhaObrigatoria() {
     const novaSenha = document.getElementById('nova-senha-obrigatoria').value.trim();
     const confirma  = document.getElementById('nova-senha-confirma').value.trim();
+
     if (novaSenha !== confirma) return mostrarAlerta('Erro', 'As senhas não coincidem.');
     if (!validarSenhaForte(novaSenha)) return mostrarAlerta('Senha Fraca', 'A nova senha não atende aos requisitos.');
+
     usuarioAguardandoRedefinicao.senha = novaSenha;
     await salvarConfig();
     document.getElementById('nova-senha-obrigatoria').value = '';
     document.getElementById('nova-senha-confirma').value    = '';
     document.getElementById('modal-redefinir-senha').classList.add('view-hidden');
-    registrarLog('atualizou a própria senha.');
+    registrarLog('atualizou a própria senha para o novo padrão corporativo.');
     aplicarLogin(usuarioAguardandoRedefinicao);
     usuarioAguardandoRedefinicao = null;
 }
 
 function cancelarRedefinicaoSenha() {
     usuarioAguardandoRedefinicao = null;
+    document.getElementById('nova-senha-obrigatoria').value = '';
+    document.getElementById('nova-senha-confirma').value    = '';
     document.getElementById('modal-redefinir-senha').classList.add('view-hidden');
 }
 
 function aplicarLogin(user) {
     usuarioLogado = user;
-    document.getElementById('usuario-logado-nome').innerText = user.nome;
+    document.getElementById('usuario-logado-nome').innerText   = user.nome;
     document.getElementById('usuario-logado-codigo').innerText = `Crachá: ${user.cracha}`;
+
     if (user.role === 'ADMIN') {
         document.body.classList.add('is-admin');
         document.getElementById('badge-admin').classList.remove('view-hidden');
@@ -398,40 +485,56 @@ function aplicarLogin(user) {
         document.body.classList.remove('is-admin');
         document.getElementById('badge-admin').classList.add('view-hidden');
     }
+
     document.getElementById('view-login').classList.replace('view-active', 'view-hidden');
     document.getElementById('app-container').classList.replace('view-hidden', 'view-active');
     document.getElementById('input-login-senha').value = '';
+    document.getElementById('reg-senha').value         = '';
+
     solicitarPermissaoNotificacao();
     atualizarDashboard();
     mostrarTela('view-dashboard');
 }
 
+// =========================================================================
+// NAVEGAÇÃO
+// =========================================================================
 function mostrarTela(id) {
     ['view-dashboard', 'view-gavetas', 'view-compartimentos', 'view-historico', 'view-config'].forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.replace('view-active', 'view-hidden');
     });
+
     const alvo = document.getElementById(id);
     if (alvo) alvo.classList.replace('view-hidden', 'view-active');
+
     document.querySelectorAll('.nav-item').forEach(l => l.classList.remove('active'));
-    if (typeof event !== 'undefined' && event && event.currentTarget && event.currentTarget.classList) event.currentTarget.classList.add('active');
+    if (typeof event !== 'undefined' && event && event.currentTarget && event.currentTarget.classList) {
+        event.currentTarget.classList.add('active');
+    }
+
     document.getElementById('sidebar-menu').classList.remove('open');
     document.getElementById('mobile-overlay').classList.remove('open');
+
     if (id === 'view-gavetas' || id === 'view-dashboard') gavetaAtualAberta = null;
     if (id === 'view-historico') renderizarHistorico();
+
     const scroll = document.getElementById('area-conteudo-scroll');
     if (scroll) scroll.scrollTo(0, 0);
+
     if (id === 'view-dashboard') {
         iniciarCarrosselDashboard();
         setTimeout(() => { const inp = document.getElementById('input-busca-global'); if (inp) inp.focus(); }, 300);
-    } else { pararCarrosselDashboard(); }
+    } else {
+        pararCarrosselDashboard();
+    }
 }
 
 function voltarParaGavetas() { mostrarTela('view-gavetas'); }
 function sairDoSistema()     { location.reload(); }
 
 // =========================================================================
-// DASHBOARD & CARROSSEL
+// DASHBOARD, BUSCA E CARROSSEL
 // =========================================================================
 function atualizarImagensCarrossel() {
     carrosselImagens = [];
@@ -440,10 +543,12 @@ function atualizarImagensCarrossel() {
             if (peca.image && peca.image.trim() !== '') carrosselImagens.push(peca.image);
         });
     });
+
     if (carrosselImagens.length === 0) {
         carrosselImagens = [
             'https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop',
-            'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070&auto=format&fit=crop'
+            'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070&auto=format&fit=crop',
+            'https://images.unsplash.com/photo-1631281956016-30c1e85cae92?q=80&w=2070&auto=format&fit=crop'
         ];
     }
 }
@@ -453,8 +558,10 @@ function iniciarCarrosselDashboard() {
     atualizarImagensCarrossel();
     const wrapper = document.querySelector('.dashboard-wrapper');
     if (!wrapper) return;
+
     if (carrosselIndex >= carrosselImagens.length) carrosselIndex = 0;
     wrapper.style.backgroundImage = `url('${carrosselImagens[carrosselIndex]}')`;
+
     carrosselInterval = setInterval(() => {
         carrosselIndex++;
         if (carrosselIndex >= carrosselImagens.length) carrosselIndex = 0;
@@ -470,6 +577,7 @@ function buscarPecasGlobal() {
     const termo = document.getElementById('input-busca-global').value.toLowerCase();
     const resultadosDiv = document.getElementById('resultados-busca-global');
     resultadosDiv.innerHTML = '';
+
     if (termo.length < 2) { resultadosDiv.classList.add('view-hidden'); return; }
 
     let achados = [];
@@ -490,10 +598,18 @@ function buscarPecasGlobal() {
     achados.forEach(item => {
         const div = document.createElement('div');
         div.className = 'resultado-card';
-        div.onclick   = () => { document.getElementById('input-busca-global').value = ''; resultadosDiv.classList.add('view-hidden'); abrirGaveta(item.gaveta.id); };
+        div.onclick   = () => {
+            document.getElementById('input-busca-global').value = '';
+            resultadosDiv.classList.add('view-hidden');
+            abrirGaveta(item.gaveta.id);
+        };
         div.innerHTML = `
-            <div class="res-info"><h4>${item.peca.name}</h4><p>Item: ${item.peca.code || 'S/N'} | <strong>${item.gaveta.label}</strong> (Div: ${item.peca.divisoria || 'Geral'})</p></div>
-            <div class="res-tag"><i class="fa-solid fa-box-open"></i> ${item.peca.current} un</div>`;
+            <div class="res-info">
+                <h4>${item.peca.name}</h4>
+                <p>Item: ${item.peca.code || 'S/N'} &nbsp;|&nbsp; <strong>${item.gaveta.label}</strong> (Div: ${item.peca.divisoria || 'Geral'})</p>
+            </div>
+            <div class="res-tag"><i class="fa-solid fa-box-open"></i> ${item.peca.current} un</div>
+        `;
         resultadosDiv.appendChild(div);
     });
     resultadosDiv.classList.remove('view-hidden');
@@ -504,21 +620,27 @@ function atualizarDashboard() {
     calcularKPIs();
     verificarEstoqueZerado();
     renderizarHistorico();
+
     atualizarImagensCarrossel();
     const dashAtivo = document.getElementById('view-dashboard') && document.getElementById('view-dashboard').classList.contains('view-active');
     if (dashAtivo && !carrosselInterval && carrosselImagens.length > 0) iniciarCarrosselDashboard();
+
     if (gavetaAtualAberta !== null) renderizarPecasDaGaveta(gavetaAtualAberta);
 }
 
 function verificarEstoqueZerado() {
     let qtdZerados = 0;
-    database.drawers.forEach(gaveta => { (database.items[gaveta.id] || []).forEach(p => { if (p.current === 0) qtdZerados++; }); });
+    database.drawers.forEach(gaveta => {
+        (database.items[gaveta.id] || []).forEach(p => { if (p.current === 0) qtdZerados++; });
+    });
     const banner = document.getElementById('alerta-global-zerado');
     if (!banner) return;
     if (qtdZerados > 0) {
         banner.classList.remove('view-hidden');
         document.getElementById('texto-alerta-zerado').innerHTML = `<strong>Atenção:</strong> Existem <strong>${qtdZerados} item(ns)</strong> com estoque ZERADO no armário!`;
-    } else { banner.classList.add('view-hidden'); }
+    } else {
+        banner.classList.add('view-hidden');
+    }
 }
 
 function calcularKPIs() {
@@ -539,7 +661,7 @@ function calcularKPIs() {
 }
 
 // =========================================================================
-// ARMÁRIO VERTICAL (GAVETAS DRAG AND DROP)
+// ARMÁRIO VERTICAL COM DRAG AND DROP
 // =========================================================================
 function renderArmarioVertical() {
     const chassi = document.getElementById('menu-gavetas');
@@ -549,12 +671,15 @@ function renderArmarioVertical() {
         const status = getGavetaStatus(database.items[gaveta.id] || []);
         const div = document.createElement('div');
         div.className = 'btn-gaveta';
+
         div.innerHTML = `
             <div class="gaveta-content">
-                <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste para reordenar" style="cursor: grab; font-size: 1.2rem; color: rgba(255,255,255,0.5);"></i>
+                <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste para reordenar a gaveta" style="cursor: grab; font-size: 1.2rem; color: rgba(255,255,255,0.5);"></i>
                 <span class="gnumber">${gaveta.label}</span>
                 <span class="glabel">${gaveta.title}</span>
-                <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
                 <div class="gstatus-light ${status}"></div>
             </div>`;
 
@@ -565,32 +690,48 @@ function renderArmarioVertical() {
 
         if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
             div.draggable = true;
+
             div.ondragstart = (e) => {
                 draggedDrawerIndex = index;
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', index);
                 setTimeout(() => div.classList.add('dragging'), 0);
             };
-            div.ondragover = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; div.classList.add('drag-over'); };
-            div.ondragleave = (e) => { if (!div.contains(e.relatedTarget)) div.classList.remove('drag-over'); };
+
+            div.ondragover = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                div.classList.add('drag-over');
+            };
+
+            div.ondragleave = () => { div.classList.remove('drag-over'); };
+
             div.ondrop = async (e) => {
                 e.preventDefault();
                 div.classList.remove('drag-over');
                 if (draggedDrawerIndex === null || draggedDrawerIndex === index) return;
+
                 const gavetaArrastada = database.drawers[draggedDrawerIndex];
                 database.drawers.splice(draggedDrawerIndex, 1);
                 database.drawers.splice(index, 0, gavetaArrastada);
+
                 registrarLog(`reordenou a ${gavetaArrastada.label} para a nova posição no armário.`);
-                await salvarConfig(); renderArmarioVertical(); 
+
+                await salvarConfig();
+                renderArmarioVertical(); 
             };
-            div.ondragend = () => { div.classList.remove('dragging'); draggedDrawerIndex = null; };
+
+            div.ondragend = () => {
+                div.classList.remove('dragging');
+                draggedDrawerIndex = null;
+            };
         }
+
         chassi.appendChild(div);
     });
 }
 
 // =========================================================================
-// INTERIOR DA GAVETA: GRID REAL (COLMEIA DINÂMICA)
+// INTERIOR DA GAVETA E DRAG AND DROP DAS PEÇAS
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
@@ -604,7 +745,6 @@ function renderizarPecasDaGaveta(idGaveta) {
     const mainContainer = document.getElementById('container-divisorias');
     if (!mainContainer) return;
     mainContainer.innerHTML = '';
-    
     const pecasBrutas = database.items[idGaveta] || [];
 
     if (pecasBrutas.length === 0) {
@@ -622,103 +762,98 @@ function renderizarPecasDaGaveta(idGaveta) {
     const nomesDivisorias = Object.keys(grupos).sort();
 
     nomesDivisorias.forEach(nomeDivisoria => {
-        const headerDivi = document.createElement('div');
-        headerDivi.className = 'divisoria-header';
-        headerDivi.innerHTML = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
+        const headerDivi      = document.createElement('div');
+        headerDivi.className  = 'divisoria-header';
+        headerDivi.innerHTML  = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
         mainContainer.appendChild(headerDivi);
 
-        const gridDivi = document.createElement('div');
-        gridDivi.className = 'gaveteiro-grid'; // CSS Grid Industrial (5 Colunas, Auto-Rows: 180px, Dense)
+        const gridDivi      = document.createElement('div');
+        gridDivi.className  = 'grid-pecas';
 
         const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
 
         pecasOrdenadas.forEach(peca => {
-            const statusPeca = getPecaStatus(peca);
-            
-            const imgHtml = peca.image 
-                ? `<img src="${peca.image}" alt="${peca.name}" class="peca-img" draggable="false">` 
-                : `<i class="fa-solid fa-microchip peca-icon-placeholder"></i>`;
-                
-            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-clean">Últ. retirada: ${peca.lastTakenBy}</div>` : '';
+            const statusPeca   = getPecaStatus(peca);
+            const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
+
+            const imgHtml      = peca.image 
+                ? `<img src="${peca.image}" alt="${peca.name}" style="max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply;">` 
+                : `<i class="fa-solid fa-microchip" style="font-size: 3rem; color: #94a3b8;"></i>`;
+
+            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
 
             const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
-            
-            // ATENÇÃO AQUI: Como a altura base agora é GIGANTE (180px),
-            // a imensa maioria das peças será tamanho 1. 
-            // Se a peça não tiver tamanho definido no BD, força ser 1 para não bugar.
-            const displaySize = peca.size || 1;
+            const displaySize     = peca.size || 1;
 
-            const div = document.createElement('div');
-            div.className = 'compartimento-card';
-            
-            // CSS Dinâmico: A altura da peça dita quantas 'linhas' ela ocupa na colmeia
-            div.style.gridRow = `span ${displaySize}`;
+            const div      = document.createElement('div');
+            div.className  = 'compartimento-card';
 
-            // Adiciona um listener pra forçar ativação do menu no toque do celular
-            div.onclick = () => { div.classList.toggle('active-touch'); };
+            // ALTURA FÍSICA: a peça ocupa "span N" linhas de 60px da colmeia.
+            // (1 = encaixe pequeno ... 10 = encaixe gigante). Aceita QUALQUER valor.
+            div.style.setProperty('--span-size', displaySize);
+            div.style.display       = 'flex';
+            div.style.flexDirection = 'column';
+            div.style.height        = '100%';
+            div.style.minHeight     = '0';
+
+            // A caixa de imagem agora SEMPRE preenche o espaço livre do encaixe:
+            // em peça baixa ela encolhe, em peça alta ela estica, sem deformar.
+            const imgBoxStyle = 'flex: 1 1 auto; min-height: 0;';
 
             div.innerHTML = `
-                <div class="card-padrao">
-                    <div class="card-header-clean">
-                        <span class="pos-badge" title="Posição">#${displayPosition}</span>
-                        <span class="status-indicator ${statusPeca}" title="Status: ${getStatusText(statusPeca)}"></span>
+                <div class="card-top">
+                    <div>
+                        <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
+                        <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
+                        <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
                     </div>
-                    
-                    <div class="card-image-clean">
-                        ${imgHtml}
-                    </div>
-                    
-                    <div class="card-info-clean">
-                        <div class="codigo-clean">${peca.code || 'S/N'}</div>
-                        <div class="nome-clean">${peca.name}</div>
-                    </div>
-                    
-                    <div class="card-qtd-clean">
-                        <span class="qtd-atual">${peca.current}</span>
-                        <span class="qtd-ideal">/ ${peca.expected}</span>
-                    </div>
+                    <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
                 </div>
-
-                <div class="card-overlay-acoes">
-                    <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
-                    
-                    <div class="quick-control">
-                        <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                        <strong>${peca.current}</strong>
-                        <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                
+                <div class="card-title">${peca.name}</div>
+                
+                <div class="card-image-box" style="${imgBoxStyle} background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 6px 0; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden;">
+                    ${imgHtml}
+                </div>
+                
+                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+                    <div class="card-data-row">
+                        <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
+                        <div class="data-box">
+                            <span>Física Atual</span>
+                            <div class="quick-control">
+                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                                <strong style="color:${corQtd}">${peca.current}</strong>
+                                <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <button class="btn-acao-clean" onclick="window.abrirModalConferencia(${peca.id})">
-                        <i class="fa-solid fa-clipboard-check"></i> Contagem
-                    </button>
-                    
-                    <button class="btn-acao-clean ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
-                        <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Requisitar'}
-                    </button>
-                    
-                    <button class="btn-acao-clean admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
-                        <i class="fa-solid fa-right-left"></i> Mover Gaveta
-                    </button>
-
-                    <div class="admin-actions-clean admin-only">
-                        <button class="btn-edit-peca" title="Editar Peça" onclick="window.abrirModalEditarPeca(${peca.id})"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn-excluir" title="Excluir Peça" onclick="window.excluirPeca(${peca.id})"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                    
                     ${retiradaHtml}
-                </div>
-            `;
-            
+                    <div class="botoes-acao-card">
+                        <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
+                            <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
+                        </button>
+                        <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
+                            <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
+                        </button>
+                        <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
+                            <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
+                        </button>
+                    </div>
+                </div>`;
+
+            // Lógica Drag and Drop de Peças (Somente ADMIN)
             if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
                 div.draggable = true;
 
                 div.ondragstart = (e) => {
                     if(e.target.closest('.btn-quick') || e.target.closest('button')) {
-                        e.preventDefault(); return;
+                        e.preventDefault();
+                        return;
                     }
                     draggedPecaId = peca.id;
                     e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', peca.id);
                     setTimeout(() => div.classList.add('dragging'), 0);
                 };
 
@@ -728,44 +863,49 @@ function renderizarPecasDaGaveta(idGaveta) {
                     div.classList.add('drag-over');
                 };
 
-                div.ondragleave = (e) => {
-                    if (!div.contains(e.relatedTarget)) div.classList.remove('drag-over');
-                };
+                div.ondragleave = () => { div.classList.remove('drag-over'); };
 
                 div.ondrop = async (e) => {
                     e.preventDefault();
                     div.classList.remove('drag-over');
-                    
+
                     if (!draggedPecaId || draggedPecaId === peca.id) return;
 
                     let itensGaveta = database.items[gavetaAtualAberta];
+
                     const pecaArrastada = itensGaveta.find(p => p.id === draggedPecaId);
-                    const pecaAlvo = peca; 
+                    const pecaAlvo = peca;
 
                     if(!pecaArrastada || !pecaAlvo) return;
 
                     pecaArrastada.divisoria = pecaAlvo.divisoria;
 
                     let divisoriaItems = itensGaveta.filter(p => p.divisoria === pecaAlvo.divisoria).sort((a, b) => (a.position || 999) - (b.position || 999));
+
                     divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
-                    
+
                     const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
-                    const insertIndex = novoIndexAlvo !== -1 ? novoIndexAlvo : divisoriaItems.length;
-                    
-                    divisoriaItems.splice(insertIndex, 0, pecaArrastada);
-                    divisoriaItems.forEach((p, index) => { p.position = index + 1; });
+
+                    divisoriaItems.splice(novoIndexAlvo, 0, pecaArrastada);
+
+                    divisoriaItems.forEach((p, index) => {
+                        p.position = index + 1;
+                    });
 
                     registrarLog(`reordenou a peça "${pecaArrastada.name}" na gaveta`);
+
                     await salvarItensDaGaveta(gavetaAtualAberta);
-                    renderizarPecasDaGaveta(gavetaAtualAberta); 
+                    renderizarPecasDaGaveta(gavetaAtualAberta);
                 };
 
-                div.ondragend = () => { div.classList.remove('dragging'); draggedPecaId = null; };
+                div.ondragend = () => {
+                    div.classList.remove('dragging');
+                    draggedPecaId = null;
+                };
             }
 
             gridDivi.appendChild(div);
         });
-        
         mainContainer.appendChild(gridDivi);
     });
 }
@@ -804,6 +944,9 @@ function excluirPeca(idPeca) {
     }
 }
 
+// =========================================================================
+// MOVER PEÇA ENTRE GAVETAS
+// =========================================================================
 function abrirModalMoverPeca(idPeca) {
     pecaSendoMovidaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
@@ -865,12 +1008,15 @@ function salvarNomeGaveta() {
     fecharModalEditarGaveta();
 }
 
+// =========================================================================
+// GERENCIAMENTO DE PEÇAS
+// =========================================================================
 function abrirModalCadastro() {
     ['novo-codigo', 'novo-nome', 'novo-posicao'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('novo-esperado').value  = '1';
     document.getElementById('novo-atual').value     = '0';
     document.getElementById('novo-divisoria').value = 'Geral';
-    document.getElementById('novo-tamanho').value   = '1'; // Default base mudou para 1 já que a altura agora é 180px
+    document.getElementById('novo-tamanho').value   = '1';
     document.getElementById('novo-imagem').value    = '';
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
     setTimeout(() => document.getElementById('novo-nome').focus(), 100);
@@ -1002,6 +1148,9 @@ function mostrarAlerta(titulo, mensagem) {
 
 function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
+// =========================================================================
+// GERADOR DE PEDIDO DE COMPRA
+// =========================================================================
 function gerarEmailPedido() {
     const containerItens = document.getElementById('formulario-pedido-itens');
     containerItens.innerHTML = '';
@@ -1111,19 +1260,29 @@ function processarFormularioPedido() {
 
 function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
 
-function copiarTextoPedido() {
+function copiarTextoPedido(event) {
     const ta  = document.getElementById('texto-pedido-gerado');
-    ta.select(); document.execCommand('copy');
-    const btn  = event.currentTarget;
-    const orig = btn.innerHTML;
-    btn.innerHTML             = `<i class="fa-solid fa-check"></i> Copiado!`;
-    btn.style.backgroundColor = 'var(--status-verde)';
-    registrarLog('copiou a lista de pedido de peças para envio.');
-    setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = 'var(--drawer-blue)'; }, 2000);
+    const btn = (event && event.currentTarget) ? event.currentTarget : document.getElementById('btn-copiar-pedido');
+
+    const finalizar = () => {
+        const orig = btn.innerHTML;
+        btn.innerHTML             = `<i class="fa-solid fa-check"></i> Copiado!`;
+        btn.style.backgroundColor = 'var(--status-verde)';
+        registrarLog('copiou a lista de pedido de peças para envio.');
+        setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = 'var(--drawer-blue)'; }, 2000);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).then(finalizar).catch(() => {
+            ta.select(); document.execCommand('copy'); finalizar();
+        });
+    } else {
+        ta.select(); document.execCommand('copy'); finalizar();
+    }
 }
 
 // =========================================================================
-// EXPOSIÇÃO GLOBAL DE FUNÇÕES
+// EXPOSIÇÃO GLOBAL DE FUNÇÕES (NECESSÁRIO POR SER type="module")
 // =========================================================================
 window.toggleMenuMobile          = toggleMenuMobile;
 window.autorizarDispositivo      = autorizarDispositivo;
