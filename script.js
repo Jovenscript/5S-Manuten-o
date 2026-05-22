@@ -1,568 +1,1329 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+========================================================================
+   VARIÁVEIS DE CORES E TEMA
+========================================================================= */
+:root {
+    --bg-grey: #f1f5f9;
+    --sidebar-bg: #0f172a;
+    --main-bg: #ffffff;
+    --border-color: #e2e8f0;
+    --cabinet-blue: #1e3a5f;
+    --drawer-blue: #2a5288;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --danger: #ef4444;
 
-const firebaseConfig = {
-    apiKey: "AIzaSyBRddH3U2K6DAW8gAQZC1gZu7XUVSWgebE",
-    authDomain: "fir-manut.firebaseapp.com",
-    projectId: "fir-manut",
-    storageBucket: "fir-manut.firebasestorage.app",
-    messagingSenderId: "509518361914",
-    appId: "1:509518361914:web:456e0eb1f3d97cdf8ccc03"
-};
+    /* Cores de Status 5S */
+    --status-verde: #10b981;
+    --status-laranja: #f97316;
+    --status-vermelho: #ef4444;
+    --status-amarelo: #eab308;
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+    /* Grade física do gaveteiro (colmeia industrial) */
+    --slot-altura: 60px;   /* altura de 1 encaixe físico */
+    --slot-gap: 12px;      /* espaço entre encaixes */
+    --slot-colunas: 5;     /* divisórias verticais metálicas */
+    --slot-linhas-min: 10; /* repartições horizontais mínimas */
+}
 
-const CLOUDINARY_CLOUD_NAME    = 'dxc1zmhbj';
-const CLOUDINARY_UPLOAD_PRESET = '5s_manutencao';
-const CLOUDINARY_URL           = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-const ADMIN_CREDENTIALS = { login: 'admin@weg.net', senha: 'admin123' };
-const DEVICE_MASTER_KEY = 'WEG2026';
+/* =========================================================================
+   RESET E CONFIGURAÇÕES GERAIS
+========================================================================= */
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Segoe UI', Arial, sans-serif; 
+}
 
-const GAVETAS_PADRAO = [
-    { id: 1,  label: "G1",  title: "Sensores M12"   }, { id: 2,  label: "G2",  title: "Botões e LED's" },
-    { id: 3,  label: "G3",  title: "Fusíveis"       }, { id: 4,  label: "G4",  title: "Contatoras"     },
-    { id: 5,  label: "G5",  title: "Prensas Cabos"  }, { id: 6,  label: "G6",  title: "Bornes e Relés" },
-    { id: 7,  label: "G7",  title: "Abraçadeiras"   }, { id: 8,  label: "G8",  title: "Anilhas"        },
-    { id: 9,  label: "G9",  title: "Lâmpadas"       }, { id: 10, label: "G10", title: "Miscelânea 1"   },
-    { id: 11, label: "G11", title: "Miscelânea 2"   }, { id: 12, label: "G12", title: "Outros"         }
-];
+body { 
+    background-color: var(--bg-grey); 
+    color: var(--text-primary); 
+    height: 100vh; 
+    overflow: hidden; 
+}
 
-let database = { drawers: [...GAVETAS_PADRAO], items: {} };
-GAVETAS_PADRAO.forEach(d => { database.items[d.id] = []; });
+.view-hidden { display: none !important; }
 
-let usuariosSalvos  = []; let historicoLogs = []; let usuarioLogado = null;
-let gavetaAtualAberta = null; let pecaEmFocoId = null; let draggedDrawerIndex = null; let draggedPecaId = null;
+.view-active { 
+    display: block; 
+    animation: fadeIn 0.3s ease-in-out; 
+}
 
-window.onload = () => {
-    iniciarPWA(); iniciarSincronizacaoFirebase(); configurarEventosEnter();
-    if (localStorage.getItem('5s_device_authorized') === 'true') {
-        document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
-        document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
+@keyframes fadeIn { 
+    from { opacity: 0; } 
+    to { opacity: 1; } 
+}
+
+body:not(.is-admin) .admin-only { display: none !important; }
+
+.text-center { text-align: center; }
+.centralizado { justify-content: center; }
+.espacado { justify-content: space-between; }
+.btn-full { width: 100%; }
+
+/* =========================================================================
+   TELA DE BLOQUEIO DE DISPOSITIVO E LOGIN
+========================================================================= */
+#view-device-auth.view-active, #view-login.view-active { 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    min-height: 100vh; 
+    background-color: var(--sidebar-bg); 
+    padding: 1rem; 
+}
+
+.lock-container { border-top: 5px solid var(--danger); }
+
+.lock-icon { 
+    font-size: 3rem; 
+    color: var(--danger); 
+    margin-bottom: 1rem;
+}
+
+.login-container { 
+    background: var(--main-bg); 
+    padding: 3rem 2rem; 
+    border-radius: 12px; 
+    width: 100%; 
+    max-width: 400px; 
+    text-align: center; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5); 
+}
+
+.login-container h2 { 
+    color: var(--drawer-blue); 
+    margin-bottom: 0.5rem; 
+    font-size: 1.5rem; 
+}
+
+.login-container p { 
+    color: var(--text-secondary); 
+    margin-bottom: 2rem; 
+    font-size: 0.9rem; 
+}
+
+.form-group { 
+    margin-bottom: 1.5rem; 
+    text-align: left; 
+}
+
+.form-group label { 
+    display: block; 
+    margin-bottom: 0.5rem; 
+    font-weight: bold; 
+    font-size: 0.9rem; 
+}
+
+.form-group input, .form-group select { 
+    width: 100%; 
+    padding: 1rem; 
+    border: 1px solid var(--border-color); 
+    border-radius: 8px; 
+    font-size: 1rem; 
+    background-color: white;
+}
+
+.btn-login { 
+    width: 100%; 
+    padding: 1rem; 
+    background-color: #3b82f6; 
+    color: white; 
+    border: none; 
+    border-radius: 8px; 
+    font-size: 1.1rem; 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: background 0.3s; 
+}
+
+.btn-login:hover { background-color: #2563eb; }
+.btn-registrar { background-color: #10b981; }
+.btn-registrar:hover { background-color: #059669; }
+.btn-auth { background-color: var(--text-primary); }
+
+.link-toggle { 
+    color: #3b82f6; 
+    cursor: pointer; 
+    font-size: 0.9rem; 
+    margin-top: 1.5rem; 
+    text-decoration: underline; 
+    font-weight: 500; 
+}
+
+/* =========================================================================
+   ESTRUTURA PRINCIPAL DO SISTEMA E NAVEGAÇÃO
+========================================================================= */
+#app-container.view-active { 
+    display: flex; 
+    height: 100vh; 
+    width: 100%; 
+}
+
+.sidebar { 
+    width: 110px; 
+    background: var(--sidebar-bg); 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    padding: 20px 0; 
+    flex-shrink: 0; 
+    z-index: 3000; 
+    transition: transform 0.3s ease; 
+}
+
+.logo { 
+    color: #38bdf8; 
+    font-size: 26px; 
+    font-weight: 800; 
+    margin-bottom: 40px; 
+}
+
+.nav-items { 
+    flex: 1; 
+    width: 100%; 
+}
+
+.nav-item { 
+    color: #94a3b8; 
+    padding: 20px 0; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    cursor: pointer; 
+    font-size: 11px; 
+    font-weight: bold; 
+    gap: 8px; 
+    transition: background 0.2s;
+}
+
+.nav-item i { font-size: 24px; }
+
+.nav-item.active, .nav-item:hover { 
+    color: white; 
+    background: rgba(255,255,255,0.05); 
+    border-left: 4px solid #38bdf8; 
+}
+
+.nav-footer { 
+    color: var(--status-vermelho); 
+    cursor: pointer; 
+    padding: 20px 0; 
+    width: 100%; 
+    text-align: center; 
+    font-size: 11px; 
+    font-weight: bold; 
+    transition: background 0.2s;
+}
+
+.nav-footer:hover { background: rgba(239, 68, 68, 0.1); }
+
+.nav-footer i { 
+    font-size: 22px; 
+    display: block; 
+    margin-bottom: 5px; 
+}
+
+.menu-toggle-mobile { 
+    display: none; 
+    font-size: 1.5rem; 
+    color: var(--cabinet-blue); 
+    cursor: pointer; 
+}
+
+.sidebar-overlay { 
+    display: none; 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    bottom: 0; 
+    background: rgba(0,0,0,0.5); 
+    z-index: 2999; 
+}
+
+.sidebar-overlay.open { display: block; }
+
+.content-area { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    overflow: hidden; 
+}
+
+.top-bar { 
+    background: var(--main-bg); 
+    height: 70px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 0 2rem; 
+    border-bottom: 1px solid var(--border-color); 
+    flex-shrink: 0; 
+}
+
+.page-info { display: flex; align-items: center; gap: 15px; }
+.page-info h1 { font-size: 1.2rem; margin: 0; }
+
+.user-profile { display: flex; align-items: center; gap: 1rem; }
+.user-text { text-align: right; }
+.user-name { font-weight: bold; font-size: 0.95rem; }
+.user-code { font-size: 0.8rem; color: var(--text-secondary); }
+
+.badge-admin { 
+    background-color: var(--drawer-blue); 
+    color: white; 
+    font-size: 0.65rem; 
+    padding: 2px 6px; 
+    border-radius: 4px; 
+    font-weight: bold; 
+    display: inline-block; 
+    margin-top: 2px; 
+}
+
+.user-avatar { 
+    width: 45px; 
+    height: 45px; 
+    background: #e2e8f0; 
+    border-radius: 50%; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    font-size: 20px; 
+    flex-shrink: 0; 
+}
+
+.main-padding { 
+    flex: 1; 
+    padding: 0; 
+    overflow-y: auto; 
+    position: relative; 
+    scroll-behavior: smooth;
+}
+
+#view-gavetas, #view-historico, #view-config, #view-compartimentos, #alerta-global-zerado {
+    padding: 2rem;
+}
+
+/* =========================================================================
+   DASHBOARD DE BUSCA (CARROSSEL DINÂMICO JS E GLASSMORPHISM)
+========================================================================= */
+.dashboard-wrapper {
+    min-height: calc(100vh - 70px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    position: relative;
+    background-color: var(--sidebar-bg);
+    background-size: cover;
+    background-position: center;
+    transition: background-image 1.5s ease-in-out;
+}
+
+.dashboard-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 1;
+}
+
+.glass-panel {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    padding: 3rem;
+    width: 100%;
+    max-width: 750px;
+    text-align: center;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    z-index: 2; 
+    transition: transform 0.3s ease;
+}
+
+.search-box-container {
+    position: relative;
+    width: 100%;
+    margin-bottom: 1.5rem;
+}
+
+.search-icon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.5rem;
+    color: #64748b;
+}
+
+.search-input-glass {
+    width: 100%;
+    padding: 1.2rem 1.2rem 1.2rem 60px;
+    border-radius: 50px;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.search-input-glass:focus {
+    background: #ffffff;
+    box-shadow: 0 4px 25px rgba(56, 189, 248, 0.6);
+    border-color: #38bdf8;
+}
+
+.resultados-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    max-height: 350px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.resultados-grid::-webkit-scrollbar { width: 8px; }
+.resultados-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 4px; }
+.resultados-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 4px; }
+
+.resultado-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 1.2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-align: left;
+    border: 1px solid rgba(255,255,255,0.5);
+}
+
+.resultado-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
+    background: #ffffff;
+}
+
+.res-info h4 { color: var(--cabinet-blue); font-size: 1.1rem; margin-bottom: 5px; }
+.res-info p { color: var(--text-secondary); font-size: 0.9rem; margin: 0; }
+.res-tag {
+    background: var(--drawer-blue);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* =========================================================================
+   TELA: CONFIGURAÇÕES E BACKUP (SÓ ADM)
+========================================================================= */
+.config-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+    gap: 1.5rem; 
+    margin-top: 1rem;
+}
+
+.config-card { 
+    background: var(--main-bg); 
+    border-radius: 12px; 
+    padding: 1.5rem; 
+    border: 1px solid var(--border-color); 
+    transition: box-shadow 0.3s;
+}
+
+.config-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+
+.config-card h3 { 
+    color: var(--cabinet-blue); 
+    margin-bottom: 10px; 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+}
+
+.config-card p { 
+    color: var(--text-secondary); 
+    font-size: 0.9rem; 
+    line-height: 1.4; 
+}
+
+.config-buttons { 
+    display: flex; 
+    gap: 10px; 
+    margin-top: 15px; 
+    flex-wrap: wrap; 
+}
+
+/* =========================================================================
+   TELA: HISTÓRICO DE ATIVIDADES (LOGS)
+========================================================================= */
+.subtitulo-historico {
+    color: var(--text-secondary); 
+    margin-bottom: 1.5rem;
+}
+
+.historico-lista { 
+    background: var(--main-bg); 
+    border-radius: 12px; 
+    padding: 1.5rem; 
+    border: 1px solid var(--border-color); 
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px; 
+}
+
+.log-item { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    padding: 12px; 
+    background-color: #f8fafc; 
+    border-radius: 8px; 
+    border-left: 4px solid var(--drawer-blue); 
+    transition: transform 0.2s;
+}
+
+.log-item:hover { transform: translateX(5px); }
+
+.log-time { 
+    color: var(--text-secondary); 
+    font-size: 0.85rem; 
+    font-weight: 600; 
+    min-width: 130px; 
+}
+
+.log-text { 
+    font-size: 0.95rem; 
+    color: var(--text-primary); 
+}
+
+.log-text strong { color: var(--cabinet-blue); }
+
+/* =========================================================================
+   ALERTA GLOBAL (NOTIFICAÇÃO DE ESTOQUE ZERADO)
+========================================================================= */
+.alerta-global { 
+    background-color: #fef2f2; 
+    border: 1px solid #f87171; 
+    color: #b91c1c; 
+    padding: 1.2rem; 
+    border-radius: 8px; 
+    margin-bottom: 1.5rem; 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    font-size: 1.05rem; 
+    box-shadow: 0 4px 6px rgba(239, 68, 68, 0.15); 
+    animation: pulse-border 2s infinite; 
+}
+
+@keyframes pulse-border { 
+    0% { border-color: #f87171; box-shadow: 0 0 0 rgba(239, 68, 68, 0); } 
+    50% { border-color: #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); } 
+    100% { border-color: #f87171; box-shadow: 0 0 0 rgba(239, 68, 68, 0); } 
+}
+
+/* =========================================================================
+   VISÃO GERAL DO ARMÁRIO E GAVETAS DRAG AND DROP
+========================================================================= */
+.relatorio-geral { 
+    background: var(--main-bg); 
+    border-radius: 12px; 
+    padding: 1.5rem; 
+    margin-bottom: 1rem; 
+    border: 1px solid var(--border-color); 
+}
+
+.kpi-grid { 
+    display: flex; 
+    gap: 2rem; 
+    margin-top: 15px; 
+}
+
+.kpi-summary { 
+    width: 30%; 
+    border-right: 1px solid var(--border-color); 
+    display: flex; 
+    align-items: center; 
+    padding-right: 15px;
+}
+
+.kpi-big-number { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    color: var(--text-primary); 
+}
+
+.kpi-big-number span { 
+    font-size: 3.8rem; 
+    font-weight: 900; 
+    line-height: 1; 
+    color: var(--cabinet-blue); 
+}
+
+.kpi-big-number p { 
+    font-size: 0.95rem; 
+    font-weight: bold; 
+    margin: 0; 
+    line-height: 1.3; 
+    text-align: left;
+}
+
+.kpi-status-list { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+    gap: 10px; 
+    flex: 1; 
+    max-height: 150px; 
+    overflow-y: auto; 
+}
+
+.kpi-status-item { 
+    font-size: 0.85rem; 
+    font-weight: 700; 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+}
+
+.kpi-status-item.verde { color: var(--status-verde); }
+.kpi-status-item.amarelo { color: var(--status-amarelo); } 
+.kpi-status-item.laranja { color: var(--status-laranja); }
+.kpi-status-item.vermelho { color: var(--status-vermelho); }
+
+.cabinet-vertical { 
+    display: flex; 
+    flex-direction: column; 
+    background-color: var(--cabinet-blue); 
+    padding: 15px; 
+    border-radius: 8px; 
+    gap: 6px; 
+    width: 100%; 
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5); 
+}
+
+.btn-gaveta { 
+    background: linear-gradient(to bottom, #4477b5, var(--drawer-blue)); 
+    border: 1px solid #1a385f; 
+    border-bottom: 5px solid #132a47; 
+    border-radius: 4px; 
+    height: 90px; 
+    cursor: pointer; 
+    display: flex; 
+    justify-content: flex-start; 
+    align-items: center; 
+    padding: 0 2rem; 
+    position: relative; 
+    transition: transform 0.2s, filter 0.2s, opacity 0.2s, border 0.2s;
+}
+
+.btn-gaveta:hover { filter: brightness(1.15); }
+
+/* Classes para o Drag and Drop */
+.btn-gaveta.dragging {
+    opacity: 0.5;
+    border: 2px dashed #38bdf8;
+    transform: scale(0.98);
+}
+
+.btn-gaveta.drag-over {
+    border-top: 4px solid #38bdf8;
+    margin-top: 10px;
+    filter: brightness(1.3);
+}
+
+.drag-handle {
+    margin-right: 15px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.drag-handle:hover {
+    opacity: 1;
+    color: white !important;
+}
+
+.gaveta-content { 
+    display: flex; 
+    align-items: center; 
+    gap: 1.5rem; 
+    width: 100%; 
+    color: white; 
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.6); 
+    pointer-events: none; 
+}
+
+.gaveta-content .btn-edit-gaveta, .gaveta-content .drag-handle {
+    pointer-events: auto;
+}
+
+.gnumber { 
+    font-size: 1.4rem; 
+    font-weight: 800; 
+    background: rgba(255,255,255,0.2); 
+    padding: 5px 15px; 
+    border-radius: 4px; 
+}
+
+.glabel { 
+    font-size: 1.3rem; 
+    font-weight: 600; 
+    flex: 1; 
+    text-align: left; 
+}
+
+.btn-edit-gaveta {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 5px;
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.btn-edit-gaveta:hover { background: rgba(255, 255, 255, 0.3); }
+
+.btn-gaveta::after { 
+    content: ""; 
+    position: absolute; 
+    bottom: 15px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+    width: 250px; 
+    height: 12px; 
+    background: linear-gradient(to bottom, #cbd5e1, #94a3b8); 
+    border-radius: 6px; 
+    box-shadow: 0 3px 5px rgba(0,0,0,0.4); 
+    pointer-events: none;
+}
+
+.gstatus-light { 
+    width: 18px; 
+    height: 18px; 
+    border-radius: 50%; 
+    border: 2px solid rgba(0,0,0,0.4); 
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.gstatus-light.verde { background-color: var(--status-verde); box-shadow: 0 0 10px var(--status-verde); }
+.gstatus-light.amarelo { background-color: var(--status-amarelo); box-shadow: 0 0 10px var(--status-amarelo); }
+.gstatus-light.laranja { background-color: var(--status-laranja); box-shadow: 0 0 10px var(--status-laranja); }
+.gstatus-light.vermelho { background-color: var(--status-vermelho); box-shadow: 0 0 10px var(--status-vermelho); }
+
+/* =========================================================================
+   DENTRO DA GAVETA — DIVISÓRIAS
+========================================================================= */
+.header-gaveta { 
+    display: flex; 
+    align-items: center; 
+    gap: 1rem; 
+    margin-bottom: 1rem; 
+    background: var(--main-bg); 
+    padding: 1rem 1.5rem; 
+    border-radius: 8px; 
+    border: 1px solid var(--border-color); 
+    flex-wrap: wrap; 
+}
+
+.btn-voltar, .btn-add-item { 
+    color: white; 
+    border: none; 
+    padding: 0.8rem 1.2rem; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-weight: bold; 
+    font-size: 0.95rem; 
+    transition: transform 0.2s, filter 0.2s;
+}
+
+.btn-voltar:hover, .btn-add-item:hover { filter: brightness(0.9); transform: scale(1.02); }
+
+.btn-voltar { background: var(--text-secondary); }
+.btn-add-item { background: #3b82f6; }
+
+#titulo-gaveta-aberta { 
+    flex: 1; 
+    text-align: center; 
+    font-size: 1.5rem; 
+    color: var(--cabinet-blue); 
+    min-width: 200px; 
+}
+
+.divisoria-header {
+    background: #e2e8f0;
+    color: var(--drawer-blue);
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin: 20px 0 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-left: 5px solid var(--drawer-blue);
+}
+
+/* =========================================================================
+   COLMEIA / GAVETEIRO FÍSICO  (5 COLUNAS x LINHAS DINÂMICAS DE 60px)
+   - As COLUNAS são as 5 divisórias verticais metálicas do gaveteiro.
+   - As LINHAS crescem automaticamente; cada encaixe ocupa "span N" linhas
+     conforme a altura física real da peça (1 = pequena ... 10 = gigante).
+========================================================================= */
+.grid-pecas {
+    display: grid;
+    grid-template-columns: repeat(var(--slot-colunas), minmax(0, 1fr));
+    grid-auto-rows: var(--slot-altura);
+    /* REMOVIDO: grid-auto-flow: dense; 
+       Agora o grid NÃO empacota agressivamente → deixa espaços vazios naturais */
+    gap: var(--slot-gap);
+    padding: var(--slot-gap);
+    margin-bottom: 1.5rem;
+
+    /* Moldura do gaveteiro: garante a "altura mínima de 10 linhas" mesmo vazio
+       e cresce sozinho conforme os spans vão empilhando. */
+    min-height: calc(
+        var(--slot-altura) * var(--slot-linhas-min)
+        + var(--slot-gap) * (var(--slot-linhas-min) - 1)
+        + var(--slot-gap) * 2
+    );
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(30, 58, 95, 0.04) 0,
+            rgba(30, 58, 95, 0.04) var(--slot-altura),
+            transparent var(--slot-altura),
+            transparent calc(var(--slot-altura) + var(--slot-gap))
+        ),
+        var(--cabinet-blue);
+    border-radius: 10px;
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.45);
+}
+
+.compartimento-card { 
+    background: var(--main-bg); 
+    border-radius: 10px; 
+    padding: 12px; 
+    border: 1px solid var(--border-color); 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12); 
+    position: relative; 
+    display: flex; 
+    flex-direction: column; 
+
+    /* A altura física: ocupa "span N" linhas de 60px da colmeia */
+    grid-row: span var(--span-size, 1);
+
+    height: 100%;
+    min-height: 0;       /* deixa o conteúdo encolher para caber no encaixe */
+    overflow: hidden;    /* impede que peças pequenas "vazem" para fora */
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+
+.compartimento-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 18px rgba(0,0,0,0.18);
+
+    z-index: 5;
+
+}
+
+/* SLOT VAZIO: espaços vazios físicos da gaveta (compartimentos sem peça) */
+.slot-vazio {
+    background: rgba(42, 82, 136, 0.08);
+    border: 2px dashed rgba(148, 163, 184, 0.4);
+    box-shadow: none;
+    color: #94a3b8;
+    padding: 8px;
+}
+.slot-vazio:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgba(42, 82, 136, 0.15);
+    border-color: rgba(148, 163, 184, 0.6);
+}
+.slot-vazio-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.slot-vazio-top .card-local {
+    background: rgba(148, 163, 184, 0.25);
+    color: #64748b;
+    font-size: 0.7rem;
+}
+.slot-vazio-corpo {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+}
+.slot-vazio-corpo i {
+    font-size: 2rem;
+    color: #cbd5e1;
+}
+.slot-vazio-corpo span {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+/* Efeitos Drag and Drop PEÇAS */
+.compartimento-card.dragging {
+    opacity: 0.5;
+    border: 2px dashed #38bdf8;
+    transform: scale(0.98);
+}
+.compartimento-card.drag-over {
+    border: 2px solid #38bdf8;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+}
+
+.drag-handle-item {
+    cursor: grab;
+    color: #94a3b8;
+    margin-right: 10px;
+    font-size: 1.2rem;
+    transition: color 0.2s;
+}
+
+.drag-handle-item:hover { color: #38bdf8; }
+
+
+
+
+.card-top { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 0.6rem; 
+    flex-shrink: 0;
+}
+
+.card-top > div {
+    display: flex;
+    align-items: center;
+}
+
+.card-local { 
+    background: var(--bg-grey); 
+    padding: 4px 10px; 
+    border-radius: 4px; 
+    font-weight: bold; 
+    color: var(--text-secondary); 
+    font-size: 0.75rem; 
+}
+
+.btn-edit-peca { 
+    background: #e0f2fe; 
+    color: #0284c7; 
+    border: none; 
+    padding: 6px 10px; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    margin-left: 10px; 
+    transition: background 0.2s;
+}
+.btn-edit-peca:hover { background: #0284c7; color: white; }
+
+.btn-excluir { 
+    background: #fee2e2; 
+    color: var(--status-vermelho); 
+    border: none; 
+    padding: 6px 10px; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    margin-left: 5px; 
+    transition: background 0.2s;
+}
+.btn-excluir:hover { background: var(--status-vermelho); color: white; }
+
+.badge-status { 
+    padding: 4px 10px; 
+    border-radius: 4px; 
+    font-size: 0.7rem; 
+    font-weight: 800; 
+    text-transform: uppercase; 
+    text-align: center; 
+    flex-shrink: 0;
+}
+
+.badge-status.verde { background-color: #d1fae5; color: #047857; border: 1px solid #10b981; }
+.badge-status.amarelo { background-color: #fef08a; color: #854d0e; border: 1px solid #eab308; }
+.badge-status.laranja { background-color: #ffedd5; color: #c2410c; border: 1px solid #f97316; }
+.badge-status.vermelho { background-color: #fee2e2; color: #b91c1c; border: 1px solid #ef4444; }
+
+.card-title { 
+    font-size: 1.05rem; 
+    font-weight: bold; 
+    margin-bottom: 0.6rem; 
+    flex-shrink: 0;
+    line-height: 1.2;
+}
+
+/* Caixa de imagem: agora SEMPRE flexível para preencher a altura do encaixe.
+   Em peças baixas (span pequeno) ela encolhe; em peças altas, estica. */
+.card-image-box { 
+    width: 100%; 
+    flex: 1 1 auto; 
+    min-height: 0; 
+    background: #f8fafc; 
+    border-radius: 8px; 
+    margin-bottom: 0.6rem; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    overflow: hidden; 
+    border: 1px solid #e2e8f0; 
+    padding: 8px;
+}
+
+.peca-img { 
+    max-width: 100%; 
+    max-height: 100%; 
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.peca-icon-placeholder { 
+    font-size: 3.5rem; 
+    color: #cbd5e1; 
+}
+
+.card-data-row { 
+    display: flex; 
+    justify-content: space-between; 
+    margin-bottom: 0.6rem; 
+    background: var(--bg-grey); 
+    padding: 8px; 
+    border-radius: 8px; 
+    gap: 10px; 
+    flex-shrink: 0;
+}
+
+.data-box { 
+    text-align: center; 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: center; 
+}
+
+.data-box span { 
+    font-size: 0.75rem; 
+    color: var(--text-secondary); 
+    margin-bottom: 4px; 
+}
+
+.data-box strong { 
+    font-size: 1.4rem; 
+    font-weight: 800; 
+}
+
+.quick-control { 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 10px; 
+    background: white; 
+    border: 1px solid var(--border-color); 
+    border-radius: 6px; 
+    padding: 4px; 
+}
+
+.btn-quick { 
+    background: #f1f5f9; 
+    border: none; 
+    width: 30px; 
+    height: 30px; 
+    border-radius: 4px; 
+    font-size: 1rem; 
+    color: var(--cabinet-blue); 
+    cursor: pointer; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    transition: background 0.1s;
+}
+
+.btn-quick:hover { background: #e2e8f0; }
+.btn-quick:active { background: #cbd5e1; transform: scale(0.95); }
+
+.quick-control strong { 
+    font-size: 1.4rem; 
+    min-width: 25px; 
+    text-align: center; 
+}
+
+.last-taken-info { 
+    background: #f8fafc; 
+    color: var(--text-secondary); 
+    font-size: 0.72rem; 
+    text-align: center; 
+    padding: 5px; 
+    border-radius: 6px; 
+    margin-bottom: 0.6rem; 
+    font-style: italic; 
+    border: 1px dashed #cbd5e1; 
+}
+
+.botoes-acao-card { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 6px; 
+    margin-top: auto; 
+    flex-shrink: 0;
+}
+
+.btn-conferir, .btn-requisitado, .btn-mover { 
+    width: 100%; 
+    padding: 0.55rem; 
+    border-radius: 6px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    font-size: 0.8rem; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    gap: 8px; 
+    transition: all 0.2s;
+}
+
+.btn-conferir { background: var(--cabinet-blue); color: white; border: none; }
+.btn-conferir:hover { background: var(--drawer-blue); }
+
+.btn-requisitado { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.btn-requisitado:hover { background: #e2e8f0; }
+.btn-requisitado.ativo { background: #fef08a; color: #854d0e; border-color: #eab308; }
+
+.btn-mover { background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; }
+.btn-mover:hover { background: #7c3aed; color: white; }
+
+/* =========================================================================
+   MODAIS E ALERTAS
+========================================================================= */
+.modal-overlay { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background: rgba(15, 23, 42, 0.7); 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    z-index: 4000; 
+    animation: fadeIn 0.2s; 
+    padding: 1rem; 
+}
+
+.modal-content { 
+    background: var(--main-bg); 
+    padding: 2rem; 
+    border-radius: 12px; 
+    width: 100%; 
+    max-width: 500px; 
+    box-shadow: 0 20px 25px rgba(0,0,0,0.2); 
+    max-height: 90vh; 
+    overflow-y: auto; 
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-pequeno { max-width: 400px; }
+.modal-largo { max-width: 600px; }
+
+.modal-subtitle {
+    color: #64748b; 
+    margin-bottom: 15px; 
+    font-size: 0.9rem;
+}
+
+.form-group.row { display: flex; gap: 15px; }
+.form-group.row .col { flex: 1; }
+.input-grande { font-size: 2rem; text-align: center; height: 60px; }
+.file-input { border: 1px dashed var(--border-color) !important; padding: 15px !important; background: #f8fafc; cursor: pointer; }
+
+.modal-actions { 
+    display: flex; 
+    justify-content: flex-end; 
+    gap: 10px; 
+    margin-top: 1.5rem; 
+    flex-wrap: wrap; 
+}
+
+.btn-cancel, .btn-save { 
+    padding: 0.8rem 1.5rem; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-weight: bold; 
+    font-size: 1rem; 
+    border: none; 
+    flex: 1; 
+    min-width: 120px; 
+    text-align: center; 
+    transition: filter 0.2s;
+}
+
+.btn-cancel:hover, .btn-save:hover { filter: brightness(0.9); }
+.btn-cancel { background: #e2e8f0; color: #475569; }
+.btn-save { background: #3b82f6; color: white; }
+.btn-copiar { background-color: var(--drawer-blue); width: 200px; }
+
+.textarea-pedido {
+    width: 100%; 
+    padding: 15px; 
+    border-radius: 6px; 
+    border: 1px solid var(--border-color); 
+    margin-bottom: 15px; 
+    font-family: inherit; 
+    resize: none; 
+    background-color: #f8fafc; 
+    font-size: 0.95rem;
+}
+
+.icone-alerta-grande { font-size: 3rem; color: #ef4444; margin-bottom: 15px; }
+.titulo-alerta { margin-bottom: 10px; }
+.mensagem-alerta { margin-bottom: 25px; color: #475569; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* =========================================================================
+   MEDIA QUERIES PARA MOBILE (CELULARES) - RESPONSIVIDADE COMPLETA
+========================================================================= */
+@media (max-width: 768px) {
+    .menu-toggle-mobile { display: block; } 
+
+    .sidebar { 
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        height: 100vh; 
+        width: 260px; 
+        transform: translateX(-100%); 
+        padding-top: 30px; 
     }
-};
+    .sidebar.open { transform: translateX(0); } 
 
-function iniciarPWA() { if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
-function validarSenhaForte(senha) { return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(senha); }
-function getPecaStatus(peca) { if (peca.current === 0) return 'vermelho'; if (peca.current < peca.expected * 0.25) return 'laranja'; if (peca.current < peca.expected) return 'amarelo'; return 'verde'; }
-function getStatusText(status) { const map = { verde: 'OK', amarelo: 'Atenção', laranja: 'Crítico', vermelho: 'Zerado' }; return map[status] || 'OK'; }
-function getGavetaStatus(pecas) {
-    if (!pecas || pecas.length === 0) return 'verde';
-    const hasZerado = pecas.some(p => p.current === 0);
-    const hasCritico = pecas.some(p => p.current > 0 && p.current < p.expected * 0.25);
-    if (hasZerado) return 'vermelho'; if (hasCritico) return 'laranja';
-    if (pecas.some(p => p.current < p.expected)) return 'amarelo'; return 'verde';
-}
-
-function registrarLog(acao) {
-    const data = new Date().toLocaleDateString('pt-BR');
-    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const nome = usuarioLogado ? usuarioLogado.nome : 'Sistema';
-    historicoLogs.unshift({ data, hora, nome, acao });
-    if (historicoLogs.length > 200) historicoLogs = historicoLogs.slice(0, 200);
-    salvarHistorico();
-}
-
-function renderizarHistorico() {
-    const lista = document.getElementById('lista-historico'); if (!lista) return;
-    lista.innerHTML = historicoLogs.length === 0 ? '<p style="text-align:center; padding:30px;">Nenhum registro.</p>' : '';
-    historicoLogs.forEach(log => {
-        const div = document.createElement('div'); div.className = 'log-item';
-        div.innerHTML = `<span class="log-time">${log.data} ${log.hora}</span><span class="log-text"><strong>${log.nome}</strong> ${log.acao}</span>`;
-        lista.appendChild(div);
-    });
-}
-
-function toggleMenuMobile() { document.getElementById('sidebar-menu').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('open'); }
-
-async function uploadImagemCloudinary(file) {
-    const formData = new FormData(); formData.append('file', file); formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(`Cloudinary Error`);
-    return (await res.json()).secure_url;
-}
-
-async function salvarConfig() { try { await setDoc(doc(db, "manutencao_5s", "config"), { drawers: database.drawers, usuarios: usuariosSalvos }); } catch (e) {} }
-async function salvarHistorico() { try { await setDoc(doc(db, "manutencao_5s", "historico"), { logs: historicoLogs }); } catch (e) {} }
-async function salvarItensDaGaveta(idGaveta) { try { await setDoc(doc(db, "manutencao_5s", `itens_g${idGaveta}`), { items: database.items[idGaveta] || [] }); } catch (e) {} }
-
-async function iniciarSincronizacaoFirebase() {
-    onSnapshot(doc(db, "manutencao_5s", "config"), (snap) => {
-        if (snap.exists()) {
-            const d = snap.data(); database.drawers = d.drawers || [...GAVETAS_PADRAO]; usuariosSalvos = d.usuarios || [];
-            database.drawers.forEach(g => { if (!database.items[g.id]) database.items[g.id] = []; });
-            registrarListenersGavetas();
-        } else { salvarConfig(); registrarListenersGavetas(); }
-        if(document.getElementById('view-dashboard').classList.contains('view-active')) atualizarDashboard();
-    });
-    onSnapshot(doc(db, "manutencao_5s", "historico"), (snap) => { if (snap.exists()) historicoLogs = snap.data().logs || []; renderizarHistorico(); });
-}
-
-function registrarListenersGavetas() {
-    database.drawers.forEach(gaveta => {
-        onSnapshot(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), (snap) => {
-            database.items[gaveta.id] = snap.exists() ? (snap.data().items || []) : [];
-            // Migração silenciosa de variáveis antigas para o modelo matriz
-            database.items[gaveta.id].forEach(p => {
-                if (p.coluna === undefined) p.coluna = 1;
-                if (p.linha === undefined && p.position !== undefined) p.linha = p.position; // Migra position para linha
-                if (p.linha === undefined) p.linha = 'auto';
-                if (p.altura === undefined && p.size !== undefined) p.altura = p.size; // Migra size para altura
-                if (p.altura === undefined) p.altura = 1;
-            });
-            if (gavetaAtualAberta === gaveta.id) renderizarPecasDaGaveta(gavetaAtualAberta);
-        });
-    });
-}
-
-function configurarEventosEnter() { /* Mantido */ }
-function autorizarDispositivo() {
-    if (document.getElementById('input-device-key').value === DEVICE_MASTER_KEY) {
-        localStorage.setItem('5s_device_authorized', 'true');
-        document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
-        document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
-    } else { alert('Chave incorreta.'); }
-}
-
-function alternarTelaLogin() {
-    const fe = document.getElementById('form-entrar'); const fr = document.getElementById('form-registrar');
-    fe.classList.toggle('view-hidden'); fe.classList.toggle('view-active');
-    fr.classList.toggle('view-hidden'); fr.classList.toggle('view-active');
-}
-
-function registrarUsuario() {
-    const nome = document.getElementById('reg-nome').value.trim(); const cracha = document.getElementById('reg-cracha').value.trim(); const senha = document.getElementById('reg-senha').value.trim();
-    if (!nome || !cracha || !senha) return alert('Preencha tudo!');
-    if (!validarSenhaForte(senha)) return alert('Senha Fraca!');
-    const novoUser = { nome, cracha, senha, role: 'USER' };
-    usuariosSalvos.push(novoUser); salvarConfig(); aplicarLogin(novoUser);
-}
-
-function realizarLogin() {
-    const id = document.getElementById('input-login-id').value.trim(); const senha = document.getElementById('input-login-senha').value.trim();
-    if (id === ADMIN_CREDENTIALS.login && senha === ADMIN_CREDENTIALS.senha) return aplicarLogin({ nome: 'Administrador', cracha: 'Admin', role: 'ADMIN' });
-    const user = usuariosSalvos.find(u => u.cracha === id && u.senha === senha);
-    if (!user) return alert('Dados incorretos.');
-    aplicarLogin(user);
-}
-
-function aplicarLogin(user) {
-    usuarioLogado = user;
-    document.getElementById('usuario-logado-nome').innerText = user.nome;
-    document.getElementById('usuario-logado-codigo').innerText = `Crachá: ${user.cracha}`;
-    if (user.role === 'ADMIN') { document.body.classList.add('is-admin'); document.getElementById('badge-admin').classList.remove('view-hidden'); } 
-    else { document.body.classList.remove('is-admin'); document.getElementById('badge-admin').classList.add('view-hidden'); }
-    document.getElementById('view-login').classList.replace('view-active', 'view-hidden');
-    document.getElementById('app-container').classList.replace('view-hidden', 'view-active');
-    atualizarDashboard(); mostrarTela('view-dashboard');
-}
-
-function mostrarTela(id) {
-    ['view-dashboard', 'view-gavetas', 'view-compartimentos', 'view-historico', 'view-config'].forEach(v => {
-        const el = document.getElementById(v); if (el) el.classList.replace('view-active', 'view-hidden');
-    });
-    document.getElementById(id).classList.replace('view-hidden', 'view-active');
-    document.querySelectorAll('.nav-item').forEach(l => l.classList.remove('active'));
-    if (event && event.currentTarget && event.currentTarget.classList) event.currentTarget.classList.add('active');
-    document.getElementById('sidebar-menu').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open');
-    if (id === 'view-gavetas' || id === 'view-dashboard') gavetaAtualAberta = null;
-}
-
-function voltarParaGavetas() { mostrarTela('view-gavetas'); }
-function sairDoSistema() { location.reload(); }
-
-function atualizarDashboard() {
-    renderArmarioVertical(); calcularKPIs();
-    if (gavetaAtualAberta !== null) renderizarPecasDaGaveta(gavetaAtualAberta);
-}
-
-function calcularKPIs() {
-    let alerts = 0; const lista = document.getElementById('kpi-lista-gavetas'); if (!lista) return; lista.innerHTML = '';
-    database.drawers.forEach(gaveta => {
-        const status = getGavetaStatus(database.items[gaveta.id] || []);
-        const div = document.createElement('div'); div.className = `kpi-status-item ${status}`;
-        div.innerHTML = `<i class="fa-solid fa-circle-${status === 'verde' ? 'check' : 'exclamation'}"></i> ${gaveta.label}: ${getStatusText(status)}`;
-        lista.appendChild(div); if (status !== 'verde') alerts++;
-    });
-    document.getElementById('kpi-pendencias-count').innerText = alerts;
-}
-
-function renderArmarioVertical() {
-    const chassi = document.getElementById('menu-gavetas'); if (!chassi) return; chassi.innerHTML = '';
-    database.drawers.forEach((gaveta, index) => {
-        const status = getGavetaStatus(database.items[gaveta.id] || []);
-        const div = document.createElement('div'); div.className = 'btn-gaveta';
-        div.innerHTML = `
-            <div class="gaveta-content">
-                <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste"></i>
-                <span class="gnumber">${gaveta.label}</span><span class="glabel">${gaveta.title}</span>
-                <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})"><i class="fa-solid fa-pen"></i></button>
-                <div class="gstatus-light ${status}"></div>
-            </div>`;
-        div.onclick = (e) => { if (!e.target.closest('.btn-edit-gaveta') && !e.target.closest('.drag-handle')) abrirGaveta(gaveta.id); };
-        
-        // Drag Drop Gavetas (simplificado)
-        if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
-            div.draggable = true;
-            div.ondragstart = (e) => { draggedDrawerIndex = index; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', index); div.classList.add('dragging'); };
-            div.ondragover = (e) => { e.preventDefault(); div.classList.add('drag-over'); };
-            div.ondragleave = () => div.classList.remove('drag-over');
-            div.ondrop = async (e) => {
-                e.preventDefault(); div.classList.remove('drag-over');
-                if (draggedDrawerIndex !== null && draggedDrawerIndex !== index) {
-                    const gavetaArrastada = database.drawers[draggedDrawerIndex];
-                    database.drawers.splice(draggedDrawerIndex, 1); database.drawers.splice(index, 0, gavetaArrastada);
-                    registrarLog(`reordenou a ${gavetaArrastada.label}`); await salvarConfig(); renderArmarioVertical(); 
-                }
-            };
-            div.ondragend = () => { div.classList.remove('dragging'); draggedDrawerIndex = null; };
-        }
-        chassi.appendChild(div);
-    });
-}
-
-// =========================================================================
-// O CORAÇÃO DO GAVETEIRO: A COLMEIA EXCEL GRID
-// =========================================================================
-function abrirGaveta(idGaveta) {
-    gavetaAtualAberta = idGaveta;
-    const gaveta = database.drawers.find(d => d.id === idGaveta);
-    document.getElementById('titulo-gaveta-aberta').innerText = `${gaveta.label}: ${gaveta.title}`;
-    renderizarPecasDaGaveta(idGaveta);
-    mostrarTela('view-compartimentos');
-}
-
-function renderizarPecasDaGaveta(idGaveta) {
-    const mainContainer = document.getElementById('matriz-gaveta');
-    if (!mainContainer) return;
-    mainContainer.innerHTML = '';
-    
-    const pecas = database.items[idGaveta] || [];
-
-    if (pecas.length === 0) {
-        mainContainer.innerHTML = '<div style="grid-column: span 5; text-align:center; padding:40px; color:#94a3b8;">Nenhuma peça cadastrada nesta gaveta.</div>';
-        return;
+    .nav-item { 
+        flex-direction: row; 
+        justify-content: flex-start; 
+        padding: 15px 25px; 
+        font-size: 14px; 
+        gap: 15px; 
+        width: 100%; 
+        border-left: 4px solid transparent; 
     }
+    .nav-item i { font-size: 20px; width: 30px; text-align: center; }
+    .nav-item.active { border-left: 4px solid #38bdf8; }
 
-    pecas.forEach(peca => {
-        const div = document.createElement('div');
-        div.className = 'compartimento-card';
-        
-        // CSS GRID MÁGICO: Posicionamento exato tipo Excel
-        const col = parseInt(peca.coluna) || 1;
-        const linha = peca.linha && peca.linha !== 'auto' ? parseInt(peca.linha) : 'auto';
-        const span = parseInt(peca.altura) || 1;
-
-        div.style.gridColumn = String(col);
-        div.style.gridRow = linha !== 'auto' ? `${linha} / span ${span}` : `span ${span}`;
-
-        const status = getPecaStatus(peca);
-        const imgHtml = peca.image 
-            ? `<img src="${peca.image}" class="peca-img" draggable="false">` 
-            : `<i class="fa-solid fa-microchip peca-icon-placeholder"></i>`;
-
-        // Card Visível
-        div.innerHTML = `
-            <div class="card-padrao">
-                <div class="card-header-clean">
-                    <span class="pos-badge">Col ${col} | Linha ${linha !== 'auto' ? linha : '-'}</span>
-                    <span class="status-indicator ${status}"></span>
-                </div>
-                <div class="card-image-clean">${imgHtml}</div>
-                <div class="card-info-clean">
-                    <div class="codigo-clean">${peca.code || 'S/N'}</div>
-                    <div class="nome-clean">${peca.name}</div>
-                </div>
-            </div>
-        `;
-
-        // Clique abre o Drawer/Modal de Detalhes
-        div.onclick = () => abrirModalAcoesPeca(peca);
-
-        // Drag and Drop (SWAP CÉLULAS EXCEL)
-        if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
-            div.draggable = true;
-            div.ondragstart = (e) => { draggedPecaId = peca.id; e.dataTransfer.setData('text/plain', peca.id); setTimeout(() => div.classList.add('dragging'), 0); };
-            div.ondragover = (e) => { e.preventDefault(); div.classList.add('drag-over'); };
-            div.ondragleave = (e) => { if (!div.contains(e.relatedTarget)) div.classList.remove('drag-over'); };
-            div.ondrop = async (e) => {
-                e.preventDefault(); div.classList.remove('drag-over');
-                if (!draggedPecaId || draggedPecaId === peca.id) return;
-                
-                const pecaArrastada = pecas.find(p => p.id === draggedPecaId);
-                const pecaAlvo = peca; 
-
-                // TROCA (SWAP) DE POSIÇÃO ENTRE AS CÉLULAS
-                const tempCol = pecaArrastada.coluna;
-                const tempLinha = pecaArrastada.linha;
-                pecaArrastada.coluna = pecaAlvo.coluna;
-                pecaArrastada.linha = pecaAlvo.linha;
-                pecaAlvo.coluna = tempCol;
-                pecaAlvo.linha = tempLinha;
-
-                registrarLog(`trocou a posição de "${pecaArrastada.name}" com "${pecaAlvo.name}"`);
-                await salvarItensDaGaveta(gavetaAtualAberta);
-                renderizarPecasDaGaveta(gavetaAtualAberta); 
-            };
-            div.ondragend = () => { div.classList.remove('dragging'); draggedPecaId = null; };
-        }
-
-        mainContainer.appendChild(div);
-    });
-}
-
-// =========================================================================
-// O NOVO DRAWER/MODAL DE DETALHES (SUBSTITUI O HOVER OVERLAY)
-// =========================================================================
-function abrirModalAcoesPeca(peca) {
-    pecaEmFocoId = peca.id;
-    const status = getPecaStatus(peca);
-    
-    document.getElementById('drawer-posicao').innerText = `Col ${peca.coluna || 1} | L. ${peca.linha !== 'auto' ? peca.linha : '-'}`;
-    
-    const statusBadge = document.getElementById('drawer-status');
-    statusBadge.innerText = getStatusText(status).toUpperCase();
-    statusBadge.className = `badge-status-color status-indicator ${status}`; // reusa a cor
-    statusBadge.style.boxShadow = 'none';
-
-    if (peca.image) {
-        document.getElementById('drawer-img').src = peca.image;
-        document.getElementById('drawer-img').style.display = 'block';
-        document.getElementById('drawer-img-placeholder').style.display = 'none';
-    } else {
-        document.getElementById('drawer-img').style.display = 'none';
-        document.getElementById('drawer-img-placeholder').style.display = 'block';
+    .nav-footer { 
+        margin-top: auto; 
+        padding: 20px 25px; 
+        display: flex; 
+        flex-direction: row; 
+        gap: 15px; 
+        font-size: 14px; 
+        justify-content: flex-start; 
+        align-items: center; 
     }
+    .nav-footer i { margin-bottom: 0; width: 30px; text-align: center; }
 
-    document.getElementById('drawer-codigo').innerText = peca.code || 'SEM CÓDIGO';
-    document.getElementById('drawer-nome').innerText = peca.name;
-    document.getElementById('drawer-qtd-atual').innerText = peca.current;
-    document.getElementById('drawer-qtd-ideal').innerText = peca.expected;
-    
-    document.getElementById('drawer-last-taken').innerText = peca.lastTakenBy ? `Última retirada por: ${peca.lastTakenBy}` : '';
+    .top-bar { padding: 0 1rem; height: 60px; }
+    .page-info h1 { font-size: 1rem; }
+    .user-profile { gap: 0.5rem; }
+    .user-avatar { width: 35px; height: 35px; font-size: 16px; }
 
-    const btnReq = document.getElementById('drawer-btn-requisitar');
-    if (peca.requested) { btnReq.innerHTML = `<i class="fa-solid fa-cart-arrow-down"></i> Já Requisitado`; btnReq.classList.add('ativo'); } 
-    else { btnReq.innerHTML = `<i class="fa-solid fa-cart-arrow-down"></i> Requisitar Compra`; btnReq.classList.remove('ativo'); }
+    .dashboard-wrapper { padding: 1rem; min-height: calc(100vh - 60px); }
+    .glass-panel { padding: 1.5rem; }
+    .glass-panel h2 { font-size: 1.8rem !important; }
+    .search-input-glass { padding: 1rem 1rem 1rem 50px; font-size: 1rem; }
 
-    document.getElementById('modal-acoes-peca').classList.remove('view-hidden');
-}
+    #view-gavetas, #view-historico, #view-config, #view-compartimentos, #alerta-global-zerado { padding: 1rem; }
 
-function fecharModalAcoesPeca() {
-    pecaEmFocoId = null;
-    document.getElementById('modal-acoes-peca').classList.add('view-hidden');
-}
+    .kpi-grid { flex-direction: column; gap: 1rem; }
+    .kpi-summary { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
 
-// Funções acionadas de dentro do Drawer:
-window.drawerAjusteRapido = (delta) => {
-    ajusteRapidoEstoque(pecaEmFocoId, delta);
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaEmFocoId);
-    document.getElementById('drawer-qtd-atual').innerText = peca.current; // Atualiza a tela na hora
-    renderizarPecasDaGaveta(gavetaAtualAberta); // Atualiza o fundo
-};
+    .btn-gaveta { padding: 0 1rem; height: 80px; }
+    .gaveta-content { gap: 1rem; }
+    .gnumber { font-size: 1.1rem; padding: 4px 10px; }
+    .glabel { font-size: 1rem; }
+    .btn-gaveta::after { width: 80%; }
 
-window.drawerAbrirConferencia = () => { fecharModalAcoesPeca(); abrirModalConferencia(pecaEmFocoId); };
-window.drawerAlternarRequisitado = () => { 
-    alternarStatusRequisitado(pecaEmFocoId); 
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaEmFocoId);
-    const btnReq = document.getElementById('drawer-btn-requisitar');
-    if (peca.requested) { btnReq.innerHTML = `<i class="fa-solid fa-cart-arrow-down"></i> Já Requisitado`; btnReq.classList.add('ativo'); } 
-    else { btnReq.innerHTML = `<i class="fa-solid fa-cart-arrow-down"></i> Requisitar Compra`; btnReq.classList.remove('ativo'); }
-    renderizarPecasDaGaveta(gavetaAtualAberta);
-};
-window.drawerAbrirMover = () => { fecharModalAcoesPeca(); abrirModalMoverPeca(pecaEmFocoId); };
-window.drawerAbrirEditar = () => { fecharModalAcoesPeca(); abrirModalEditarPeca(pecaEmFocoId); };
-window.drawerExcluir = () => { fecharModalAcoesPeca(); excluirPeca(pecaEmFocoId); };
-
-
-// =========================================================================
-// CRUD DE PEÇAS (ATUALIZADO PARA EXCEL GRID)
-// =========================================================================
-function ajusteRapidoEstoque(idPeca, delta) {
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
-    if (!peca) return;
-    let novaQtd = Math.max(0, peca.current + delta);
-    if (delta < 0 && peca.current > 0) {
-        peca.lastTakenBy = usuarioLogado.nome;
-        registrarLog(`retirou 1x "${peca.name}"`);
-        enviarNotificacao("Peça Retirada", `Você retirou 1x ${peca.name}. Restam ${novaQtd}.`);
-    } else if (delta > 0) registrarLog(`adicionou 1x "${peca.name}"`);
-    peca.current = novaQtd;
-    if (peca.current >= peca.expected) peca.requested = false;
-    salvarItensDaGaveta(gavetaAtualAberta);
-}
-
-function alternarStatusRequisitado(idPeca) {
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
-    peca.requested = !peca.requested;
-    registrarLog(`${peca.requested ? 'marcou REQUISITADO' : 'removeu requisitado'} de "${peca.name}"`);
-    salvarItensDaGaveta(gavetaAtualAberta);
-}
-
-function excluirPeca(idPeca) {
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
-    if (confirm(`Excluir "${peca.name}" permanentemente?`)) {
-        database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== idPeca);
-        registrarLog(`excluiu "${peca.name}"`);
-        salvarItensDaGaveta(gavetaAtualAberta);
-        renderizarPecasDaGaveta(gavetaAtualAberta);
+    /* No celular MANTEMOS as 5 colunas físicas do gaveteiro real,
+       só apertamos o gap/padding e deixamos as colunas encolherem (minmax 0). */
+    .grid-pecas {
+        --slot-gap: 6px;
+        --slot-altura: 54px;
+        padding: 6px;
     }
+    .compartimento-card { padding: 7px; }
+    .card-title { font-size: 0.8rem; }
+    .card-local { font-size: 0.62rem; padding: 3px 6px; }
+    .badge-status { font-size: 0.58rem; padding: 3px 6px; }
+    .data-box strong, .quick-control strong { font-size: 1.05rem; }
+    .btn-conferir, .btn-requisitado, .btn-mover { font-size: 0.65rem; padding: 0.45rem; gap: 4px; }
+    .btn-quick { width: 26px; height: 26px; }
+
+    .header-gaveta { flex-direction: column; gap: 10px; text-align: center; }
+    #titulo-gaveta-aberta { width: 100%; order: -1; } 
+    .btn-voltar, .btn-add-item { width: 100%; }
+
+    .form-group.row { flex-direction: column; gap: 0; }
+    .log-item { flex-direction: column; align-items: flex-start; gap: 5px; }
 }
 
-function abrirModalCadastro() {
-    ['novo-codigo', 'novo-nome', 'novo-posicao'].forEach(id => { document.getElementById(id).value = ''; });
-    document.getElementById('novo-esperado').value  = '1';
-    document.getElementById('novo-atual').value     = '0';
-    document.getElementById('novo-coluna').value    = '1';
-    document.getElementById('novo-tamanho').value   = '1'; 
-    document.getElementById('novo-imagem').value    = '';
-    document.getElementById('modal-cadastro').classList.remove('view-hidden');
+@media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
 }
-
-function fecharModalCadastro() { document.getElementById('modal-cadastro').classList.add('view-hidden'); }
-
-async function salvarNovoItem() {
-    const nome = document.getElementById('novo-nome').value.trim();
-    if (!nome) return alert('O nome da peça é obrigatório!');
-    const btnSalvar = document.querySelector('#modal-cadastro .btn-save'); btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...';
-
-    const novaPeca = {
-        id:          Date.now(),
-        code:        document.getElementById('novo-codigo').value.trim() || `G${gavetaAtualAberta}-P${Date.now().toString().slice(-4)}`,
-        name:        nome, 
-        expected:    parseInt(document.getElementById('novo-esperado').value), 
-        current:     parseInt(document.getElementById('novo-atual').value), 
-        coluna:      parseInt(document.getElementById('novo-coluna').value) || 1,
-        linha:       document.getElementById('novo-posicao').value.trim() ? parseInt(document.getElementById('novo-posicao').value) : 'auto',
-        altura:      parseInt(document.getElementById('novo-tamanho').value) || 1, 
-        requested:   false, 
-        lastTakenBy: null, 
-        image:       null
-    };
-
-    const imgInput = document.getElementById('novo-imagem');
-    if (imgInput.files && imgInput.files[0]) {
-        try { novaPeca.image = await uploadImagemCloudinary(imgInput.files[0]); } catch (err) {}
-    }
-
-    database.items[gavetaAtualAberta].push(novaPeca);
-    registrarLog(`cadastrou "${novaPeca.name}".`);
-    await salvarItensDaGaveta(gavetaAtualAberta);
-    fecharModalCadastro(); btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Peça';
-}
-
-function abrirModalEditarPeca(idPeca) {
-    pecaSendoEditadaId = idPeca;
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
-    document.getElementById('edit-peca-codigo').value    = peca.code || '';
-    document.getElementById('edit-peca-nome').value      = peca.name;
-    document.getElementById('edit-peca-esperado').value  = peca.expected;
-    document.getElementById('edit-peca-atual').value     = peca.current;
-    document.getElementById('edit-peca-coluna').value    = peca.coluna || 1;
-    document.getElementById('edit-peca-posicao').value   = peca.linha !== 'auto' ? peca.linha : '';
-    document.getElementById('edit-peca-tamanho').value   = peca.altura || 1;
-    document.getElementById('edit-peca-imagem').value    = '';
-    document.getElementById('modal-editar-peca').classList.remove('view-hidden');
-}
-
-function fecharModalEditarPeca() { document.getElementById('modal-editar-peca').classList.add('view-hidden'); }
-
-async function salvarEdicaoPeca() {
-    const nome = document.getElementById('edit-peca-nome').value.trim();
-    if (!nome) return alert('O nome da peça é obrigatório!');
-    const btnSalvar = document.querySelector('#modal-editar-peca .btn-save'); btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...';
-
-    const peca    = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
-    peca.code     = document.getElementById('edit-peca-codigo').value.trim();
-    peca.name     = nome;
-    peca.expected = parseInt(document.getElementById('edit-peca-esperado').value);
-    peca.current  = parseInt(document.getElementById('edit-peca-atual').value);
-    peca.coluna   = parseInt(document.getElementById('edit-peca-coluna').value) || 1;
-    peca.linha    = document.getElementById('edit-peca-posicao').value.trim() ? parseInt(document.getElementById('edit-peca-posicao').value) : 'auto';
-    peca.altura   = parseInt(document.getElementById('edit-peca-tamanho').value) || 1;
-
-    if (peca.current >= peca.expected) peca.requested = false;
-
-    const imgInput = document.getElementById('edit-peca-imagem');
-    if (imgInput.files && imgInput.files[0]) {
-        try { peca.image = await uploadImagemCloudinary(imgInput.files[0]); } catch (err) {}
-    }
-
-    registrarLog(`editou "${peca.name}"`);
-    await salvarItensDaGaveta(gavetaAtualAberta);
-    fecharModalEditarPeca(); btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Alterações';
-}
-
-// =========================================================================
-// OUTROS MODAIS EXISTENTES (Conferência, Mover, Exportar...)
-// =========================================================================
-function abrirModalConferencia(idPeca) {
-    pecaSendoConferidaId = idPeca;
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
-    document.getElementById('conf-nome-peca').innerText = peca.name;
-    document.getElementById('conf-qtd-atual').value     = peca.current;
-    document.getElementById('modal-conferencia').classList.remove('view-hidden');
-}
-function fecharModalConferencia() { document.getElementById('modal-conferencia').classList.add('view-hidden'); }
-function salvarConferencia() {
-    const novaQtd = parseInt(document.getElementById('conf-qtd-atual').value);
-    if (isNaN(novaQtd) || novaQtd < 0) return alert('Valor Inválido');
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoConferidaId);
-    if (novaQtd !== peca.current) registrarLog(`contagem de "${peca.name}": ${novaQtd}`);
-    if (novaQtd < peca.current) peca.lastTakenBy = usuarioLogado.nome;
-    peca.current = novaQtd;
-    if (peca.current >= peca.expected) peca.requested = false;
-    salvarItensDaGaveta(gavetaAtualAberta); fecharModalConferencia(); renderizarPecasDaGaveta(gavetaAtualAberta);
-}
-
-function abrirModalMoverPeca(idPeca) {
-    pecaSendoMovidaId = idPeca;
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
-    document.getElementById('mover-peca-nome').innerText = peca.name;
-    const select = document.getElementById('mover-destino-select'); select.innerHTML = '';
-    database.drawers.forEach(gaveta => {
-        if (gaveta.id === gavetaAtualAberta) return;
-        const option = document.createElement('option'); option.value = gaveta.id; option.innerText = `${gaveta.label} — ${gaveta.title}`; select.appendChild(option);
-    });
-    document.getElementById('modal-mover-peca').classList.remove('view-hidden');
-}
-function fecharModalMoverPeca() { document.getElementById('modal-mover-peca').classList.add('view-hidden'); }
-async function confirmarMoverPeca() {
-    const destinoId = parseInt(document.getElementById('mover-destino-select').value);
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoMovidaId);
-    database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== pecaSendoMovidaId);
-    if (!database.items[destinoId]) database.items[destinoId] = []; database.items[destinoId].push(peca);
-    registrarLog(`moveu a peça "${peca.name}"`);
-    await salvarItensDaGaveta(gavetaAtualAberta); await salvarItensDaGaveta(destinoId); fecharModalMoverPeca(); renderizarPecasDaGaveta(gavetaAtualAberta);
-}
-
-function abrirModalEditarGaveta(eventoClick, idGaveta) {
-    eventoClick.stopPropagation(); gavetaSendoEditadaId = idGaveta;
-    document.getElementById('edit-gaveta-nome').value = database.drawers.find(d => d.id === idGaveta).title;
-    document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
-}
-function fecharModalEditarGaveta() { document.getElementById('modal-editar-gaveta').classList.add('view-hidden'); }
-function salvarNomeGaveta() {
-    const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
-    if (!novoNome) return alert('O nome da gaveta não pode ficar vazio.');
-    const gaveta = database.drawers.find(d => d.id === gavetaSendoEditadaId);
-    registrarLog(`alterou o nome da gaveta ${gaveta.label}`); gaveta.title = novoNome;
-    salvarConfig(); fecharModalEditarGaveta();
-}
-
-function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
-function mostrarAlerta(titulo, mensagem) { alert(titulo + ": " + mensagem); }
-function fecharAlerta() {} // fallback
-
-// EXPORTAÇÕES GLOBAIS
-window.toggleMenuMobile = toggleMenuMobile; window.autorizarDispositivo = autorizarDispositivo; window.realizarLogin = realizarLogin;
-window.alternarTelaLogin = alternarTelaLogin; window.registrarUsuario = registrarUsuario; window.mostrarTela = mostrarTela;
-window.sairDoSistema = sairDoSistema; window.fazerBackup = fazerBackup; window.restaurarBackup = restaurarBackup;
-window.exportarEstoqueCSV = exportarEstoqueCSV; window.exportarHistoricoCSV = exportarHistoricoCSV; window.voltarParaGavetas = voltarParaGavetas;
-window.abrirModalCadastro = abrirModalCadastro; window.fecharModalCadastro = fecharModalCadastro; window.salvarNovoItem = salvarNovoItem;
-window.abrirModalEditarPeca = abrirModalEditarPeca; window.fecharModalEditarPeca = fecharModalEditarPeca; window.salvarEdicaoPeca = salvarEdicaoPeca;
-window.abrirModalConferencia = abrirModalConferencia; window.fecharModalConferencia = fecharModalConferencia; window.salvarConferencia = salvarConferencia;
-window.abrirModalEditarGaveta = abrirModalEditarGaveta; window.fecharModalEditarGaveta = fecharModalEditarGaveta; window.salvarNomeGaveta = salvarNomeGaveta;
-window.abrirModalMoverPeca = abrirModalMoverPeca; window.fecharModalMoverPeca = fecharModalMoverPeca; window.confirmarMoverPeca = confirmarMoverPeca;
-window.ajusteRapidoEstoque = ajusteRapidoEstoque; window.alternarStatusRequisitado = alternarStatusRequisitado; window.excluirPeca = excluirPeca;
-window.fecharModalAcoesPeca = fecharModalAcoesPeca;
