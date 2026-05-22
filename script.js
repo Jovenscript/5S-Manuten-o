@@ -29,31 +29,130 @@ const CLOUDINARY_URL           = `https://api.cloudinary.com/v1_1/${CLOUDINARY_C
 const ADMIN_CREDENTIALS = { login: 'admin@weg.net', senha: 'admin123' };
 const DEVICE_MASTER_KEY = 'WEG2026';
 
-const GAVETAS_PADRAO = [
-    { id: 1,  label: "G1",  title: "Sensores M12"   },
-    { id: 2,  label: "G2",  title: "Botões e LED's" },
-    { id: 3,  label: "G3",  title: "Fusíveis"       },
-    { id: 4,  label: "G4",  title: "Contatoras"     },
-    { id: 5,  label: "G5",  title: "Prensas Cabos"  },
-    { id: 6,  label: "G6",  title: "Bornes e Relés" },
-    { id: 7,  label: "G7",  title: "Abraçadeiras"   },
-    { id: 8,  label: "G8",  title: "Anilhas"        },
-    { id: 9,  label: "G9",  title: "Lâmpadas"       },
-    { id: 10, label: "G10", title: "Miscelânea 1"   },
-    { id: 11, label: "G11", title: "Miscelânea 2"   },
-    { id: 12, label: "G12", title: "Outros"         }
+// ESTRUTURA DE CONTAINERS: cada setor tem seu próprio gaveteiro
+const CONTAINERS_PADRAO = [
+    {
+        id: 1,
+        nome: 'Elétrica',
+        tipo: 'gaveteiro',
+        icone: 'fa-bolt',
+        cor: '#2a5288',
+        gavetas: [
+            { id: 1,  label: "G1",  title: "Sensores M12"   },
+            { id: 2,  label: "G2",  title: "Botões e LED's" },
+            { id: 3,  label: "G3",  title: "Fusíveis"       },
+            { id: 4,  label: "G4",  title: "Contatoras"     },
+            { id: 5,  label: "G5",  title: "Prensas Cabos"  },
+            { id: 6,  label: "G6",  title: "Bornes e Relés" },
+            { id: 7,  label: "G7",  title: "Abraçadeiras"   },
+            { id: 8,  label: "G8",  title: "Anilhas"        },
+            { id: 9,  label: "G9",  title: "Lâmpadas"       },
+            { id: 10, label: "G10", title: "Miscelânea 1"   },
+            { id: 11, label: "G11", title: "Miscelânea 2"   },
+            { id: 12, label: "G12", title: "Outros"         }
+        ]
+    },
+    {
+        id: 2,
+        nome: 'Mecânica',
+        tipo: 'gaveteiro',
+        icone: 'fa-gears',
+        cor: '#dc2626',
+        gavetas: [
+            { id: 13, label: "M1", title: "Ferramentas" },
+            { id: 14, label: "M2", title: "Rolamentos" },
+            { id: 15, label: "M3", title: "Parafusos" },
+            { id: 16, label: "M4", title: "Correias" },
+            { id: 17, label: "M5", title: "Engrenagens" },
+            { id: 18, label: "M6", title: "Molas" }
+        ]
+    }
 ];
 
 // =========================================================================
 // VARIÁVEIS GLOBAIS
 // =========================================================================
-let database = { drawers: [...GAVETAS_PADRAO], items: {} };
-GAVETAS_PADRAO.forEach(d => { database.items[d.id] = []; });
+let database = { 
+    version: 4,
+    containers: JSON.parse(JSON.stringify(CONTAINERS_PADRAO)),  // deep copy
+    items: {}  // Agora indexado por "containerId_gavetaId"
+};
+
+// Inicializar items vazios para todas as gavetas (IDs únicos globais)
+database.containers.forEach(container => {
+    container.gavetas.forEach(gaveta => {
+        if (!database.items[gaveta.id]) database.items[gaveta.id] = [];
+    });
+});
+
+// =========================================================================
+// HELPERS DE CONTAINERS E GAVETAS
+// -------------------------------------------------------------------------
+// Como agora temos VÁRIOS gaveteiros/armários (containers), centralizamos
+// aqui toda a lógica de localizar gavetas. Os IDs das gavetas são ÚNICOS
+// em todo o sistema (Elétrica 1-12, Mecânica 13-18, etc.), então
+// database.items[idGaveta] continua funcionando direto, sem chave composta.
+// =========================================================================
+
+// Retorna uma lista "achatada" de TODAS as gavetas de TODOS os containers.
+// Usado em buscas globais, KPIs gerais, exportação CSV, pedido de compra, etc.
+function getTodasGavetas() {
+    const todas = [];
+    database.containers.forEach(container => {
+        (container.gavetas || []).forEach(gaveta => {
+            todas.push({ ...gaveta, containerId: container.id, containerNome: container.nome });
+        });
+    });
+    return todas;
+}
+
+// Retorna apenas as gavetas de UM container específico (pelo id do container).
+function getGavetasDoContainer(containerId) {
+    const container = database.containers.find(c => c.id === containerId);
+    return container ? (container.gavetas || []) : [];
+}
+
+// Acha uma gaveta específica pelo seu id (procurando em todos os containers).
+function acharGaveta(idGaveta) {
+    for (const container of database.containers) {
+        const gaveta = (container.gavetas || []).find(g => g.id === idGaveta);
+        if (gaveta) return gaveta;
+    }
+    return null;
+}
+
+// Acha qual container "dono" de uma gaveta (pelo id da gaveta).
+function getContainerDeGaveta(idGaveta) {
+    return database.containers.find(c => (c.gavetas || []).some(g => g.id === idGaveta)) || null;
+}
+
+// Retorna o objeto do container atualmente selecionado.
+function getContainerAtual() {
+    return database.containers.find(c => c.id === containerAtual) || null;
+}
+
+// Gera o próximo ID único de gaveta (maior id existente + 1).
+// Garante que novos containers não colidam com gavetas existentes.
+function proximoIdGaveta() {
+    let maxId = 0;
+    database.containers.forEach(c => {
+        (c.gavetas || []).forEach(g => { if (g.id > maxId) maxId = g.id; });
+    });
+    return maxId + 1;
+}
+
+// Gera o próximo ID único de container.
+function proximoIdContainer() {
+    let maxId = 0;
+    database.containers.forEach(c => { if (c.id > maxId) maxId = c.id; });
+    return maxId + 1;
+}
 
 let usuariosSalvos  = [];
 let historicoLogs   = [];
 let usuarioLogado   = null;
 
+let containerAtual       = null;  // Container selecionado (Elétrica, Mecânica, etc.)
 let gavetaAtualAberta    = null;
 let pecaSendoConferidaId = null;
 let gavetaSendoEditadaId = null;
@@ -62,56 +161,37 @@ let pecaSendoMovidaId    = null;
 
 let usuarioAguardandoRedefinicao = null;
 
-// Carrossel
+// Drag and Drop
+let draggedDrawerIndex = null;
+let draggedPecaId      = null;
+
+// Variáveis do Carrossel de Imagens
 let carrosselInterval = null;
 let carrosselImagens  = [];
 let carrosselIndex    = 0;
 
-// Reorganização de gavetas (drag-and-drop)
-let modoReorganizar = false;
-let drag = null;
-
-// Confirmação customizada
-let confirmCallback = null;
-
-// PWA install
-let deferredInstallPrompt = null;
-
 // =========================================================================
-// PWA — REGISTRO DO SERVICE WORKER  (ESTAVA FALTANDO — POR ISSO NÃO INSTALAVA)
+// INICIALIZAÇÃO PWA E FIREBASE
 // =========================================================================
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-            .then(() => console.log('Service Worker registrado.'))
-            .catch(err => console.warn('Falha ao registrar Service Worker:', err));
-    });
-}
+window.onload = () => {
+    iniciarPWA();
+    iniciarSincronizacaoFirebase();
+    configurarEventosEnter();
 
-// PWA — captura o evento de instalação e mostra o botão "Instalar App"
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    const btn = document.getElementById('btn-instalar-pwa');
-    if (btn) btn.classList.remove('view-hidden');
-});
-
-function instalarPWA() {
-    if (!deferredInstallPrompt) {
-        return mostrarAlerta('Instalação', 'Se o botão não funcionar, use o menu do navegador → "Adicionar à tela inicial". No iPhone (Safari): botão Compartilhar → "Adicionar à Tela de Início".');
+    const deviceAuthorized = localStorage.getItem('5s_device_authorized');
+    if (deviceAuthorized === 'true') {
+        document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
+        document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
     }
-    deferredInstallPrompt.prompt();
-    deferredInstallPrompt.userChoice.finally(() => {
-        deferredInstallPrompt = null;
-        const btn = document.getElementById('btn-instalar-pwa');
-        if (btn) btn.classList.add('view-hidden');
-    });
-}
+};
 
-window.addEventListener('appinstalled', () => {
-    const btn = document.getElementById('btn-instalar-pwa');
-    if (btn) btn.classList.add('view-hidden');
-});
+function iniciarPWA() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('PWA Service Worker registrado com sucesso.', reg.scope))
+            .catch(err => console.error('Erro ao registrar Service Worker PWA:', err));
+    }
+}
 
 // =========================================================================
 // VALIDADOR DE SENHA FORTE
@@ -126,21 +206,28 @@ function validarSenhaForte(senha) {
 // =========================================================================
 function getGavetaStatus(pecas) {
     if (!pecas || pecas.length === 0) return 'verde';
-    if (pecas.some(p => p.current === 0))                          return 'vermelho';
-    if (pecas.some(p => p.current > 0 && p.current < p.expected * 0.25)) return 'laranja';
-    if (pecas.some(p => p.current < p.expected))                   return 'amarelo';
+    const temZerado  = pecas.some(p => p.current === 0);
+    const temCritico = pecas.some(p => p.current > 0 && p.current < p.expected * 0.25);
+    const temBaixo   = pecas.some(p => p.current > 0 && p.current < p.expected * 0.5);
+    const temAlerta  = pecas.some(p => p.current < p.expected);
+    if (temZerado)  return 'vermelho';
+    if (temCritico) return 'laranja';
+    if (temBaixo)   return 'amarelo';
+    if (temAlerta)  return 'amarelo';
     return 'verde';
 }
 
 function getPecaStatus(peca) {
-    if (peca.current === 0)                  return 'vermelho';
+    if (peca.current === 0) return 'vermelho';
     if (peca.current < peca.expected * 0.25) return 'laranja';
-    if (peca.current < peca.expected)        return 'amarelo';
+    if (peca.current < peca.expected * 0.5) return 'amarelo';
+    if (peca.current < peca.expected) return 'amarelo';
     return 'verde';
 }
 
 function getStatusText(status) {
-    return { verde: 'OK', amarelo: 'Atenção', laranja: 'Crítico', vermelho: 'Zerado' }[status] || 'OK';
+    const map = { verde: 'OK', amarelo: 'Atenção', laranja: 'Crítico', vermelho: 'Zerado' };
+    return map[status] || 'OK';
 }
 
 // =========================================================================
@@ -191,9 +278,8 @@ function solicitarPermissaoNotificacao() {
 function enviarNotificacao(titulo, corpo) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
-        try {
-            new Notification(titulo, { body: corpo, icon: 'icon-192x192.png' });
-        } catch (e) { /* silencioso */ }
+        try { new Notification(titulo, { body: corpo, icon: 'icon-192x192.png' }); } 
+        catch (e) {}
     }
 }
 
@@ -201,8 +287,10 @@ function enviarNotificacao(titulo, corpo) {
 // MENU MOBILE
 // =========================================================================
 function toggleMenuMobile() {
-    document.getElementById('sidebar-menu').classList.toggle('open');
-    document.getElementById('mobile-overlay').classList.toggle('open');
+    const sidebar = document.getElementById('sidebar-menu');
+    const overlay = document.getElementById('mobile-overlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
 }
 
 // =========================================================================
@@ -223,13 +311,13 @@ async function uploadImagemCloudinary(file) {
 }
 
 // =========================================================================
-// FIRESTORE — DOCUMENTOS SEPARADOS
+// FIRESTORE
 // =========================================================================
 async function salvarConfig() {
     try {
         await setDoc(doc(db, "manutencao_5s", "config"), {
-            drawers:  database.drawers,
-            usuarios: usuariosSalvos
+            containers: database.containers,   // Nova estrutura (vários gaveteiros/armários)
+            usuarios:   usuariosSalvos
         });
     } catch (e) {
         console.error("Erro ao salvar config:", e);
@@ -261,14 +349,14 @@ async function salvarItensDaGaveta(idGaveta) {
 // =========================================================================
 function fazerBackup() {
     const payload = {
-        versao: 'v4',
-        geradoEm: new Date().toISOString(),
-        database,
-        usuarios: usuariosSalvos,
-        historico: historicoLogs
+        versao: 'v3', geradoEm: new Date().toISOString(),
+        database, usuarios: usuariosSalvos, historico: historicoLogs
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    baixarArquivo(blob, `backup_5s_${dataArquivo()}.json`);
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url; a.download = `backup_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.json`;
+    a.click(); URL.revokeObjectURL(url);
     registrarLog('gerou um arquivo de backup do sistema.');
 }
 
@@ -279,17 +367,28 @@ function restaurarBackup(event) {
     reader.onload = async (e) => {
         try {
             const dados = JSON.parse(e.target.result);
-            if (!dados.database || !dados.usuarios) {
-                return mostrarAlerta('Arquivo Inválido', 'O arquivo selecionado não é um backup válido do sistema.');
-            }
+            if (!dados.database || !dados.usuarios) return mostrarAlerta('Arquivo Inválido', 'O arquivo selecionado não é um backup válido.');
+
             database       = dados.database;
             usuariosSalvos = dados.usuarios;
             historicoLogs  = dados.historico || [];
 
+            // Migração de backups ANTIGOS: se vier com "drawers" e sem "containers",
+            // converte para a estrutura nova (Container Elétrica).
+            if (!database.containers && database.drawers) {
+                database.containers = [{
+                    id: 1, nome: 'Elétrica', tipo: 'gaveteiro',
+                    icone: 'fa-bolt', cor: '#2a5288', gavetas: database.drawers
+                }];
+                delete database.drawers;
+            }
+            if (!database.containers) database.containers = [];
+
             await salvarConfig();
             await salvarHistorico();
-            for (const gaveta of GAVETAS_PADRAO) await salvarItensDaGaveta(gaveta.id);
-
+            for (const gaveta of getTodasGavetas()) {
+                await salvarItensDaGaveta(gaveta.id);
+            }
             registrarLog('restaurou o sistema a partir de um arquivo de backup.');
             mostrarAlerta('Sucesso', 'Backup restaurado com sucesso! O sistema foi atualizado.');
             atualizarDashboard();
@@ -302,62 +401,72 @@ function restaurarBackup(event) {
 }
 
 function exportarEstoqueCSV() {
-    let csv = 'Gaveta;Label;Divisória;Código;Nome;Padrão 5S;Qtd Atual;Status;Requisitado\n';
-    database.drawers.forEach(gaveta => {
+    let csv = 'Local;Gaveta;Label;Divisória;Código;Nome;Padrão 5S;Qtd Atual;Status;Requisitado\n';
+    getTodasGavetas().forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(p => {
             const status = getStatusText(getPecaStatus(p));
-            csv += `"${gaveta.title}";"${gaveta.label}";"${p.divisoria || 'Geral'}";"${p.code || ''}";"${p.name}";${p.expected};${p.current};"${status}";"${p.requested ? 'Sim' : 'Não'}"\n`;
+            csv += `"${gaveta.containerNome}";"${gaveta.title}";"${gaveta.label}";"${p.divisoria || 'Geral'}";"${p.code || ''}";"${p.name}";${p.expected};${p.current};"${status}";"${p.requested ? 'Sim' : 'Não'}"\n`;
         });
     });
-    baixarArquivo(new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }), `estoque_5s_${dataArquivo()}.csv`);
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url; a.download = `estoque_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
+    a.click(); URL.revokeObjectURL(url);
     registrarLog('exportou o relatório de estoque em CSV.');
 }
 
 function exportarHistoricoCSV() {
     let csv = 'Data;Hora;Usuário;Ação\n';
-    historicoLogs.forEach(log => { csv += `"${log.data}";"${log.hora}";"${log.nome}";"${log.acao}"\n`; });
-    baixarArquivo(new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }), `historico_5s_${dataArquivo()}.csv`);
+    historicoLogs.forEach(log => {
+        csv += `"${log.data}";"${log.hora}";"${log.nome}";"${log.acao}"\n`;
+    });
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url; a.download = `historico_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
+    a.click(); URL.revokeObjectURL(url);
     registrarLog('exportou o histórico de atividades em CSV.');
 }
 
-function baixarArquivo(blob, nome) {
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    a.href = url; a.download = nome; a.click();
-    URL.revokeObjectURL(url);
-}
-function dataArquivo() { return new Date().toLocaleDateString('pt-BR').replace(/\//g, '-'); }
-
 // =========================================================================
-// INICIALIZAÇÃO, MIGRAÇÃO E SINCRONIZAÇÃO FIREBASE
+// SINCRONIZAÇÃO FIREBASE
 // =========================================================================
-window.addEventListener('load', () => {
-    iniciarSincronizacaoFirebase();
-    configurarEventosEnter();
-
-    if (localStorage.getItem('5s_device_authorized') === 'true') {
-        document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
-        document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
-    }
-});
-
 async function iniciarSincronizacaoFirebase() {
-    setupListeners();
-    migrarDadosLegados();
-}
-
-function setupListeners() {
     onSnapshot(doc(db, "manutencao_5s", "config"), (snap) => {
         if (snap.exists()) {
             const d = snap.data();
-            // Não sobrescreve a ordem enquanto o admin está arrastando gavetas
-            if (!modoReorganizar) {
-                database.drawers = d.drawers || [...GAVETAS_PADRAO];
+
+            if (d.containers && Array.isArray(d.containers) && d.containers.length > 0) {
+                // Formato NOVO: já tem containers salvos na nuvem
+                database.containers = d.containers;
+            } else if (d.drawers && Array.isArray(d.drawers)) {
+                // MIGRAÇÃO: formato antigo (lista de gavetas solta) → vira Container "Elétrica"
+                // e já adiciona o gaveteiro "Mecânica" novo ao lado.
+                database.containers = [
+                    {
+                        id: 1,
+                        nome: 'Elétrica',
+                        tipo: 'gaveteiro',
+                        icone: 'fa-bolt',
+                        cor: '#2a5288',
+                        gavetas: d.drawers
+                    },
+                    // Gaveteiro da Mecânica (gavetas com IDs únicos 13-18)
+                    JSON.parse(JSON.stringify(CONTAINERS_PADRAO[1]))
+                ];
+                console.log('Migração: dados antigos → Container Elétrica + novo Container Mecânica.');
+                salvarConfig();  // Persiste já no formato novo
             }
+
             usuariosSalvos = d.usuarios || [];
-            database.drawers.forEach(g => { if (!database.items[g.id]) database.items[g.id] = []; });
+
+            // Garante que toda gaveta tenha um array de items inicializado
+            getTodasGavetas().forEach(g => { if (!database.items[g.id]) database.items[g.id] = []; });
+            registrarListenersGavetas();
         } else {
             salvarConfig();
+            registrarListenersGavetas();
         }
         atualizarSeLogado();
     });
@@ -366,16 +475,25 @@ function setupListeners() {
         if (snap.exists()) historicoLogs = snap.data().logs || [];
         atualizarSeLogado();
     });
+}
 
-    GAVETAS_PADRAO.forEach(gaveta => {
+function registrarListenersGavetas() {
+    // Escuta as mudanças em tempo real de cada gaveta de TODOS os containers
+    getTodasGavetas().forEach(gaveta => {
         onSnapshot(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), (snap) => {
             database.items[gaveta.id] = snap.exists() ? (snap.data().items || []) : [];
+            // Preenche campos que podem faltar em dados antigos (retrocompatibilidade)
             database.items[gaveta.id].forEach(p => {
-                if (p.requested   === undefined) p.requested   = false;
-                if (p.lastTakenBy === undefined) p.lastTakenBy = null;
-                if (p.position    === undefined) p.position    = 999;
-                if (p.divisoria   === undefined) p.divisoria   = 'Geral';
-                if (p.size        === undefined) p.size        = 1;
+                if (p.requested      === undefined) p.requested      = false;
+                if (p.lastTakenBy    === undefined) p.lastTakenBy    = null;
+                if (p.position       === undefined) p.position       = 999;
+                if (p.divisoria      === undefined) p.divisoria      = 'Geral';
+                if (p.size           === undefined) p.size           = 1;
+                // Campos do Grid 10x5 (peças antigas ganham posição padrão):
+                if (p.coluna         === undefined) p.coluna         = 1;
+                if (p.linha          === undefined) p.linha          = 1;
+                if (p.larguraColunas === undefined) p.larguraColunas = 1;
+                if (p.alturaLinhas   === undefined) p.alturaLinhas   = p.size || 6;
             });
             atualizarSeLogado();
         });
@@ -384,34 +502,8 @@ function setupListeners() {
 
 function atualizarSeLogado() {
     const container = document.getElementById('app-container');
-    if (container && container.classList.contains('view-active')) atualizarDashboard();
-}
-
-async function migrarDadosLegados() {
-    if (localStorage.getItem('5s_migrado_v3')) return;
-    try {
-        const legadoSnap = await getDoc(doc(db, "manutencao_5s", "dados_sistema"));
-        const configSnap = await getDoc(doc(db, "manutencao_5s", "config"));
-        if (!legadoSnap.exists() || configSnap.exists()) {
-            localStorage.setItem('5s_migrado_v3', 'true');
-            return;
-        }
-        const legado    = legadoSnap.data();
-        const db_legado = legado.database || {};
-        await setDoc(doc(db, "manutencao_5s", "config"), {
-            drawers:  db_legado.drawers || [...GAVETAS_PADRAO],
-            usuarios: legado.usuarios   || []
-        });
-        await setDoc(doc(db, "manutencao_5s", "historico"), { logs: legado.historico || [] });
-        for (const gaveta of GAVETAS_PADRAO) {
-            const itens = ((db_legado.items || {})[gaveta.id] || []).map(p => ({
-                ...p, image: null, position: 999, divisoria: 'Geral', size: 1
-            }));
-            await setDoc(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), { items: itens });
-        }
-        localStorage.setItem('5s_migrado_v3', 'true');
-    } catch (e) {
-        console.warn("Aviso na migração:", e);
+    if (container && container.classList.contains('view-active')) {
+        atualizarDashboard();
     }
 }
 
@@ -420,15 +512,15 @@ async function migrarDadosLegados() {
 // =========================================================================
 function configurarEventosEnter() {
     const map = [
-        { inputId: 'input-device-key',    btnAcao: autorizarDispositivo  },
+        { inputId: 'input-device-key',    btnAcao: autorizarDispositivo   },
         { inputId: 'input-login-id',      btnAcao: realizarLogin          },
         { inputId: 'input-login-senha',   btnAcao: realizarLogin          },
-        { inputId: 'reg-senha',           btnAcao: registrarUsuario       },
-        { inputId: 'conf-qtd-atual',      btnAcao: salvarConferencia      },
-        { inputId: 'edit-gaveta-nome',    btnAcao: salvarNomeGaveta       },
-        { inputId: 'novo-atual',          btnAcao: salvarNovoItem         },
-        { inputId: 'edit-peca-atual',     btnAcao: salvarEdicaoPeca       },
-        { inputId: 'nova-senha-confirma', btnAcao: salvarSenhaObrigatoria }
+        { inputId: 'reg-senha',           btnAcao: registrarUsuario        },
+        { inputId: 'conf-qtd-atual',      btnAcao: salvarConferencia       },
+        { inputId: 'edit-gaveta-nome',    btnAcao: salvarNomeGaveta        },
+        { inputId: 'novo-atual',          btnAcao: salvarNovoItem          },
+        { inputId: 'edit-peca-atual',     btnAcao: salvarEdicaoPeca        },
+        { inputId: 'nova-senha-confirma', btnAcao: salvarSenhaObrigatoria  }
     ];
     map.forEach(item => {
         const el = document.getElementById(item.inputId);
@@ -468,6 +560,7 @@ function registrarUsuario() {
 
     if (!nome || !cracha || !senha) return mostrarAlerta('Erro', 'Preencha todos os campos!');
     if (usuariosSalvos.find(u => u.cracha === cracha)) return mostrarAlerta('Erro', 'Crachá já cadastrado!');
+
     if (!validarSenhaForte(senha)) return mostrarAlerta('Senha Fraca', 'A senha deve ter no mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo.');
 
     const novoUser = { nome, cracha, senha, role: 'USER' };
@@ -500,16 +593,15 @@ function realizarLogin() {
 async function salvarSenhaObrigatoria() {
     const novaSenha = document.getElementById('nova-senha-obrigatoria').value.trim();
     const confirma  = document.getElementById('nova-senha-confirma').value.trim();
+
     if (novaSenha !== confirma) return mostrarAlerta('Erro', 'As senhas não coincidem.');
     if (!validarSenhaForte(novaSenha)) return mostrarAlerta('Senha Fraca', 'A nova senha não atende aos requisitos.');
 
     usuarioAguardandoRedefinicao.senha = novaSenha;
     await salvarConfig();
-
     document.getElementById('nova-senha-obrigatoria').value = '';
     document.getElementById('nova-senha-confirma').value    = '';
     document.getElementById('modal-redefinir-senha').classList.add('view-hidden');
-
     registrarLog('atualizou a própria senha para o novo padrão corporativo.');
     aplicarLogin(usuarioAguardandoRedefinicao);
     usuarioAguardandoRedefinicao = null;
@@ -549,10 +641,7 @@ function aplicarLogin(user) {
 // NAVEGAÇÃO
 // =========================================================================
 function mostrarTela(id) {
-    // Sair do modo reorganizar ao trocar de tela (salva a ordem)
-    if (modoReorganizar && id !== 'view-gavetas') finalizarReorganizacao();
-
-    ['view-dashboard', 'view-gavetas', 'view-compartimentos', 'view-historico', 'view-config'].forEach(v => {
+    ['view-dashboard', 'view-containers', 'view-gavetas', 'view-compartimentos', 'view-historico', 'view-config'].forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.replace('view-active', 'view-hidden');
     });
@@ -560,17 +649,17 @@ function mostrarTela(id) {
     const alvo = document.getElementById(id);
     if (alvo) alvo.classList.replace('view-hidden', 'view-active');
 
-    // Destaca o item de menu correto (sem depender de "event" global)
-    const navAtivo = (id === 'view-compartimentos') ? 'view-gavetas' : id;
-    document.querySelectorAll('.nav-item').forEach(l => {
-        l.classList.toggle('active', l.dataset.view === navAtivo);
-    });
+    document.querySelectorAll('.nav-item').forEach(l => l.classList.remove('active'));
+    if (typeof event !== 'undefined' && event && event.currentTarget && event.currentTarget.classList) {
+        event.currentTarget.classList.add('active');
+    }
 
     document.getElementById('sidebar-menu').classList.remove('open');
     document.getElementById('mobile-overlay').classList.remove('open');
 
-    if (id === 'view-gavetas' || id === 'view-dashboard') gavetaAtualAberta = null;
-    if (id === 'view-historico') renderizarHistorico();
+    if (id === 'view-gavetas' || id === 'view-dashboard' || id === 'view-containers') gavetaAtualAberta = null;
+    if (id === 'view-containers') renderContainers();   // Tela de seleção de locais
+    if (id === 'view-historico')  renderizarHistorico();
 
     const scroll = document.getElementById('area-conteudo-scroll');
     if (scroll) scroll.scrollTo(0, 0);
@@ -583,19 +672,41 @@ function mostrarTela(id) {
     }
 }
 
+function voltarParaContainers() { containerAtual = null; mostrarTela('view-containers'); }
+
 function voltarParaGavetas() { mostrarTela('view-gavetas'); }
 function sairDoSistema()     { location.reload(); }
 
 // =========================================================================
-// CARROSSEL DASHBOARD
+// MOSTRAR/OCULTAR SENHA (botão de olho nos campos de senha)
+// -------------------------------------------------------------------------
+// Recebe o id do campo de senha e alterna entre type="password" e "text".
+// O ícone (olho aberto/fechado) também é atualizado.
+// =========================================================================
+function toggleVerSenha(idCampo, elementoBotao) {
+    const campo = document.getElementById(idCampo);
+    if (!campo) return;
+    const icone = elementoBotao ? elementoBotao.querySelector('i') : null;
+    if (campo.type === 'password') {
+        campo.type = 'text';
+        if (icone) { icone.classList.remove('fa-eye'); icone.classList.add('fa-eye-slash'); }
+    } else {
+        campo.type = 'password';
+        if (icone) { icone.classList.remove('fa-eye-slash'); icone.classList.add('fa-eye'); }
+    }
+}
+
+// =========================================================================
+// DASHBOARD, BUSCA E CARROSSEL
 // =========================================================================
 function atualizarImagensCarrossel() {
     carrosselImagens = [];
-    database.drawers.forEach(gaveta => {
+    getTodasGavetas().forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
             if (peca.image && peca.image.trim() !== '') carrosselImagens.push(peca.image);
         });
     });
+
     if (carrosselImagens.length === 0) {
         carrosselImagens = [
             'https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop',
@@ -610,30 +721,30 @@ function iniciarCarrosselDashboard() {
     atualizarImagensCarrossel();
     const wrapper = document.querySelector('.dashboard-wrapper');
     if (!wrapper) return;
+
     if (carrosselIndex >= carrosselImagens.length) carrosselIndex = 0;
     wrapper.style.backgroundImage = `url('${carrosselImagens[carrosselIndex]}')`;
+
     carrosselInterval = setInterval(() => {
-        carrosselIndex = (carrosselIndex + 1) % carrosselImagens.length;
+        carrosselIndex++;
+        if (carrosselIndex >= carrosselImagens.length) carrosselIndex = 0;
         wrapper.style.backgroundImage = `url('${carrosselImagens[carrosselIndex]}')`;
-    }, 4500);
+    }, 4500); 
 }
 
 function pararCarrosselDashboard() {
     if (carrosselInterval) { clearInterval(carrosselInterval); carrosselInterval = null; }
 }
 
-// =========================================================================
-// BUSCA GLOBAL
-// =========================================================================
 function buscarPecasGlobal() {
-    const termo         = document.getElementById('input-busca-global').value.toLowerCase();
+    const termo = document.getElementById('input-busca-global').value.toLowerCase();
     const resultadosDiv = document.getElementById('resultados-busca-global');
     resultadosDiv.innerHTML = '';
 
     if (termo.length < 2) { resultadosDiv.classList.add('view-hidden'); return; }
 
     let achados = [];
-    database.drawers.forEach(gaveta => {
+    getTodasGavetas().forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
             if (peca.name.toLowerCase().includes(termo) || (peca.code && peca.code.toLowerCase().includes(termo))) {
                 achados.push({ gaveta, peca });
@@ -650,7 +761,7 @@ function buscarPecasGlobal() {
     achados.forEach(item => {
         const div = document.createElement('div');
         div.className = 'resultado-card';
-        div.onclick = () => {
+        div.onclick   = () => {
             document.getElementById('input-busca-global').value = '';
             resultadosDiv.classList.add('view-hidden');
             abrirGaveta(item.gaveta.id);
@@ -658,25 +769,23 @@ function buscarPecasGlobal() {
         div.innerHTML = `
             <div class="res-info">
                 <h4>${item.peca.name}</h4>
-                <p>Item: ${item.peca.code || 'S/N'} &nbsp;|&nbsp; <strong>${item.gaveta.label}</strong> (Div: ${item.peca.divisoria || 'Geral'} - Pos: ${item.peca.position === 999 ? 'Livre' : item.peca.position})</p>
+                <p>Item: ${item.peca.code || 'S/N'} &nbsp;|&nbsp; <strong>${item.gaveta.label}</strong> (Div: ${item.peca.divisoria || 'Geral'})</p>
             </div>
-            <div class="res-tag"><i class="fa-solid fa-box-open"></i> ${item.peca.current} un</div>`;
+            <div class="res-tag"><i class="fa-solid fa-box-open"></i> ${item.peca.current} un</div>
+        `;
         resultadosDiv.appendChild(div);
     });
     resultadosDiv.classList.remove('view-hidden');
 }
 
-// =========================================================================
-// DASHBOARD / KPIs / ARMÁRIO
-// =========================================================================
 function atualizarDashboard() {
-    if (!modoReorganizar) renderArmarioVertical();
+    renderArmarioVertical();
     calcularKPIs();
     verificarEstoqueZerado();
     renderizarHistorico();
-    atualizarImagensCarrossel();
 
-    const dashAtivo = document.getElementById('view-dashboard')?.classList.contains('view-active');
+    atualizarImagensCarrossel();
+    const dashAtivo = document.getElementById('view-dashboard') && document.getElementById('view-dashboard').classList.contains('view-active');
     if (dashAtivo && !carrosselInterval && carrosselImagens.length > 0) iniciarCarrosselDashboard();
 
     if (gavetaAtualAberta !== null) renderizarPecasDaGaveta(gavetaAtualAberta);
@@ -684,15 +793,14 @@ function atualizarDashboard() {
 
 function verificarEstoqueZerado() {
     let qtdZerados = 0;
-    database.drawers.forEach(gaveta => {
+    getTodasGavetas().forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(p => { if (p.current === 0) qtdZerados++; });
     });
     const banner = document.getElementById('alerta-global-zerado');
     if (!banner) return;
     if (qtdZerados > 0) {
         banner.classList.remove('view-hidden');
-        document.getElementById('texto-alerta-zerado').innerHTML =
-            `<strong>Atenção:</strong> Existem <strong>${qtdZerados} item(ns)</strong> com estoque ZERADO no armário!`;
+        document.getElementById('texto-alerta-zerado').innerHTML = `<strong>Atenção:</strong> Existem <strong>${qtdZerados} item(ns)</strong> com estoque ZERADO no armário!`;
     } else {
         banner.classList.add('view-hidden');
     }
@@ -703,7 +811,11 @@ function calcularKPIs() {
     const lista = document.getElementById('kpi-lista-gavetas');
     if (!lista) return;
     lista.innerHTML = '';
-    database.drawers.forEach(gaveta => {
+
+    // KPIs do container atual; se nenhum selecionado, mostra todas as gavetas do sistema
+    const gavetas = containerAtual ? getGavetasDoContainer(containerAtual) : getTodasGavetas();
+
+    gavetas.forEach(gaveta => {
         const status = getGavetaStatus(database.items[gaveta.id] || []);
         const div = document.createElement('div');
         div.className = `kpi-status-item ${status}`;
@@ -715,143 +827,366 @@ function calcularKPIs() {
     if (kpiEl) kpiEl.innerText = alerts;
 }
 
+// =========================================================================
+// ARMÁRIO VERTICAL COM DRAG AND DROP
+// =========================================================================
 function renderArmarioVertical() {
     const chassi = document.getElementById('menu-gavetas');
     if (!chassi) return;
     chassi.innerHTML = '';
-    chassi.classList.toggle('modo-reorganizar', modoReorganizar);
 
-    database.drawers.forEach((gaveta, idx) => {
+    // Pega só as gavetas do container atualmente selecionado (Elétrica, Mecânica...)
+    const gavetasDoContainer = getGavetasDoContainer(containerAtual);
+
+    gavetasDoContainer.forEach((gaveta, index) => {
         const status = getGavetaStatus(database.items[gaveta.id] || []);
         const div = document.createElement('div');
         div.className = 'btn-gaveta';
-        div.dataset.id = gaveta.id;
 
-        if (modoReorganizar) {
-            div.classList.add('reordenando');
-            div.innerHTML = `
-                <div class="gaveta-content">
-                    <span class="reorder-handle"><i class="fa-solid fa-grip-lines"></i></span>
-                    <span class="gnumber">${gaveta.label}</span>
-                    <span class="glabel">${gaveta.title}</span>
-                    <div class="reorder-arrows">
-                        <button class="btn-arrow" ${idx === 0 ? 'disabled' : ''} onclick="window.moverGaveta(${gaveta.id}, -1)" title="Subir"><i class="fa-solid fa-chevron-up"></i></button>
-                        <button class="btn-arrow" ${idx === database.drawers.length - 1 ? 'disabled' : ''} onclick="window.moverGaveta(${gaveta.id}, 1)" title="Descer"><i class="fa-solid fa-chevron-down"></i></button>
-                    </div>
-                    <div class="gstatus-light ${status}"></div>
-                </div>`;
-            // Drag via Pointer Events (funciona em toque e mouse)
-            div.addEventListener('pointerdown', (e) => gavetaPointerDown(e, gaveta.id));
-        } else {
-            div.onclick = () => abrirGaveta(gaveta.id);
-            div.innerHTML = `
-                <div class="gaveta-content">
-                    <span class="gnumber">${gaveta.label}</span>
-                    <span class="glabel">${gaveta.title}</span>
-                    <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
-                        <i class="fa-solid fa-pen"></i>
-                    </button>
-                    <div class="gstatus-light ${status}"></div>
-                </div>`;
+        div.innerHTML = `
+            <div class="gaveta-content">
+                <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste para reordenar a gaveta" style="cursor: grab; font-size: 1.2rem; color: rgba(255,255,255,0.5);"></i>
+                <span class="gnumber">${gaveta.label}</span>
+                <span class="glabel">${gaveta.title}</span>
+                <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+                <div class="gstatus-light ${status}"></div>
+            </div>`;
+
+        div.onclick = (e) => {
+            if (e.target.closest('.btn-edit-gaveta') || e.target.closest('.drag-handle')) return;
+            abrirGaveta(gaveta.id);
+        };
+
+        if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
+            div.draggable = true;
+
+            div.ondragstart = (e) => {
+                draggedDrawerIndex = index;
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => div.classList.add('dragging'), 0);
+            };
+
+            div.ondragover = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                div.classList.add('drag-over');
+            };
+
+            div.ondragleave = () => { div.classList.remove('drag-over'); };
+
+            div.ondrop = async (e) => {
+                e.preventDefault();
+                div.classList.remove('drag-over');
+                if (draggedDrawerIndex === null || draggedDrawerIndex === index) return;
+
+                // Reordena dentro do array de gavetas do container atual
+                const cont = getContainerAtual();
+                if (!cont) return;
+                const gavetaArrastada = cont.gavetas[draggedDrawerIndex];
+                cont.gavetas.splice(draggedDrawerIndex, 1);
+                cont.gavetas.splice(index, 0, gavetaArrastada);
+
+                registrarLog(`reordenou a ${gavetaArrastada.label} no ${cont.nome}.`);
+
+                await salvarConfig();
+                renderArmarioVertical(); 
+            };
+
+            div.ondragend = () => {
+                div.classList.remove('dragging');
+                draggedDrawerIndex = null;
+            };
         }
+
         chassi.appendChild(div);
     });
 }
 
 // =========================================================================
-// REORGANIZAR GAVETAS (DRAG-AND-DROP + SETAS)
-// =========================================================================
-function alternarModoReorganizar() {
-    if (modoReorganizar) { finalizarReorganizacao(); return; }
-    modoReorganizar = true;
-    const btn  = document.getElementById('btn-toggle-reorganizar');
-    btn.classList.add('ativo');
-    btn.querySelector('span').innerText = 'Concluir';
-    btn.querySelector('i').className = 'fa-solid fa-check';
-    document.getElementById('dica-reorganizar').classList.remove('view-hidden');
-    renderArmarioVertical();
-}
-
-function finalizarReorganizacao() {
-    modoReorganizar = false;
-    const btn = document.getElementById('btn-toggle-reorganizar');
-    if (btn) {
-        btn.classList.remove('ativo');
-        btn.querySelector('span').innerText = 'Reorganizar';
-        btn.querySelector('i').className = 'fa-solid fa-up-down-left-right';
-    }
-    document.getElementById('dica-reorganizar')?.classList.add('view-hidden');
-    salvarConfig();
-    registrarLog('reorganizou a ordem das gavetas no armário.');
-    renderArmarioVertical();
-}
-
-function moverGaveta(idGaveta, direcao) {
-    const idx = database.drawers.findIndex(d => d.id === idGaveta);
-    const novo = idx + direcao;
-    if (novo < 0 || novo >= database.drawers.length) return;
-    const arr = database.drawers;
-    [arr[idx], arr[novo]] = [arr[novo], arr[idx]];
-    renderArmarioVertical();
-}
-
-function gavetaPointerDown(e, id) {
-    if (!modoReorganizar) return;
-    // ignora cliques nos botões de seta
-    if (e.target.closest('.btn-arrow')) return;
-    const el = e.currentTarget;
-    el.setPointerCapture(e.pointerId);
-    drag = { id, el, startY: e.clientY, moved: false, pointerId: e.pointerId };
-    el.classList.add('arrastando');
-    el.addEventListener('pointermove', gavetaPointerMove);
-    el.addEventListener('pointerup', gavetaPointerUp);
-    el.addEventListener('pointercancel', gavetaPointerUp);
-}
-
-function gavetaPointerMove(e) {
-    if (!drag) return;
-    e.preventDefault();
-    drag.moved = true;
-    const dy = e.clientY - drag.startY;
-    drag.el.style.transform = `translateY(${dy}px) scale(1.02)`;
-}
-
-function gavetaPointerUp(e) {
-    if (!drag) return;
-    const el = drag.el;
-    el.style.transform = '';
-    el.classList.remove('arrastando');
-    el.removeEventListener('pointermove', gavetaPointerMove);
-    el.removeEventListener('pointerup', gavetaPointerUp);
-    el.removeEventListener('pointercancel', gavetaPointerUp);
-
-    if (drag.moved) {
-        const chassi  = document.getElementById('menu-gavetas');
-        const outros  = [...chassi.children].filter(c => c !== el);
-        const y = e.clientY;
-        let posInsercao = outros.length;
-        for (let i = 0; i < outros.length; i++) {
-            const r = outros[i].getBoundingClientRect();
-            if (y < r.top + r.height / 2) { posInsercao = i; break; }
-        }
-        const idsOrdenados = outros.map(c => parseInt(c.dataset.id));
-        idsOrdenados.splice(posInsercao, 0, drag.id);
-        database.drawers.sort((a, b) => idsOrdenados.indexOf(a.id) - idsOrdenados.indexOf(b.id));
-        renderArmarioVertical();
-    }
-    drag = null;
-}
-
-// =========================================================================
-// DENTRO DA GAVETA (DIVISÓRIAS E GRID)
+// INTERIOR DA GAVETA E DRAG AND DROP DAS PEÇAS
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
-    const gaveta = database.drawers.find(d => d.id === idGaveta);
+    const gaveta = acharGaveta(idGaveta);
+    if (!gaveta) return;
+
+    // Garante que o container dono dessa gaveta fique selecionado
+    // (importante quando a busca global abre uma peça de outro container)
+    const containerDono = getContainerDeGaveta(idGaveta);
+    if (containerDono) containerAtual = containerDono.id;
+
     document.getElementById('titulo-gaveta-aberta').innerText = `${gaveta.label}: ${gaveta.title}`;
     renderizarPecasDaGaveta(idGaveta);
     mostrarTela('view-compartimentos');
 }
+
+// =========================================================================
+// TELA DE SELEÇÃO DE LOCAIS (CONTAINERS: Gaveteiros, Armários, Mezaninos)
+// =========================================================================
+// Cada "container" é um local físico de estoque. Esta tela mostra todos eles
+// como cards. O usuário clica em um para ver as gavetas/prateleiras dentro.
+function renderContainers() {
+    const grid = document.getElementById('containers-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    database.containers.forEach(container => {
+        // Calcula estatísticas do container: total de peças e quantas estão zeradas
+        let totalPecas = 0, totalZerados = 0;
+        (container.gavetas || []).forEach(g => {
+            (database.items[g.id] || []).forEach(p => {
+                totalPecas++;
+                if (p.current === 0) totalZerados++;
+            });
+        });
+
+        const numCompartimentos = (container.gavetas || []).length;
+        const rotuloCompart = container.tipo === 'armario' ? 'prateleiras'
+                            : container.tipo === 'mezanino' ? 'seções'
+                            : 'gavetas';
+
+        const card = document.createElement('div');
+        card.className = 'container-card';
+        card.style.borderTopColor = container.cor || '#2a5288';
+        card.onclick = () => abrirContainer(container.id);
+
+        card.innerHTML = `
+            <div class="container-card-icone" style="background:${container.cor || '#2a5288'}">
+                <i class="fa-solid ${container.icone || 'fa-box-archive'}"></i>
+            </div>
+            <div class="container-card-info">
+                <h3>${container.nome}</h3>
+                <span class="container-tipo-badge">${tipoContainerLabel(container.tipo)}</span>
+                <p>${numCompartimentos} ${rotuloCompart} · ${totalPecas} peças</p>
+                ${totalZerados > 0 ? `<p class="container-alerta"><i class="fa-solid fa-triangle-exclamation"></i> ${totalZerados} item(ns) zerado(s)</p>` : '<p class="container-ok"><i class="fa-solid fa-circle-check"></i> Tudo abastecido</p>'}
+            </div>
+            <div class="container-card-seta"><i class="fa-solid fa-chevron-right"></i></div>
+            <button class="btn-excluir-container admin-only" onclick="event.stopPropagation(); window.excluirContainer(${container.id})" title="Excluir este local">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+// Traduz o tipo do container para um rótulo amigável
+function tipoContainerLabel(tipo) {
+    const map = { gaveteiro: 'Gaveteiro', armario: 'Armário', mezanino: 'Mezanino / Almox.' };
+    return map[tipo] || 'Local';
+}
+
+// Abre um container: seleciona-o e mostra suas gavetas/prateleiras
+function abrirContainer(idContainer) {
+    containerAtual = idContainer;
+    const container = getContainerAtual();
+    const titulo = document.getElementById('titulo-container-atual');
+    if (titulo && container) {
+        titulo.innerHTML = `<i class="fa-solid ${container.icone}"></i> ${container.nome}`;
+    }
+    atualizarDashboard();
+    mostrarTela('view-gavetas');
+}
+
+// =========================================================================
+// ASSISTENTE (WIZARD) DE CRIAÇÃO DE NOVOS LOCAIS DE ESTOQUE
+// -------------------------------------------------------------------------
+// Pergunta ao usuário o tipo de local (gaveteiro, armário ou mezanino) e,
+// conforme o tipo, pede as informações necessárias para montar a estrutura:
+//   - Gaveteiro → quantas gavetas
+//   - Armário   → quantas portas e quantas prateleiras por porta
+//   - Mezanino  → quantas seções/estantes
+// No final, gera automaticamente os compartimentos (gavetas) com IDs únicos.
+// =========================================================================
+function abrirWizardContainer() {
+    // Limpa e prepara o formulário
+    document.getElementById('wiz-nome').value = '';
+    document.getElementById('wiz-tipo').value = 'gaveteiro';
+    document.getElementById('wiz-num-gavetas').value = '12';
+    document.getElementById('wiz-num-portas').value = '2';
+    document.getElementById('wiz-num-prateleiras').value = '4';
+    document.getElementById('wiz-num-secoes').value = '10';
+    wizardTipoMudou();  // Ajusta quais campos aparecem
+    document.getElementById('modal-wizard-container').classList.remove('view-hidden');
+    setTimeout(() => document.getElementById('wiz-nome').focus(), 100);
+}
+
+function fecharWizardContainer() {
+    document.getElementById('modal-wizard-container').classList.add('view-hidden');
+}
+
+// Mostra/esconde os campos conforme o tipo de local escolhido
+function wizardTipoMudou() {
+    const tipo = document.getElementById('wiz-tipo').value;
+    document.getElementById('wiz-campos-gaveteiro').style.display = (tipo === 'gaveteiro') ? 'block' : 'none';
+    document.getElementById('wiz-campos-armario').style.display   = (tipo === 'armario')   ? 'block' : 'none';
+    document.getElementById('wiz-campos-mezanino').style.display  = (tipo === 'mezanino')  ? 'block' : 'none';
+}
+
+// Cria de fato o novo container com base nas respostas do wizard
+async function criarContainer() {
+    const nome = document.getElementById('wiz-nome').value.trim();
+    const tipo = document.getElementById('wiz-tipo').value;
+
+    if (!nome) return mostrarAlerta('Atenção', 'Dê um nome para o local (Ex: Mecânica, Almoxarifado...).');
+
+    // Ícones e cores padrão por tipo
+    const presets = {
+        gaveteiro: { icone: 'fa-table-cells', cor: '#2a5288' },
+        armario:   { icone: 'fa-warehouse',   cor: '#7c3aed' },
+        mezanino:  { icone: 'fa-layer-group',  cor: '#059669' }
+    };
+
+    // Monta as gavetas/compartimentos conforme o tipo escolhido
+    const gavetas = [];
+    let idGaveta = proximoIdGaveta();
+
+    if (tipo === 'gaveteiro') {
+        const num = Math.max(1, parseInt(document.getElementById('wiz-num-gavetas').value) || 1);
+        for (let i = 1; i <= num; i++) {
+            gavetas.push({ id: idGaveta++, label: `G${i}`, title: `Gaveta ${i}` });
+        }
+    } else if (tipo === 'armario') {
+        const portas = Math.max(1, parseInt(document.getElementById('wiz-num-portas').value) || 1);
+        const prateleiras = Math.max(1, parseInt(document.getElementById('wiz-num-prateleiras').value) || 1);
+        // Cada prateleira de cada porta vira um compartimento (com grid próprio)
+        for (let p = 1; p <= portas; p++) {
+            for (let pr = 1; pr <= prateleiras; pr++) {
+                gavetas.push({ id: idGaveta++, label: `P${p}-Prat${pr}`, title: `Porta ${p} · Prateleira ${pr}` });
+            }
+        }
+    } else if (tipo === 'mezanino') {
+        const secoes = Math.max(1, parseInt(document.getElementById('wiz-num-secoes').value) || 1);
+        for (let s = 1; s <= secoes; s++) {
+            gavetas.push({ id: idGaveta++, label: `S${s}`, title: `Seção ${s}` });
+        }
+    }
+
+    // Cria o novo container e inicializa o estoque vazio de cada compartimento
+    const novoContainer = {
+        id:      proximoIdContainer(),
+        nome:    nome,
+        tipo:    tipo,
+        icone:   presets[tipo].icone,
+        cor:     presets[tipo].cor,
+        gavetas: gavetas
+    };
+    gavetas.forEach(g => { if (!database.items[g.id]) database.items[g.id] = []; });
+
+    database.containers.push(novoContainer);
+    registrarLog(`criou o novo local "${nome}" (${tipoContainerLabel(tipo)}) com ${gavetas.length} compartimentos.`);
+
+    await salvarConfig();
+    registrarListenersGavetas();  // Passa a escutar as novas gavetas no Firestore
+    fecharWizardContainer();
+    renderContainers();
+    mostrarAlerta('Local Criado!', `"${nome}" foi criado com ${gavetas.length} compartimentos. Agora é só clicar nele e cadastrar as peças.`);
+}
+
+// Exclui um container inteiro (e todo o estoque dentro dele). Ação destrutiva!
+async function excluirContainer(idContainer) {
+    const container = database.containers.find(c => c.id === idContainer);
+    if (!container) return;
+
+    if (!confirm(`ATENÇÃO: Excluir o local "${container.nome}" apaga TODAS as suas gavetas e peças. Esta ação não pode ser desfeita. Continuar?`)) return;
+
+    // Remove os items de cada gaveta da memória
+    (container.gavetas || []).forEach(g => { delete database.items[g.id]; });
+    database.containers = database.containers.filter(c => c.id !== idContainer);
+
+    if (containerAtual === idContainer) containerAtual = null;
+
+    registrarLog(`excluiu o local "${container.nome}" e todo o seu conteúdo.`);
+    await salvarConfig();
+    renderContainers();
+}
+
+// =========================================================================
+// NOVA GAVETA AVULSA (adiciona uma gaveta a um local já existente)
+// -------------------------------------------------------------------------
+// Útil quando o usuário precisa só de mais uma gaveta sem recriar o local.
+// A gaveta recebe um ID único global (não colide com nenhuma outra).
+// =========================================================================
+function abrirModalNovaGaveta() {
+    if (!containerAtual) return mostrarAlerta('Atenção', 'Abra um local primeiro para adicionar uma gaveta.');
+    document.getElementById('nova-gaveta-label').value = '';
+    document.getElementById('nova-gaveta-title').value = '';
+    document.getElementById('modal-nova-gaveta').classList.remove('view-hidden');
+    setTimeout(() => document.getElementById('nova-gaveta-label').focus(), 100);
+}
+
+function fecharModalNovaGaveta() {
+    document.getElementById('modal-nova-gaveta').classList.add('view-hidden');
+}
+
+async function salvarNovaGaveta() {
+    const label = document.getElementById('nova-gaveta-label').value.trim();
+    const title = document.getElementById('nova-gaveta-title').value.trim();
+
+    if (!label) return mostrarAlerta('Atenção', 'Dê uma etiqueta curta para a gaveta (Ex: G13).');
+
+    const container = getContainerAtual();
+    if (!container) return;
+
+    const novaGaveta = {
+        id:    proximoIdGaveta(),                 // ID único global
+        label: label,
+        title: title || label                     // Se não informar nome, usa a etiqueta
+    };
+
+    container.gavetas.push(novaGaveta);
+    database.items[novaGaveta.id] = [];
+
+    registrarLog(`adicionou a gaveta "${label}" ao ${container.nome}.`);
+    await salvarConfig();
+    registrarListenersGavetas();   // Passa a escutar a nova gaveta no Firestore
+    fecharModalNovaGaveta();
+    renderArmarioVertical();
+}
+
+// =========================================================================
+// PRÉ-VISUALIZAÇÃO DO GRID 10x5 (mini-mapa no modal de cadastro/edição)
+// -------------------------------------------------------------------------
+// Desenha uma gradezinha de 5 colunas × 10 linhas e pinta de azul as células
+// que a peça vai ocupar, conforme os campos coluna/linha/largura/altura.
+// Atualiza em tempo real conforme o usuário digita (evento oninput).
+// 'prefixo' = 'novo' (cadastro) ou 'edit' (edição).
+// =========================================================================
+function atualizarPreviewGrid(prefixo) {
+    // Mapeia os IDs dos campos conforme o modal (cadastro x edição)
+    const ids = prefixo === 'edit'
+        ? { col: 'edit-peca-coluna', lin: 'edit-peca-linha', larg: 'edit-peca-largura-colunas', alt: 'edit-peca-altura-linhas', preview: 'edit-grid-preview' }
+        : { col: 'novo-coluna',      lin: 'novo-linha',      larg: 'novo-largura-colunas',      alt: 'novo-altura-linhas',      preview: 'novo-grid-preview' };
+
+    const preview = document.getElementById(ids.preview);
+    if (!preview) return;
+
+    // Lê os valores (com limites de segurança)
+    const coluna = Math.min(5,  Math.max(1, parseInt(document.getElementById(ids.col).value)  || 1));
+    const linha  = Math.min(10, Math.max(1, parseInt(document.getElementById(ids.lin).value)  || 1));
+    const larg   = Math.min(5,  Math.max(1, parseInt(document.getElementById(ids.larg).value) || 1));
+    const alt    = Math.min(10, Math.max(1, parseInt(document.getElementById(ids.alt).value)  || 1));
+
+    // Marca se vai ultrapassar os limites do gaveteiro (fica vermelho)
+    const estoura = (coluna + larg - 1 > 5) || (linha + alt - 1 > 10);
+
+    // Redesenha as 50 células (5 colunas × 10 linhas)
+    preview.innerHTML = '';
+    for (let r = 1; r <= 10; r++) {
+        for (let c = 1; c <= 5; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'grid-preview-cell';
+            const dentro = (c >= coluna && c < coluna + larg) && (r >= linha && r < linha + alt);
+            if (dentro) cell.classList.add(estoura ? 'ocupada-erro' : 'ocupada');
+            preview.appendChild(cell);
+        }
+    }
+}
+
+
+
+
 
 function renderizarPecasDaGaveta(idGaveta) {
     const mainContainer = document.getElementById('container-divisorias');
@@ -867,58 +1202,180 @@ function renderizarPecasDaGaveta(idGaveta) {
     const grupos = {};
     pecasBrutas.forEach(peca => {
         const divi = (peca.divisoria || 'Geral').toUpperCase();
-        (grupos[divi] = grupos[divi] || []).push(peca);
+        if (!grupos[divi]) grupos[divi] = [];
+        grupos[divi].push(peca);
     });
 
-    Object.keys(grupos).sort().forEach(nomeDivisoria => {
-        const headerDivi = document.createElement('div');
-        headerDivi.className = 'divisoria-header';
-        headerDivi.innerHTML = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
+    const nomesDivisorias = Object.keys(grupos).sort();
+
+    nomesDivisorias.forEach(nomeDivisoria => {
+        const headerDivi      = document.createElement('div');
+        headerDivi.className  = 'divisoria-header';
+        headerDivi.innerHTML  = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
         mainContainer.appendChild(headerDivi);
 
-        const gridDivi = document.createElement('div');
-        gridDivi.className = 'grid-pecas';
+        const gridDivi      = document.createElement('div');
+        gridDivi.className  = 'grid-pecas';
 
-        grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999)).forEach(peca => {
-            const statusPeca = getPecaStatus(peca);
-            const corQtd     = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
-            const imgHtml    = peca.image ? `<img src="${peca.image}" alt="${peca.name}" loading="lazy">` : `<i class="fa-solid fa-microchip"></i>`;
-            const retiradaHtml = peca.lastTakenBy
-                ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
+        const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
+
+        pecasOrdenadas.forEach(peca => {
+            const statusPeca   = getPecaStatus(peca);
+            const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
+
+            const imgHtml      = peca.image 
+                ? `<img src="${peca.image}" alt="${peca.name}" style="max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply;">` 
+                : `<i class="fa-solid fa-microchip" style="font-size: 3rem; color: #94a3b8;"></i>`;
+
+            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
+
             const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
-            const displaySize     = peca.size || 1;
 
-            const div = document.createElement('div');
-            div.className = 'compartimento-card';
-            div.style.setProperty('--span-size', displaySize);
-            div.innerHTML = `
-                <div class="card-top">
-                    <div class="card-top-left">
-                        <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
-                        <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
+            // Detecta espaços vazios: peças nomeadas "vazio" representam compartimentos físicos sem peça
+            const isVazio = (peca.name || '').trim().toLowerCase() === 'vazio';
+
+            // GRID EXPLÍCITO 10x5 (tipo planilha Excel):
+            // Cada peça tem coordenadas fixas: coluna inicial (1-5), linha inicial (1-10),
+            // quantas colunas ocupa (largura/colspan), quantas linhas ocupa (altura/rowspan).
+            // Defaults para dados antigos sem posicionamento:
+            const coluna = parseInt(peca.coluna) || 1;
+            const linha = parseInt(peca.linha) || 1;
+            const larguraColunas = parseInt(peca.larguraColunas) || 1;
+            const alturaLinhas = parseInt(peca.alturaLinhas) || (isVazio ? 1 : 6);  // Vazios pequenos, cards normais ocupam 6 linhas
+
+            const div      = document.createElement('div');
+            div.className  = isVazio ? 'compartimento-card slot-vazio' : 'compartimento-card';
+
+            // POSICIONAMENTO EXPLÍCITO: CSS Grid positioning
+            div.style.gridColumn    = `${coluna} / span ${larguraColunas}`;
+            div.style.gridRow       = `${linha} / span ${alturaLinhas}`;
+            div.style.display       = 'flex';
+            div.style.flexDirection = 'column';
+            div.style.height        = '100%';
+            div.style.minHeight     = '0';
+
+            if (isVazio) {
+                // Renderizar espaço vazio: compartimento físico sem peça (dashed translúcido)
+                div.innerHTML = `
+                    <div class="slot-vazio-top">
+                        <span class="card-local">📌 Pos: ${displayPosition}</span>
+                        <span style="display:flex; gap:4px;">
+                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                        </span>
                     </div>
-                    <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
-                </div>
-                <div class="card-title">${peca.name}</div>
-                <div class="card-image-box">${imgHtml}</div>
-                <div class="card-data-row">
-                    <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
-                    <div class="data-box">
-                        <span>Física Atual</span>
-                        <div class="quick-control">
-                            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                            <strong style="color:${corQtd}">${peca.current}</strong>
-                            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                    <div class="slot-vazio-corpo">
+                        <i class="fa-solid fa-box-open"></i>
+                        <span>Espaço vazio</span>
+                    </div>`;
+            } else {
+                // Card normal: com imagem, botões, tudo visível (span clampado em 6 mínimo)
+                const imgBoxStyle = 'flex: 1 1 auto; min-height: 0;';
+                div.innerHTML = `
+                    <div class="card-top">
+                        <div>
+                            <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
+                            <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
+                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
                         </div>
+                        <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
                     </div>
-                </div>
-                ${retiradaHtml}
-                <div class="botoes-acao-card">
-                    <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})"><i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata</button>
-                    <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})"><i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}</button>
-                    <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})"><i class="fa-solid fa-right-left"></i> Mover para outra Gaveta</button>
-                </div>`;
+                    
+                    <div class="card-title">${peca.name}</div>
+                    
+                    <div class="card-image-box" style="${imgBoxStyle} background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 6px 0; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden;">
+                        ${imgHtml}
+                    </div>
+                    
+                    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+                        <div class="card-data-row">
+                            <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
+                            <div class="data-box">
+                                <span>Física Atual</span>
+                                <div class="quick-control">
+                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                                    <strong style="color:${corQtd}">${peca.current}</strong>
+                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        ${retiradaHtml}
+                        <div class="botoes-acao-card">
+                            <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
+                                <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
+                            </button>
+                            <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
+                                <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
+                            </button>
+                            <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
+                                <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
+                            </button>
+                        </div>
+                    </div>`;
+            }
+
+            // Lógica Drag and Drop de Peças (Somente ADMIN)
+            if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
+                div.draggable = true;
+
+                div.ondragstart = (e) => {
+                    if(e.target.closest('.btn-quick') || e.target.closest('button')) {
+                        e.preventDefault();
+                        return;
+                    }
+                    draggedPecaId = peca.id;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => div.classList.add('dragging'), 0);
+                };
+
+                div.ondragover = (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    div.classList.add('drag-over');
+                };
+
+                div.ondragleave = () => { div.classList.remove('drag-over'); };
+
+                div.ondrop = async (e) => {
+                    e.preventDefault();
+                    div.classList.remove('drag-over');
+
+                    if (!draggedPecaId || draggedPecaId === peca.id) return;
+
+                    let itensGaveta = database.items[gavetaAtualAberta];
+
+                    const pecaArrastada = itensGaveta.find(p => p.id === draggedPecaId);
+                    const pecaAlvo = peca;
+
+                    if(!pecaArrastada || !pecaAlvo) return;
+
+                    pecaArrastada.divisoria = pecaAlvo.divisoria;
+
+                    let divisoriaItems = itensGaveta.filter(p => p.divisoria === pecaAlvo.divisoria).sort((a, b) => (a.position || 999) - (b.position || 999));
+
+                    divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
+
+                    const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
+
+                    divisoriaItems.splice(novoIndexAlvo, 0, pecaArrastada);
+
+                    divisoriaItems.forEach((p, index) => {
+                        p.position = index + 1;
+                    });
+
+                    registrarLog(`reordenou a peça "${pecaArrastada.name}" na gaveta`);
+
+                    await salvarItensDaGaveta(gavetaAtualAberta);
+                    renderizarPecasDaGaveta(gavetaAtualAberta);
+                };
+
+                div.ondragend = () => {
+                    div.classList.remove('dragging');
+                    draggedPecaId = null;
+                };
+            }
+
             gridDivi.appendChild(div);
         });
         mainContainer.appendChild(gridDivi);
@@ -931,10 +1388,10 @@ function ajusteRapidoEstoque(idPeca, delta) {
     let novaQtd = Math.max(0, peca.current + delta);
     if (delta < 0 && peca.current > 0) {
         peca.lastTakenBy = usuarioLogado.nome;
-        registrarLog(`retirou 1 unidade da peça "${peca.name}" (Item: ${peca.code})`);
+        registrarLog(`retirou 1 unidade da peça "${peca.name}"`);
         enviarNotificacao("Peça Retirada", `Você retirou 1x ${peca.name}. Restaram ${novaQtd} peça(s).`);
     } else if (delta > 0) {
-        registrarLog(`adicionou 1 unidade da peça "${peca.name}" (Item: ${peca.code})`);
+        registrarLog(`adicionou 1 unidade da peça "${peca.name}"`);
     }
     peca.current = novaQtd;
     if (peca.current >= peca.expected) peca.requested = false;
@@ -952,11 +1409,11 @@ function alternarStatusRequisitado(idPeca) {
 function excluirPeca(idPeca) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
-    mostrarConfirmar('Excluir Peça', `Tem certeza que deseja excluir a peça "${peca.name}" da gaveta?`, () => {
+    if (confirm(`Tem certeza que deseja excluir a peça "${peca.name}" da gaveta?`)) {
         database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== idPeca);
         registrarLog(`excluiu a peça "${peca.name}" do sistema`);
         salvarItensDaGaveta(gavetaAtualAberta);
-    });
+    }
 }
 
 // =========================================================================
@@ -968,11 +1425,11 @@ function abrirModalMoverPeca(idPeca) {
     document.getElementById('mover-peca-nome').innerText = peca.name;
     const select = document.getElementById('mover-destino-select');
     select.innerHTML = '';
-    database.drawers.forEach(gaveta => {
+    getTodasGavetas().forEach(gaveta => {
         if (gaveta.id === gavetaAtualAberta) return;
-        const option = document.createElement('option');
-        option.value = gaveta.id;
-        option.innerText = `${gaveta.label} — ${gaveta.title}`;
+        const option      = document.createElement('option');
+        option.value      = gaveta.id;
+        option.innerText  = `${gaveta.label} — ${gaveta.title}`;
         select.appendChild(option);
     });
     document.getElementById('modal-mover-peca').classList.remove('view-hidden');
@@ -985,27 +1442,24 @@ function fecharModalMoverPeca() {
 
 async function confirmarMoverPeca() {
     const destinoId     = parseInt(document.getElementById('mover-destino-select').value);
-    const gavetaOrigem  = database.drawers.find(d => d.id === gavetaAtualAberta);
-    const gavetaDestino = database.drawers.find(d => d.id === destinoId);
+    const gavetaOrigem  = acharGaveta(gavetaAtualAberta);
+    const gavetaDestino = acharGaveta(destinoId);
     const peca          = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoMovidaId);
 
     database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== pecaSendoMovidaId);
     if (!database.items[destinoId]) database.items[destinoId] = [];
     database.items[destinoId].push(peca);
 
-    registrarLog(`moveu a peça "${peca.name}" da ${gavetaOrigem.label} para ${gavetaDestino.label} (${gavetaDestino.title})`);
+    registrarLog(`moveu a peça "${peca.name}" da ${gavetaOrigem.label} para ${gavetaDestino.label}`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     await salvarItensDaGaveta(destinoId);
     fecharModalMoverPeca();
 }
 
-// =========================================================================
-// EDITAR NOME DA GAVETA
-// =========================================================================
 function abrirModalEditarGaveta(eventoClick, idGaveta) {
     eventoClick.stopPropagation();
     gavetaSendoEditadaId = idGaveta;
-    const gaveta = database.drawers.find(d => d.id === idGaveta);
+    const gaveta = acharGaveta(idGaveta);
     document.getElementById('edit-gaveta-nome').value = gaveta.title;
     document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
     setTimeout(() => document.getElementById('edit-gaveta-nome').focus(), 100);
@@ -1018,9 +1472,9 @@ function fecharModalEditarGaveta() {
 function salvarNomeGaveta() {
     const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
     if (!novoNome) return mostrarAlerta('Atenção', 'O nome da gaveta não pode ficar vazio.');
-    const gaveta = database.drawers.find(d => d.id === gavetaSendoEditadaId);
+    const gaveta     = acharGaveta(gavetaSendoEditadaId);
     const nomeAntigo = gaveta.title;
-    gaveta.title = novoNome;
+    gaveta.title     = novoNome;
     registrarLog(`alterou o nome da gaveta ${gaveta.label} de "${nomeAntigo}" para "${novoNome}"`);
     salvarConfig();
     fecharModalEditarGaveta();
@@ -1034,15 +1488,20 @@ function abrirModalCadastro() {
     document.getElementById('novo-esperado').value  = '1';
     document.getElementById('novo-atual').value     = '0';
     document.getElementById('novo-divisoria').value = 'Geral';
-    document.getElementById('novo-tamanho').value   = '1';
+    
+    // GRID 10x5: Defaults sensíveis para novo cadastro
+    document.getElementById('novo-coluna').value          = '1';
+    document.getElementById('novo-linha').value           = '1';
+    document.getElementById('novo-largura-colunas').value = '1';
+    document.getElementById('novo-altura-linhas').value   = '6';  // 6 linhas = card completo visível
+    
     document.getElementById('novo-imagem').value    = '';
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
+    atualizarPreviewGrid('novo');
     setTimeout(() => document.getElementById('novo-nome').focus(), 100);
 }
 
-function fecharModalCadastro() {
-    document.getElementById('modal-cadastro').classList.add('view-hidden');
-}
+function fecharModalCadastro() { document.getElementById('modal-cadastro').classList.add('view-hidden'); }
 
 async function salvarNovoItem() {
     const codigo    = document.getElementById('novo-codigo').value.trim();
@@ -1051,30 +1510,54 @@ async function salvarNovoItem() {
     const atual     = parseInt(document.getElementById('novo-atual').value);
     const posicao   = parseInt(document.getElementById('novo-posicao').value) || 999;
     const divisoria = document.getElementById('novo-divisoria').value.trim() || 'Geral';
-    const tamanho   = parseInt(document.getElementById('novo-tamanho').value) || 1;
+    
+    // GRID 10x5: Posicionamento explícito tipo planilha
+    const coluna         = parseInt(document.getElementById('novo-coluna').value) || 1;
+    const linha          = parseInt(document.getElementById('novo-linha').value) || 1;
+    const larguraColunas = parseInt(document.getElementById('novo-largura-colunas').value) || 1;
+    const alturaLinhas   = parseInt(document.getElementById('novo-altura-linhas').value) || 6;
+    
     const imgInput  = document.getElementById('novo-imagem');
 
     if (!nome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
+    
+    // Validação básica: não ultrapassar os limites do grid 10x5
+    if (coluna + larguraColunas - 1 > 5) return mostrarAlerta('Erro', 'Posicionamento inválido: ultrapassa as 5 colunas!');
+    if (linha + alturaLinhas - 1 > 10) return mostrarAlerta('Erro', 'Posicionamento inválido: ultrapassa as 10 linhas!');
 
     const btnSalvar = document.querySelector('#modal-cadastro .btn-save');
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
 
     const novaPeca = {
-        id: Date.now(),
-        code: codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
-        name: nome, expected: esperado, current: atual, position: posicao,
-        divisoria, size: tamanho, requested: false, lastTakenBy: null, image: null
+        id:          Date.now(),
+        code:        codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
+        name:        nome, 
+        expected:    esperado, 
+        current:     atual, 
+        position:    posicao,
+        divisoria:   divisoria, 
+        // Grid 10x5 positioning:
+        coluna:          coluna,
+        linha:           linha,
+        larguraColunas:  larguraColunas,
+        alturaLinhas:    alturaLinhas,
+        // Legacy:
+        size:        alturaLinhas,  // Mantém compatibilidade com código antigo
+        requested:   false, 
+        lastTakenBy: null, 
+        image:       null
     };
 
     if (imgInput.files && imgInput.files[0]) {
-        try { novaPeca.image = await uploadImagemCloudinary(imgInput.files[0]); }
-        catch (err) { console.error("Erro Cloudinary:", err); mostrarAlerta('Aviso', 'Não foi possível enviar a foto. A peça será salva sem imagem.'); }
+        try { novaPeca.image = await uploadImagemCloudinary(imgInput.files[0]); } 
+        catch (err) { mostrarAlerta('Aviso', 'Não foi possível enviar a foto. A peça será salva sem imagem.'); }
     }
 
     database.items[gavetaAtualAberta].push(novaPeca);
-    registrarLog(`cadastrou "${novaPeca.name}" na Divisória ${divisoria}.`);
+    registrarLog(`cadastrou "${novaPeca.name}" na Divisória ${divisoria} (Grid: Col ${coluna}, Linha ${linha}).`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     fecharModalCadastro();
+
     if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Peça'; }
 }
 
@@ -1082,21 +1565,26 @@ function abrirModalEditarPeca(idPeca) {
     pecaSendoEditadaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
-    document.getElementById('edit-peca-codigo').value    = peca.code || '';
+    document.getElementById('edit-peca-codigo').value    = peca.code    || '';
     document.getElementById('edit-peca-nome').value      = peca.name;
     document.getElementById('edit-peca-esperado').value  = peca.expected;
     document.getElementById('edit-peca-atual').value     = peca.current;
     document.getElementById('edit-peca-posicao').value   = (peca.position && peca.position !== 999) ? peca.position : '';
     document.getElementById('edit-peca-divisoria').value = peca.divisoria || 'Geral';
-    document.getElementById('edit-peca-tamanho').value   = peca.size || 1;
+    
+    // GRID 10x5: Popular campos de posicionamento (com defaults pra dados antigos)
+    document.getElementById('edit-peca-coluna').value         = peca.coluna || 1;
+    document.getElementById('edit-peca-linha').value          = peca.linha || 1;
+    document.getElementById('edit-peca-largura-colunas').value = peca.larguraColunas || 1;
+    document.getElementById('edit-peca-altura-linhas').value  = peca.alturaLinhas || 6;
+    
     document.getElementById('edit-peca-imagem').value    = '';
     document.getElementById('modal-editar-peca').classList.remove('view-hidden');
+    atualizarPreviewGrid('edit');
     setTimeout(() => document.getElementById('edit-peca-nome').focus(), 100);
 }
 
-function fecharModalEditarPeca() {
-    document.getElementById('modal-editar-peca').classList.add('view-hidden');
-}
+function fecharModalEditarPeca() { document.getElementById('modal-editar-peca').classList.add('view-hidden'); }
 
 async function salvarEdicaoPeca() {
     const novoCodigo    = document.getElementById('edit-peca-codigo').value.trim();
@@ -1105,30 +1593,50 @@ async function salvarEdicaoPeca() {
     const novoAtual     = parseInt(document.getElementById('edit-peca-atual').value);
     const novaPosicao   = parseInt(document.getElementById('edit-peca-posicao').value) || 999;
     const novaDivisoria = document.getElementById('edit-peca-divisoria').value.trim() || 'Geral';
-    const novoTamanho   = parseInt(document.getElementById('edit-peca-tamanho').value) || 1;
+    
+    // GRID 10x5: Ler posicionamento
+    const novaColuna         = parseInt(document.getElementById('edit-peca-coluna').value) || 1;
+    const novaLinha          = parseInt(document.getElementById('edit-peca-linha').value) || 1;
+    const novaLarguraColunas = parseInt(document.getElementById('edit-peca-largura-colunas').value) || 1;
+    const novaAlturaLinhas   = parseInt(document.getElementById('edit-peca-altura-linhas').value) || 6;
+    
     const imgInput      = document.getElementById('edit-peca-imagem');
 
     if (!novoNome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
-    if (isNaN(novoEsperado) || isNaN(novoAtual)) return mostrarAlerta('Erro', 'Valores numéricos inválidos.');
+    
+    // Validação básica: não ultrapassar os limites do grid 10x5
+    if (novaColuna + novaLarguraColunas - 1 > 5) return mostrarAlerta('Erro', 'Posicionamento inválido: ultrapassa as 5 colunas!');
+    if (novaLinha + novaAlturaLinhas - 1 > 10) return mostrarAlerta('Erro', 'Posicionamento inválido: ultrapassa as 10 linhas!');
 
     const btnSalvar = document.querySelector('#modal-editar-peca .btn-save');
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
 
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
-    Object.assign(peca, {
-        code: novoCodigo, name: novoNome, expected: novoEsperado, current: novoAtual,
-        position: novaPosicao, divisoria: novaDivisoria, size: novoTamanho
-    });
+    const peca      = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
+    peca.code       = novoCodigo;
+    peca.name       = novoNome;
+    peca.expected   = novoEsperado;
+    peca.current    = novoAtual;
+    peca.position   = novaPosicao;
+    peca.divisoria  = novaDivisoria;
+    
+    // GRID 10x5:
+    peca.coluna          = novaColuna;
+    peca.linha           = novaLinha;
+    peca.larguraColunas  = novaLarguraColunas;
+    peca.alturaLinhas    = novaAlturaLinhas;
+    peca.size            = novaAlturaLinhas;  // Legacy compatibility
+
     if (peca.current >= peca.expected) peca.requested = false;
 
     if (imgInput.files && imgInput.files[0]) {
-        try { peca.image = await uploadImagemCloudinary(imgInput.files[0]); }
-        catch (err) { console.error("Erro Cloudinary:", err); mostrarAlerta('Aviso', 'Não foi possível enviar a nova foto. A imagem anterior foi mantida.'); }
+        try { peca.image = await uploadImagemCloudinary(imgInput.files[0]); } 
+        catch (err) { mostrarAlerta('Aviso', 'Não foi possível enviar a nova foto. A imagem anterior foi mantida.'); }
     }
 
-    registrarLog(`editou as informações da peça "${peca.name}"`);
+    registrarLog(`editou as informações da peça "${peca.name}" (Grid: Col ${novaColuna}, Linha ${novaLinha})`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     fecharModalEditarPeca();
+
     if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Alterações'; }
 }
 
@@ -1142,9 +1650,7 @@ function abrirModalConferencia(idPeca) {
     setTimeout(() => document.getElementById('conf-qtd-atual').focus(), 100);
 }
 
-function fecharModalConferencia() {
-    document.getElementById('modal-conferencia').classList.add('view-hidden');
-}
+function fecharModalConferencia() { document.getElementById('modal-conferencia').classList.add('view-hidden'); }
 
 function salvarConferencia() {
     const novaQtd = parseInt(document.getElementById('conf-qtd-atual').value);
@@ -1159,27 +1665,13 @@ function salvarConferencia() {
     fecharModalConferencia();
 }
 
-// =========================================================================
-// ALERTA E CONFIRMAÇÃO CUSTOMIZADOS
-// =========================================================================
 function mostrarAlerta(titulo, mensagem) {
     document.getElementById('alerta-titulo').innerText   = titulo;
     document.getElementById('alerta-mensagem').innerText = mensagem;
     document.getElementById('modal-alerta').classList.remove('view-hidden');
 }
-function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
-function mostrarConfirmar(titulo, mensagem, onOk) {
-    document.getElementById('confirmar-titulo').innerText   = titulo;
-    document.getElementById('confirmar-mensagem').innerText = mensagem;
-    confirmCallback = onOk;
-    document.getElementById('btn-confirmar-ok').onclick = () => { fecharConfirmar(); if (confirmCallback) confirmCallback(); };
-    document.getElementById('modal-confirmar').classList.remove('view-hidden');
-}
-function fecharConfirmar() {
-    document.getElementById('modal-confirmar').classList.add('view-hidden');
-    confirmCallback = null;
-}
+function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
 // =========================================================================
 // GERADOR DE PEDIDO DE COMPRA
@@ -1189,7 +1681,7 @@ function gerarEmailPedido() {
     containerItens.innerHTML = '';
     let itensFaltando = [];
 
-    database.drawers.forEach(gaveta => {
+    getTodasGavetas().forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
             if (peca.current < peca.expected) {
                 itensFaltando.push({ nome: peca.name, codigo: peca.code, falta: peca.expected - peca.current });
@@ -1201,13 +1693,24 @@ function gerarEmailPedido() {
 
     itensFaltando.forEach((item, index) => {
         const div = document.createElement('div');
-        div.className = 'pedido-item-card';
+        div.style.border          = '1px solid var(--border-color)';
+        div.style.padding         = '15px';
+        div.style.marginBottom    = '15px';
+        div.style.borderRadius    = '8px';
+        div.style.backgroundColor = '#f8fafc';
+
         div.innerHTML = `
-            <p class="pedido-item-titulo"><i class="fa-solid fa-box-open"></i> ${item.falta} un. | ${item.nome}
-                <span class="pedido-item-cod">(Item: ${item.codigo || 'S/N'})</span></p>
+            <p style="font-weight: bold; margin-bottom: 12px; color: var(--cabinet-blue); font-size: 1.05rem;">
+                <i class="fa-solid fa-box-open"></i> ${item.falta} un. | ${item.nome}
+                <span style="font-weight: normal; color: var(--text-secondary);">(Item: ${item.codigo || 'S/N'})</span>
+            </p>
             <div class="form-group row" style="margin-bottom: 10px;">
-                <div class="col"><label>Ordem de Serviço (OS):</label><input type="text" id="os-${index}" placeholder="Ex: 12345678"></div>
-                <div class="col"><label>Almoxarifado:</label>
+                <div class="col">
+                    <label>Ordem de Serviço (OS):</label>
+                    <input type="text" id="os-${index}" placeholder="Ex: 12345678">
+                </div>
+                <div class="col">
+                    <label>Almoxarifado:</label>
                     <select id="almo-${index}" onchange="window.toggleCompradoFora(${index})">
                         <option value="Automação">Automação</option>
                         <option value="Estoque">Estoque</option>
@@ -1215,13 +1718,23 @@ function gerarEmailPedido() {
                     </select>
                 </div>
             </div>
-            <div id="extra-${index}" class="view-hidden pedido-extra">
+            <div id="extra-${index}" class="view-hidden" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;">
                 <div class="form-group row">
-                    <div class="col"><label>Fornecedor:</label><input type="text" id="forn-${index}" placeholder="Nome do fornecedor"></div>
-                    <div class="col"><label>Unid. Medida:</label><input type="text" id="unid-${index}" placeholder="Ex: PC, RL, CX"></div>
+                    <div class="col">
+                        <label>Fornecedor:</label>
+                        <input type="text" id="forn-${index}" placeholder="Nome do fornecedor">
+                    </div>
+                    <div class="col">
+                        <label>Unid. Medida:</label>
+                        <input type="text" id="unid-${index}" placeholder="Ex: PC, RL, CX">
+                    </div>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;"><label>Justificativa:</label><input type="text" id="just-${index}" placeholder="Motivo da compra"></div>
-            </div>`;
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Justificativa:</label>
+                    <input type="text" id="just-${index}" placeholder="Motivo da compra">
+                </div>
+            </div>
+        `;
         containerItens.appendChild(div);
     });
 
@@ -1236,8 +1749,9 @@ function gerarEmailPedido() {
 }
 
 function toggleCompradoFora(index) {
+    const select   = document.getElementById(`almo-${index}`).value;
     const extraDiv = document.getElementById(`extra-${index}`);
-    if (document.getElementById(`almo-${index}`).value === 'Comprado Fora') extraDiv.classList.remove('view-hidden');
+    if (select === 'Comprado Fora') extraDiv.classList.remove('view-hidden');
     else extraDiv.classList.add('view-hidden');
 }
 
@@ -1246,9 +1760,11 @@ function processarFormularioPedido() {
     let textoFinal = `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes para o nosso gaveteiro elétrico:\n\n`;
 
     window.itensFaltandoTemp.forEach((item, index) => {
-        const os   = document.getElementById(`os-${index}`).value || 'Não informada';
+        const os   = document.getElementById(`os-${index}`).value    || 'Não informada';
         const almo = document.getElementById(`almo-${index}`).value;
+
         textoFinal += `- ${item.falta} un. | ${item.nome} (Item: ${item.codigo || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
+
         if (almo === 'Comprado Fora') {
             const forn = document.getElementById(`forn-${index}`).value || 'Não informado';
             const unid = document.getElementById(`unid-${index}`).value || 'Não informada';
@@ -1256,6 +1772,7 @@ function processarFormularioPedido() {
             textoFinal += `  > Detalhes Compra Externa - Fornecedor: ${forn} | UM: ${unid} | Justificativa: ${just}\n`;
         }
     });
+
     textoFinal += `\nFico no aguardo.\nObrigado,\n${nomeSolicitante}`;
 
     document.getElementById('texto-pedido-gerado').value = textoFinal;
@@ -1266,43 +1783,84 @@ function processarFormularioPedido() {
     document.getElementById('pedido-subtitle').innerText = "Copie o texto pronto abaixo para enviar diretamente no seu Outlook ou Teams.";
 }
 
-function fecharModalPedido() {
-    document.getElementById('modal-pedido').classList.add('view-hidden');
-}
+function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
 
-function copiarTextoPedido(ev) {
-    const ta = document.getElementById('texto-pedido-gerado');
-    const texto = ta.value;
-    const btn = ev ? ev.currentTarget : null;
-    const feedback = () => {
-        if (btn) {
-            const orig = btn.innerHTML;
-            btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
-            btn.style.backgroundColor = 'var(--status-verde)';
-            setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = ''; }, 2000);
-        }
+function copiarTextoPedido(event) {
+    const ta  = document.getElementById('texto-pedido-gerado');
+    const btn = (event && event.currentTarget) ? event.currentTarget : document.getElementById('btn-copiar-pedido');
+
+    const finalizar = () => {
+        const orig = btn.innerHTML;
+        btn.innerHTML             = `<i class="fa-solid fa-check"></i> Copiado!`;
+        btn.style.backgroundColor = 'var(--status-verde)';
         registrarLog('copiou a lista de pedido de peças para envio.');
+        setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = 'var(--drawer-blue)'; }, 2000);
     };
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(texto).then(feedback).catch(() => { ta.select(); document.execCommand('copy'); feedback(); });
+        navigator.clipboard.writeText(ta.value).then(finalizar).catch(() => {
+            ta.select(); document.execCommand('copy'); finalizar();
+        });
     } else {
-        ta.select(); document.execCommand('copy'); feedback();
+        ta.select(); document.execCommand('copy'); finalizar();
     }
 }
 
 // =========================================================================
-// EXPOSIÇÃO GLOBAL DE FUNÇÕES (necessário por type="module")
+// EXPOSIÇÃO GLOBAL DE FUNÇÕES (NECESSÁRIO POR SER type="module")
 // =========================================================================
-Object.assign(window, {
-    toggleMenuMobile, autorizarDispositivo, realizarLogin, alternarTelaLogin, registrarUsuario,
-    mostrarTela, gerarEmailPedido, sairDoSistema, fazerBackup, restaurarBackup,
-    exportarEstoqueCSV, exportarHistoricoCSV, voltarParaGavetas, abrirModalCadastro,
-    fecharModalCadastro, salvarNovoItem, abrirModalEditarPeca, fecharModalEditarPeca,
-    salvarEdicaoPeca, abrirModalConferencia, fecharModalConferencia, salvarConferencia,
-    abrirModalEditarGaveta, fecharModalEditarGaveta, salvarNomeGaveta, fecharModalPedido,
-    copiarTextoPedido, fecharAlerta, fecharConfirmar, abrirGaveta, ajusteRapidoEstoque,
-    alternarStatusRequisitado, excluirPeca, abrirModalMoverPeca, fecharModalMoverPeca,
-    confirmarMoverPeca, toggleCompradoFora, processarFormularioPedido, salvarSenhaObrigatoria,
-    cancelarRedefinicaoSenha, buscarPecasGlobal, instalarPWA,
-    alternarModoReorganizar, moverGaveta
-});
+window.toggleMenuMobile          = toggleMenuMobile;
+window.autorizarDispositivo      = autorizarDispositivo;
+window.realizarLogin             = realizarLogin;
+window.alternarTelaLogin         = alternarTelaLogin;
+window.registrarUsuario          = registrarUsuario;
+window.mostrarTela               = mostrarTela;
+window.gerarEmailPedido          = gerarEmailPedido;
+window.sairDoSistema             = sairDoSistema;
+window.fazerBackup               = fazerBackup;
+window.restaurarBackup           = restaurarBackup;
+window.exportarEstoqueCSV        = exportarEstoqueCSV;
+window.exportarHistoricoCSV      = exportarHistoricoCSV;
+window.voltarParaGavetas         = voltarParaGavetas;
+window.abrirModalCadastro        = abrirModalCadastro;
+window.fecharModalCadastro       = fecharModalCadastro;
+window.salvarNovoItem            = salvarNovoItem;
+window.abrirModalEditarPeca      = abrirModalEditarPeca;
+window.fecharModalEditarPeca     = fecharModalEditarPeca;
+window.salvarEdicaoPeca          = salvarEdicaoPeca;
+window.abrirModalConferencia     = abrirModalConferencia;
+window.fecharModalConferencia    = fecharModalConferencia;
+window.salvarConferencia         = salvarConferencia;
+window.abrirModalEditarGaveta    = abrirModalEditarGaveta;
+window.fecharModalEditarGaveta   = fecharModalEditarGaveta;
+window.salvarNomeGaveta          = salvarNomeGaveta;
+window.fecharModalPedido         = fecharModalPedido;
+window.copiarTextoPedido         = copiarTextoPedido;
+window.fecharAlerta              = fecharAlerta;
+window.abrirGaveta               = abrirGaveta;
+window.ajusteRapidoEstoque       = ajusteRapidoEstoque;
+window.alternarStatusRequisitado = alternarStatusRequisitado;
+window.excluirPeca               = excluirPeca;
+window.abrirModalMoverPeca       = abrirModalMoverPeca;
+window.fecharModalMoverPeca      = fecharModalMoverPeca;
+window.confirmarMoverPeca        = confirmarMoverPeca;
+window.toggleCompradoFora        = toggleCompradoFora;
+window.processarFormularioPedido = processarFormularioPedido;
+window.salvarSenhaObrigatoria    = salvarSenhaObrigatoria;
+window.cancelarRedefinicaoSenha  = cancelarRedefinicaoSenha;
+window.buscarPecasGlobal         = buscarPecasGlobal;
+
+// --- Funções do sistema de múltiplos locais (containers) ---
+window.renderContainers          = renderContainers;
+window.abrirContainer            = abrirContainer;
+window.voltarParaContainers      = voltarParaContainers;
+window.abrirWizardContainer      = abrirWizardContainer;
+window.fecharWizardContainer     = fecharWizardContainer;
+window.wizardTipoMudou           = wizardTipoMudou;
+window.criarContainer            = criarContainer;
+window.excluirContainer          = excluirContainer;
+window.abrirModalNovaGaveta      = abrirModalNovaGaveta;
+window.fecharModalNovaGaveta     = fecharModalNovaGaveta;
+window.salvarNovaGaveta          = salvarNovaGaveta;
+window.atualizarPreviewGrid      = atualizarPreviewGrid;
+window.toggleVerSenha            = toggleVerSenha;
