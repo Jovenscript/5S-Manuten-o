@@ -6,13 +6,7 @@ import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstat
 
 const firebaseConfig = {
     apiKey: "AIzaSyBRddH3U2K6DAW8gAQZC1gZu7XUVSWgebE",
-    authDomain: "fir-manut.firebaseapp.com",
-    projectId: "fir-manut",
-    storageBucket: "fir-manut.firebasestorage.app",
-    messagingSenderId: "509518361914",
-    appId: "1:509518361914:web:456e0eb1f3d97cdf8ccc03"
-};
-
+@@ -16,722 +13,216 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
@@ -30,12 +24,18 @@ const ADMIN_CREDENTIALS = { login: 'admin@weg.net', senha: 'admin123' };
 const DEVICE_MASTER_KEY = 'WEG2026';
 
 const GAVETAS_PADRAO = [
-    { id: 1,  label: "G1",  title: "Sensores M12"   }, { id: 2,  label: "G2",  title: "Botões e LED's" },
-    { id: 3,  label: "G3",  title: "Fusíveis"       }, { id: 4,  label: "G4",  title: "Contatoras"     },
-    { id: 5,  label: "G5",  title: "Prensas Cabos"  }, { id: 6,  label: "G6",  title: "Bornes e Relés" },
-    { id: 7,  label: "G7",  title: "Abraçadeiras"   }, { id: 8,  label: "G8",  title: "Anilhas"        },
-    { id: 9,  label: "G9",  title: "Lâmpadas"       }, { id: 10, label: "G10", title: "Miscelânea 1"   },
-    { id: 11, label: "G11", title: "Miscelânea 2"   }, { id: 12, label: "G12", title: "Outros"         }
+    { id: 1,  label: "G1",  title: "Sensores M12"   },
+    { id: 2,  label: "G2",  title: "Botões e LED's" },
+    { id: 3,  label: "G3",  title: "Fusíveis"       },
+    { id: 4,  label: "G4",  title: "Contatoras"     },
+    { id: 5,  label: "G5",  title: "Prensas Cabos"  },
+    { id: 6,  label: "G6",  title: "Bornes e Relés" },
+    { id: 7,  label: "G7",  title: "Abraçadeiras"   },
+    { id: 8,  label: "G8",  title: "Anilhas"        },
+    { id: 9,  label: "G9",  title: "Lâmpadas"       },
+    { id: 10, label: "G10", title: "Miscelânea 1"   },
+    { id: 11, label: "G11", title: "Miscelânea 2"   },
+    { id: 12, label: "G12", title: "Outros"         }
 ];
 
 // =========================================================================
@@ -44,12 +44,11 @@ const GAVETAS_PADRAO = [
 let database = { drawers: [...GAVETAS_PADRAO], items: {} };
 GAVETAS_PADRAO.forEach(d => { database.items[d.id] = []; });
 
-let usuariosSalvos  = []; 
-let historicoLogs   = []; 
+let usuariosSalvos  = [];
+let historicoLogs   = [];
 let usuarioLogado   = null;
 
-let gavetaAtualAberta    = null; 
-let pecaEmFocoId         = null; 
+let gavetaAtualAberta    = null;
 let pecaSendoConferidaId = null;
 let gavetaSendoEditadaId = null;
 let pecaSendoEditadaId   = null;
@@ -57,9 +56,11 @@ let pecaSendoMovidaId    = null;
 
 let usuarioAguardandoRedefinicao = null;
 
+// Drag and Drop
 let draggedDrawerIndex = null;
 let draggedPecaId      = null;
 
+// Variáveis do Carrossel de Imagens
 let carrosselInterval = null;
 let carrosselImagens  = [];
 let carrosselIndex    = 0;
@@ -81,32 +82,40 @@ window.onload = () => {
 
 function iniciarPWA() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.error('Erro PWA:', err));
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('PWA Service Worker registrado com sucesso.', reg.scope))
+            .catch(err => console.error('Erro ao registrar Service Worker PWA:', err));
     }
 }
 
+// =========================================================================
+// VALIDADOR DE SENHA FORTE
+// =========================================================================
 function validarSenhaForte(senha) {
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
     return regex.test(senha);
 }
 
 // =========================================================================
-// HELPERS DE STATUS E NOTIFICAÇÕES
+// HELPERS DE STATUS
 // =========================================================================
 function getGavetaStatus(pecas) {
     if (!pecas || pecas.length === 0) return 'verde';
     const temZerado  = pecas.some(p => p.current === 0);
     const temCritico = pecas.some(p => p.current > 0 && p.current < p.expected * 0.25);
+    const temBaixo   = pecas.some(p => p.current > 0 && p.current < p.expected * 0.5);
     const temAlerta  = pecas.some(p => p.current < p.expected);
-    if (temZerado) return 'vermelho';
+    if (temZerado)  return 'vermelho';
     if (temCritico) return 'laranja';
-    if (temAlerta) return 'amarelo';
+    if (temBaixo)   return 'amarelo';
+    if (temAlerta)  return 'amarelo';
     return 'verde';
 }
 
 function getPecaStatus(peca) {
     if (peca.current === 0) return 'vermelho';
     if (peca.current < peca.expected * 0.25) return 'laranja';
+    if (peca.current < peca.expected * 0.5) return 'amarelo';
     if (peca.current < peca.expected) return 'amarelo';
     return 'verde';
 }
@@ -116,6 +125,9 @@ function getStatusText(status) {
     return map[status] || 'OK';
 }
 
+// =========================================================================
+// HISTÓRICO / LOGS
+// =========================================================================
 function registrarLog(acao) {
     const agora = new Date();
     const data  = agora.toLocaleDateString('pt-BR');
@@ -148,6 +160,9 @@ function renderizarHistorico() {
     });
 }
 
+// =========================================================================
+// NOTIFICAÇÕES (Web Push API)
+// =========================================================================
 function solicitarPermissaoNotificacao() {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'default') {
@@ -158,14 +173,19 @@ function solicitarPermissaoNotificacao() {
 function enviarNotificacao(titulo, corpo) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
-        try { new Notification(titulo, { body: corpo, icon: '/icon-192x192.png' }); } 
+        try { new Notification(titulo, { body: corpo, icon: 'icon-192x192.png' }); } 
         catch (e) {}
     }
 }
 
+// =========================================================================
+// MENU MOBILE
+// =========================================================================
 function toggleMenuMobile() {
-    document.getElementById('sidebar-menu').classList.toggle('open');
-    document.getElementById('mobile-overlay').classList.toggle('open');
+    const sidebar = document.getElementById('sidebar-menu');
+    const overlay = document.getElementById('mobile-overlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
 }
 
 // =========================================================================
@@ -177,29 +197,51 @@ async function uploadImagemCloudinary(file) {
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
     const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-    if (!response.ok) throw new Error(`Cloudinary Error`);
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Cloudinary: ${response.status} — ${err}`);
+    }
     const data = await response.json();
     return data.secure_url;
 }
 
 // =========================================================================
-// FIRESTORE E BACKUP
+// FIRESTORE
 // =========================================================================
 async function salvarConfig() {
-    try { await setDoc(doc(db, "manutencao_5s", "config"), { drawers: database.drawers, usuarios: usuariosSalvos }); } 
-    catch (e) { mostrarAlerta("Erro", "Falha ao salvar configuração."); }
+    try {
+        await setDoc(doc(db, "manutencao_5s", "config"), {
+            drawers:  database.drawers,
+            usuarios: usuariosSalvos
+        });
+    } catch (e) {
+        console.error("Erro ao salvar config:", e);
+        mostrarAlerta("Erro de Conexão", "Não foi possível salvar a configuração na nuvem.");
+    }
 }
 
 async function salvarHistorico() {
-    try { await setDoc(doc(db, "manutencao_5s", "historico"), { logs: historicoLogs }); } 
-    catch (e) {}
+    try {
+        await setDoc(doc(db, "manutencao_5s", "historico"), { logs: historicoLogs });
+    } catch (e) {
+        console.error("Erro ao salvar histórico:", e);
+    }
 }
 
 async function salvarItensDaGaveta(idGaveta) {
-    try { await setDoc(doc(db, "manutencao_5s", `itens_g${idGaveta}`), { items: database.items[idGaveta] || [] }); } 
-    catch (e) { mostrarAlerta("Erro", "Falha ao salvar gaveta."); }
+    try {
+        await setDoc(doc(db, "manutencao_5s", `itens_g${idGaveta}`), {
+            items: database.items[idGaveta] || []
+        });
+    } catch (e) {
+        console.error(`Erro ao salvar gaveta ${idGaveta}:`, e);
+        mostrarAlerta("Erro de Conexão", "Não foi possível salvar os itens na nuvem.");
+    }
 }
 
+// =========================================================================
+// BACKUP, RESTAURAR E EXPORTAR CSV
+// =========================================================================
 function fazerBackup() {
     const payload = {
         versao: 'v3', geradoEm: new Date().toISOString(),
@@ -221,7 +263,7 @@ function restaurarBackup(event) {
         try {
             const dados = JSON.parse(e.target.result);
             if (!dados.database || !dados.usuarios) return mostrarAlerta('Arquivo Inválido', 'O arquivo selecionado não é um backup válido.');
-            
+
             database       = dados.database;
             usuariosSalvos = dados.usuarios;
             historicoLogs  = dados.historico || [];
@@ -293,21 +335,20 @@ async function iniciarSincronizacaoFirebase() {
         if (snap.exists()) historicoLogs = snap.data().logs || [];
         atualizarSeLogado();
     });
+
 }
 
 function registrarListenersGavetas() {
     database.drawers.forEach(gaveta => {
         onSnapshot(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), (snap) => {
             database.items[gaveta.id] = snap.exists() ? (snap.data().items || []) : [];
-            // Migração silenciosa de variáveis antigas para o modelo matriz
+
             database.items[gaveta.id].forEach(p => {
-                if (p.coluna === undefined) p.coluna = 1;
-                if (p.linha === undefined && p.position !== undefined) p.linha = p.position; // Migra position para linha
-                if (p.linha === undefined) p.linha = 'auto';
-                if (p.altura === undefined && p.size !== undefined) p.altura = p.size; // Migra size para altura
-                if (p.altura === undefined) p.altura = 1;
-                if (p.requested === undefined) p.requested = false;
+                if (p.requested   === undefined) p.requested   = false;
                 if (p.lastTakenBy === undefined) p.lastTakenBy = null;
+                if (p.position    === undefined) p.position    = 999;
+                if (p.divisoria   === undefined) p.divisoria   = 'Geral';
+                if (p.size        === undefined) p.size        = 1;
             });
             atualizarSeLogado();
         });
@@ -322,7 +363,7 @@ function atualizarSeLogado() {
 }
 
 // =========================================================================
-// EVENTOS, AUTORIZAÇÃO E LOGIN
+// EVENTOS E AUTORIZAÇÃO
 // =========================================================================
 function configurarEventosEnter() {
     const map = [
@@ -343,6 +384,7 @@ function configurarEventosEnter() {
         });
     });
 }
+
 
 function autorizarDispositivo() {
     const key = document.getElementById('input-device-key').value;
@@ -451,6 +493,9 @@ function aplicarLogin(user) {
     mostrarTela('view-dashboard');
 }
 
+// =========================================================================
+// NAVEGAÇÃO
+// =========================================================================
 function mostrarTela(id) {
     ['view-dashboard', 'view-gavetas', 'view-compartimentos', 'view-historico', 'view-config'].forEach(v => {
         const el = document.getElementById(v);
@@ -486,7 +531,7 @@ function voltarParaGavetas() { mostrarTela('view-gavetas'); }
 function sairDoSistema()     { location.reload(); }
 
 // =========================================================================
-// DASHBOARD DE BUSCA GLOBAL E CARROSSEL
+// DASHBOARD, BUSCA E CARROSSEL
 // =========================================================================
 function atualizarImagensCarrossel() {
     carrosselImagens = [];
@@ -558,7 +603,7 @@ function buscarPecasGlobal() {
         div.innerHTML = `
             <div class="res-info">
                 <h4>${item.peca.name}</h4>
-                <p>Item: ${item.peca.code || 'S/N'} &nbsp;|&nbsp; <strong>${item.gaveta.label}</strong> (Col: ${item.peca.coluna || 1})</p>
+                <p>Item: ${item.peca.code || 'S/N'} &nbsp;|&nbsp; <strong>${item.gaveta.label}</strong> (Div: ${item.peca.divisoria || 'Geral'})</p>
             </div>
             <div class="res-tag"><i class="fa-solid fa-box-open"></i> ${item.peca.current} un</div>
         `;
@@ -572,7 +617,7 @@ function atualizarDashboard() {
     calcularKPIs();
     verificarEstoqueZerado();
     renderizarHistorico();
-    
+
     atualizarImagensCarrossel();
     const dashAtivo = document.getElementById('view-dashboard') && document.getElementById('view-dashboard').classList.contains('view-active');
     if (dashAtivo && !carrosselInterval && carrosselImagens.length > 0) iniciarCarrosselDashboard();
@@ -623,7 +668,7 @@ function renderArmarioVertical() {
         const status = getGavetaStatus(database.items[gaveta.id] || []);
         const div = document.createElement('div');
         div.className = 'btn-gaveta';
-        
+
         div.innerHTML = `
             <div class="gaveta-content">
                 <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste para reordenar a gaveta" style="cursor: grab; font-size: 1.2rem; color: rgba(255,255,255,0.5);"></i>
@@ -642,11 +687,10 @@ function renderArmarioVertical() {
 
         if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
             div.draggable = true;
-            
+
             div.ondragstart = (e) => {
                 draggedDrawerIndex = index;
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', index);
                 setTimeout(() => div.classList.add('dragging'), 0);
             };
 
@@ -656,11 +700,7 @@ function renderArmarioVertical() {
                 div.classList.add('drag-over');
             };
 
-            div.ondragleave = (e) => {
-                if (!div.contains(e.relatedTarget)) {
-                    div.classList.remove('drag-over');
-                }
-            };
+            div.ondragleave = () => { div.classList.remove('drag-over'); };
 
             div.ondrop = async (e) => {
                 e.preventDefault();
@@ -672,7 +712,7 @@ function renderArmarioVertical() {
                 database.drawers.splice(index, 0, gavetaArrastada);
 
                 registrarLog(`reordenou a ${gavetaArrastada.label} para a nova posição no armário.`);
-                
+
                 await salvarConfig();
                 renderArmarioVertical(); 
             };
@@ -681,6 +721,7 @@ function renderArmarioVertical() {
                 div.classList.remove('dragging');
                 draggedDrawerIndex = null;
             };
+
         }
 
         chassi.appendChild(div);
@@ -688,190 +729,309 @@ function renderArmarioVertical() {
 }
 
 // =========================================================================
-// A MATRIZ INTERNA DA GAVETA (NOVA COLMEIA EXCEL)
+// INTERIOR DA GAVETA E DRAG AND DROP DAS PEÇAS
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
-    const gaveta = database.drawers.find(d => d.id === idGaveta);
-    document.getElementById('titulo-gaveta-aberta').innerText = `${gaveta.label}: ${gaveta.title}`;
-    renderizarPecasDaGaveta(idGaveta);
-    mostrarTela('view-compartimentos');
+@@ -742,609 +233,336 @@ function abrirGaveta(idGaveta) {
 }
 
 function renderizarPecasDaGaveta(idGaveta) {
-    const mainContainer = document.getElementById('matriz-gaveta');
+    const mainContainer = document.getElementById('container-divisorias');
     if (!mainContainer) return;
     mainContainer.innerHTML = '';
-    
-    const pecas = database.items[idGaveta] || [];
+    const pecasBrutas = database.items[idGaveta] || [];
 
-    if (pecas.length === 0) {
-        mainContainer.innerHTML = '<div style="grid-column: span 5; text-align:center; padding:40px; color:#94a3b8; font-size: 1.2rem;">A gaveta está vazia. Adicione novas peças.</div>';
+
+    if (pecasBrutas.length === 0) {
+        mainContainer.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.1rem; padding:40px;">Nenhuma peça cadastrada nesta gaveta.</p>';
         return;
     }
 
-    pecas.forEach(peca => {
-        const div = document.createElement('div');
-        div.className = 'compartimento-card';
-        
-        // CSS GRID MÁGICO: Posicionamento exato tipo Excel
-        const col = parseInt(peca.coluna) || 1;
-        const linha = peca.linha && peca.linha !== 'auto' ? parseInt(peca.linha) : 'auto';
-        const span = parseInt(peca.altura) || 1;
+    const grupos = {};
+    pecasBrutas.forEach(peca => {
+        const divi = (peca.divisoria || 'Geral').toUpperCase();
+        if (!grupos[divi]) grupos[divi] = [];
+        grupos[divi].push(peca);
+    });
 
-        div.style.gridColumn = String(col);
-        div.style.gridRow = linha !== 'auto' ? `${linha} / span ${span}` : `span ${span}`;
 
-        const status = getPecaStatus(peca);
-        const imgHtml = peca.image 
-            ? `<img src="${peca.image}" class="peca-img" draggable="false">` 
-            : `<i class="fa-solid fa-microchip peca-icon-placeholder"></i>`;
 
-        // Card Visível
-        div.innerHTML = `
-            <div class="card-padrao">
-                <div class="card-header-clean">
-                    <span class="pos-badge" title="Coluna ${col} | Linha ${linha !== 'auto' ? linha : '-'}">Col ${col}</span>
-                    <span class="status-indicator ${status}" title="Status: ${getStatusText(status)}"></span>
-                </div>
-                <div class="card-image-clean">${imgHtml}</div>
-                <div class="card-info-clean">
-                    <div class="codigo-clean">${peca.code || 'S/N'}</div>
-                    <div class="nome-clean">${peca.name}</div>
-                </div>
-            </div>
-        `;
 
-        // Clique no card abre o Drawer/Modal de Detalhes
-        div.onclick = () => abrirModalAcoesPeca(peca);
 
-        // Drag and Drop (SWAP CÉLULAS EXCEL)
-        if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
-            div.draggable = true;
-            div.ondragstart = (e) => { 
-                draggedPecaId = peca.id; 
-                e.dataTransfer.setData('text/plain', peca.id); 
-                setTimeout(() => div.classList.add('dragging'), 0); 
-            };
-            div.ondragover = (e) => { e.preventDefault(); div.classList.add('drag-over'); };
-            div.ondragleave = (e) => { if (!div.contains(e.relatedTarget)) div.classList.remove('drag-over'); };
-            div.ondrop = async (e) => {
-                e.preventDefault(); div.classList.remove('drag-over');
-                if (!draggedPecaId || draggedPecaId === peca.id) return;
-                
-                const pecaArrastada = pecas.find(p => p.id === draggedPecaId);
-                const pecaAlvo = peca; 
 
-                // TROCA (SWAP) DE POSIÇÃO ENTRE AS CÉLULAS
-                const tempCol = pecaArrastada.coluna;
-                const tempLinha = pecaArrastada.linha;
-                pecaArrastada.coluna = pecaAlvo.coluna;
-                pecaArrastada.linha = pecaAlvo.linha;
-                pecaAlvo.coluna = tempCol;
-                pecaAlvo.linha = tempLinha;
 
-                registrarLog(`trocou a posição de "${pecaArrastada.name}" com "${pecaAlvo.name}" na matriz.`);
-                await salvarItensDaGaveta(gavetaAtualAberta);
-                renderizarPecasDaGaveta(gavetaAtualAberta); 
-            };
-            div.ondragend = () => { div.classList.remove('dragging'); draggedPecaId = null; };
-        }
 
-        mainContainer.appendChild(div);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    const nomesDivisorias = Object.keys(grupos).sort();
+
+    nomesDivisorias.forEach(nomeDivisoria => {
+        const headerDivi      = document.createElement('div');
+        headerDivi.className  = 'divisoria-header';
+        headerDivi.innerHTML  = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
+        mainContainer.appendChild(headerDivi);
+
+        const gridDivi      = document.createElement('div');
+        gridDivi.className  = 'grid-pecas';
+
+        const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
+
+        pecasOrdenadas.forEach(peca => {
+            const statusPeca   = getPecaStatus(peca);
+            const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
+
+            const imgHtml      = peca.image 
+                ? `<img src="${peca.image}" alt="${peca.name}" style="max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply;">` 
+                : `<i class="fa-solid fa-microchip" style="font-size: 3rem; color: #94a3b8;"></i>`;
+
+            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
+
+            const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
+            const tamanhoReal     = Math.max(parseInt(peca.size) || 1, 1);
+
+            // Detecta espaços vazios: peças nomeadas "vazio" representam compartimentos físicos sem peça
+            const isVazio = (peca.name || '').trim().toLowerCase() === 'vazio';
+
+            // Para garantir que TODOS os cards apareçam com imagem + botões visíveis:
+            // clampamos o span mínimo em 6 linhas (~420px, suficiente pro card completo).
+            // Espaços "vazio" usam o tamanho real (podem ser pequenos, ex: span 1 ou 2).
+            const MIN_SPAN_VISIVEL = 6;
+            const spanFinal = isVazio ? tamanhoReal : Math.max(tamanhoReal, MIN_SPAN_VISIVEL);
+
+            const div      = document.createElement('div');
+            div.className  = isVazio ? 'compartimento-card slot-vazio' : 'compartimento-card';
+
+            // ALTURA FÍSICA: a peça ocupa "span N" linhas de 60px da colmeia.
+            // (Cards reais: mínimo 6 pra tudo aparecer; grandes = tamanho real maior).
+            // (Vazios: tamanho real sem clamp, pra mostrar o buraco físico exato).
+            div.style.setProperty('--span-size', spanFinal);
+            div.style.display       = 'flex';
+            div.style.flexDirection = 'column';
+            div.style.height        = '100%';
+            div.style.minHeight     = '0';
+
+            if (isVazio) {
+                // Renderizar espaço vazio: compartimento físico sem peça (dashed translúcido)
+                div.innerHTML = `
+                    <div class="slot-vazio-top">
+                        <span class="card-local">📌 Pos: ${displayPosition}</span>
+                        <span style="display:flex; gap:4px;">
+                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                        </span>
+                    </div>
+                    <div class="slot-vazio-corpo">
+                        <i class="fa-solid fa-box-open"></i>
+                        <span>Espaço vazio</span>
+                    </div>`;
+            } else {
+                // Card normal: com imagem, botões, tudo visível (span clampado em 6 mínimo)
+                const imgBoxStyle = 'flex: 1 1 auto; min-height: 0;';
+                div.innerHTML = `
+                    <div class="card-top">
+                        <div>
+                            <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
+                            <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
+                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
+                    </div>
+                    
+                    <div class="card-title">${peca.name}</div>
+                    
+                    <div class="card-image-box" style="${imgBoxStyle} background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 6px 0; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden;">
+                        ${imgHtml}
+                    </div>
+                    
+                    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+                        <div class="card-data-row">
+                            <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
+                            <div class="data-box">
+                                <span>Física Atual</span>
+                                <div class="quick-control">
+                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                                    <strong style="color:${corQtd}">${peca.current}</strong>
+                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        ${retiradaHtml}
+                        <div class="botoes-acao-card">
+                            <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
+                                <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
+                            </button>
+                            <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
+                                <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
+                            </button>
+                            <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
+                                <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
+                            </button>
+                        </div>
+                    </div>`;
+            }
+
+            // Lógica Drag and Drop de Peças (Somente ADMIN)
+            if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
+                div.draggable = true;
+
+                div.ondragstart = (e) => {
+                    if(e.target.closest('.btn-quick') || e.target.closest('button')) {
+                        e.preventDefault();
+                        return;
+                    }
+                    draggedPecaId = peca.id;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => div.classList.add('dragging'), 0);
+                };
+
+                div.ondragover = (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    div.classList.add('drag-over');
+                };
+
+                div.ondragleave = () => { div.classList.remove('drag-over'); };
+
+                div.ondrop = async (e) => {
+                    e.preventDefault();
+                    div.classList.remove('drag-over');
+
+                    if (!draggedPecaId || draggedPecaId === peca.id) return;
+
+                    let itensGaveta = database.items[gavetaAtualAberta];
+
+                    const pecaArrastada = itensGaveta.find(p => p.id === draggedPecaId);
+                    const pecaAlvo = peca;
+
+                    if(!pecaArrastada || !pecaAlvo) return;
+
+                    pecaArrastada.divisoria = pecaAlvo.divisoria;
+
+                    let divisoriaItems = itensGaveta.filter(p => p.divisoria === pecaAlvo.divisoria).sort((a, b) => (a.position || 999) - (b.position || 999));
+
+                    divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
+
+                    const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
+
+                    divisoriaItems.splice(novoIndexAlvo, 0, pecaArrastada);
+
+                    divisoriaItems.forEach((p, index) => {
+                        p.position = index + 1;
+                    });
+
+                    registrarLog(`reordenou a peça "${pecaArrastada.name}" na gaveta`);
+
+                    await salvarItensDaGaveta(gavetaAtualAberta);
+                    renderizarPecasDaGaveta(gavetaAtualAberta);
+                };
+
+                div.ondragend = () => {
+                    div.classList.remove('dragging');
+                    draggedPecaId = null;
+                };
+            }
+
+            gridDivi.appendChild(div);
+        });
+        mainContainer.appendChild(gridDivi);
     });
 }
 
-// =========================================================================
-// O NOVO DRAWER/MODAL CENTRAL (AÇÕES DA PEÇA)
-// =========================================================================
-window.abrirModalAcoesPeca = function(peca) {
-    pecaEmFocoId = peca.id;
-    const status = getPecaStatus(peca);
-    
-    document.getElementById('drawer-posicao').innerText = `Col ${peca.coluna || 1} | L. ${peca.linha !== 'auto' ? peca.linha : '-'}`;
-    
-    const statusBadge = document.getElementById('drawer-status');
-    statusBadge.innerText = getStatusText(status).toUpperCase();
-    statusBadge.className = `badge-status-color status-indicator ${status}`; 
-    statusBadge.style.boxShadow = 'none';
-
-    if (peca.image) {
-        document.getElementById('drawer-img').src = peca.image;
-        document.getElementById('drawer-img').style.display = 'block';
-        document.getElementById('drawer-img-placeholder').style.display = 'none';
-    } else {
-        document.getElementById('drawer-img').style.display = 'none';
-        document.getElementById('drawer-img-placeholder').style.display = 'block';
-    }
-
-    document.getElementById('drawer-codigo').innerText = peca.code || 'SEM CÓDIGO';
-    document.getElementById('drawer-nome').innerText = peca.name;
-    document.getElementById('drawer-qtd-atual').innerText = peca.current;
-    document.getElementById('drawer-qtd-ideal').innerText = peca.expected;
-    
-    document.getElementById('drawer-last-taken').innerText = peca.lastTakenBy ? `Última retirada por: ${peca.lastTakenBy}` : '';
-
-    const btnReq = document.getElementById('drawer-btn-requisitar');
-    if (peca.requested) { 
-        btnReq.innerHTML = `<i class="fa-solid fa-cart-arrow-down"></i> Já Requisitado`; 
-        btnReq.classList.add('ativo'); 
-    } else { 
-        btnReq.innerHTML = `<i class="fa-solid fa-cart-arrow-down"></i> Requisitar Compra`; 
-        btnReq.classList.remove('ativo'); 
-    }
-
-    document.getElementById('modal-acoes-peca').classList.remove('view-hidden');
-};
-
-window.fecharModalAcoesPeca = function() {
-    pecaEmFocoId = null;
-    document.getElementById('modal-acoes-peca').classList.add('view-hidden');
-};
-
-window.drawerAjusteRapido = function(delta) {
-    ajusteRapidoEstoque(pecaEmFocoId, delta);
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaEmFocoId);
-    document.getElementById('drawer-qtd-atual').innerText = peca.current; // Atualiza a UI na hora
-    renderizarPecasDaGaveta(gavetaAtualAberta); // Atualiza o fundo
-};
-
-window.drawerAbrirConferencia = function() { 
-    window.fecharModalAcoesPeca(); 
-    abrirModalConferencia(pecaEmFocoId); 
-};
-
-window.drawerAlternarRequisitado = function() { 
-    alternarStatusRequisitado(pecaEmFocoId); 
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaEmFocoId);
-    const btnReq = document.getElementById('drawer-btn-requisitar');
-    if (peca.requested) { 
-        btnReq.innerHTML = `<i class="fa-solid fa-cart-arrow-down"></i> Já Requisitado`; 
-        btnReq.classList.add('ativo'); 
-    } else { 
-        btnReq.innerHTML = `<i class="fa-solid fa-cart-arrow-down"></i> Requisitar Compra`; 
-        btnReq.classList.remove('ativo'); 
-    }
-    renderizarPecasDaGaveta(gavetaAtualAberta);
-};
-
-window.drawerAbrirMover = function() { window.fecharModalAcoesPeca(); abrirModalMoverPeca(pecaEmFocoId); };
-window.drawerAbrirEditar = function() { window.fecharModalAcoesPeca(); abrirModalEditarPeca(pecaEmFocoId); };
-window.drawerExcluir = function() { window.fecharModalAcoesPeca(); excluirPeca(pecaEmFocoId); };
 
 
-// =========================================================================
-// CRUD DE PEÇAS (AJUSTES NORMAIS)
-// =========================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function ajusteRapidoEstoque(idPeca, delta) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
     let novaQtd = Math.max(0, peca.current + delta);
     if (delta < 0 && peca.current > 0) {
         peca.lastTakenBy = usuarioLogado.nome;
-        registrarLog(`retirou 1x "${peca.name}"`);
-        enviarNotificacao("Peça Retirada", `Você retirou 1x ${peca.name}. Restam ${novaQtd}.`);
+        registrarLog(`retirou 1 unidade da peça "${peca.name}"`);
+        enviarNotificacao("Peça Retirada", `Você retirou 1x ${peca.name}. Restaram ${novaQtd} peça(s).`);
     } else if (delta > 0) {
-        registrarLog(`adicionou 1x "${peca.name}"`);
+        registrarLog(`adicionou 1 unidade da peça "${peca.name}"`);
     }
     peca.current = novaQtd;
     if (peca.current >= peca.expected) peca.requested = false;
@@ -882,114 +1042,204 @@ function alternarStatusRequisitado(idPeca) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
     peca.requested = !peca.requested;
-    registrarLog(`${peca.requested ? 'marcou REQUISITADO' : 'removeu o status de requisitado'} em "${peca.name}"`);
+    registrarLog(`${peca.requested ? 'marcou como REQUISITADO' : 'removeu o status requisitado de'} a peça "${peca.name}"`);
     salvarItensDaGaveta(gavetaAtualAberta);
 }
 
 function excluirPeca(idPeca) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
-    if (confirm(`Excluir permanentemente a peça "${peca.name}" da gaveta?`)) {
+    if (confirm(`Tem certeza que deseja excluir a peça "${peca.name}" da gaveta?`)) {
         database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== idPeca);
         registrarLog(`excluiu a peça "${peca.name}" do sistema`);
         salvarItensDaGaveta(gavetaAtualAberta);
-        renderizarPecasDaGaveta(gavetaAtualAberta);
+
     }
 }
 
 // =========================================================================
-// MODAIS DE CADASTRO E EDIÇÃO
+// MOVER PEÇA ENTRE GAVETAS
+// =========================================================================
+function abrirModalMoverPeca(idPeca) {
+    pecaSendoMovidaId = idPeca;
+    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
+    document.getElementById('mover-peca-nome').innerText = peca.name;
+    const select = document.getElementById('mover-destino-select');
+    select.innerHTML = '';
+    database.drawers.forEach(gaveta => {
+        if (gaveta.id === gavetaAtualAberta) return;
+        const option      = document.createElement('option');
+        option.value      = gaveta.id;
+        option.innerText  = `${gaveta.label} — ${gaveta.title}`;
+        select.appendChild(option);
+    });
+    document.getElementById('modal-mover-peca').classList.remove('view-hidden');
+}
+
+function fecharModalMoverPeca() {
+    document.getElementById('modal-mover-peca').classList.add('view-hidden');
+    pecaSendoMovidaId = null;
+}
+
+async function confirmarMoverPeca() {
+    const destinoId     = parseInt(document.getElementById('mover-destino-select').value);
+    const gavetaOrigem  = database.drawers.find(d => d.id === gavetaAtualAberta);
+    const gavetaDestino = database.drawers.find(d => d.id === destinoId);
+    const peca          = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoMovidaId);
+
+    database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== pecaSendoMovidaId);
+    if (!database.items[destinoId]) database.items[destinoId] = [];
+    database.items[destinoId].push(peca);
+
+    registrarLog(`moveu a peça "${peca.name}" da ${gavetaOrigem.label} para ${gavetaDestino.label}`);
+    await salvarItensDaGaveta(gavetaAtualAberta);
+    await salvarItensDaGaveta(destinoId);
+    fecharModalMoverPeca();
+}
+
+function abrirModalEditarGaveta(eventoClick, idGaveta) {
+    eventoClick.stopPropagation();
+    gavetaSendoEditadaId = idGaveta;
+    const gaveta = database.drawers.find(d => d.id === idGaveta);
+    document.getElementById('edit-gaveta-nome').value = gaveta.title;
+    document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
+    setTimeout(() => document.getElementById('edit-gaveta-nome').focus(), 100);
+}
+
+function fecharModalEditarGaveta() {
+    document.getElementById('modal-editar-gaveta').classList.add('view-hidden');
+}
+
+function salvarNomeGaveta() {
+    const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
+    if (!novoNome) return mostrarAlerta('Atenção', 'O nome da gaveta não pode ficar vazio.');
+    const gaveta     = database.drawers.find(d => d.id === gavetaSendoEditadaId);
+    const nomeAntigo = gaveta.title;
+    gaveta.title     = novoNome;
+    registrarLog(`alterou o nome da gaveta ${gaveta.label} de "${nomeAntigo}" para "${novoNome}"`);
+    salvarConfig();
+    fecharModalEditarGaveta();
+}
+
+// =========================================================================
+// GERENCIAMENTO DE PEÇAS
 // =========================================================================
 function abrirModalCadastro() {
     ['novo-codigo', 'novo-nome', 'novo-posicao'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('novo-esperado').value  = '1';
     document.getElementById('novo-atual').value     = '0';
-    document.getElementById('novo-coluna').value    = '1';
-    document.getElementById('novo-tamanho').value   = '1'; 
+    document.getElementById('novo-divisoria').value = 'Geral';
+    document.getElementById('novo-tamanho').value   = '1';
     document.getElementById('novo-imagem').value    = '';
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
+    setTimeout(() => document.getElementById('novo-nome').focus(), 100);
 }
 
 function fecharModalCadastro() { document.getElementById('modal-cadastro').classList.add('view-hidden'); }
 
 async function salvarNovoItem() {
-    const nome = document.getElementById('novo-nome').value.trim();
+    const codigo    = document.getElementById('novo-codigo').value.trim();
+    const nome      = document.getElementById('novo-nome').value.trim();
+    const esperado  = parseInt(document.getElementById('novo-esperado').value);
+    const atual     = parseInt(document.getElementById('novo-atual').value);
+    const posicao   = parseInt(document.getElementById('novo-posicao').value) || 999;
+    const divisoria = document.getElementById('novo-divisoria').value.trim() || 'Geral';
+    const tamanho   = parseInt(document.getElementById('novo-tamanho').value) || 1;
+    const imgInput  = document.getElementById('novo-imagem');
+
     if (!nome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
-    const btnSalvar = document.querySelector('#modal-cadastro .btn-save'); btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...';
+
+    const btnSalvar = document.querySelector('#modal-cadastro .btn-save');
+    if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
 
     const novaPeca = {
         id:          Date.now(),
-        code:        document.getElementById('novo-codigo').value.trim() || `G${gavetaAtualAberta}-P${Date.now().toString().slice(-4)}`,
-        name:        nome, 
-        expected:    parseInt(document.getElementById('novo-esperado').value), 
-        current:     parseInt(document.getElementById('novo-atual').value), 
-        coluna:      parseInt(document.getElementById('novo-coluna').value) || 1,
-        linha:       document.getElementById('novo-posicao').value.trim() ? parseInt(document.getElementById('novo-posicao').value) : 'auto',
-        altura:      parseInt(document.getElementById('novo-tamanho').value) || 1, 
-        requested:   false, 
-        lastTakenBy: null, 
-        image:       null
+        code:        codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
+        name:        nome, expected: esperado, current: atual, position: posicao,
+        divisoria:   divisoria, size: tamanho, requested: false, lastTakenBy: null, image: null
+
+
+
+
+
+
+
     };
 
-    const imgInput = document.getElementById('novo-imagem');
+
     if (imgInput.files && imgInput.files[0]) {
-        try { novaPeca.image = await uploadImagemCloudinary(imgInput.files[0]); } catch (err) {}
+        try { novaPeca.image = await uploadImagemCloudinary(imgInput.files[0]); } 
+        catch (err) { mostrarAlerta('Aviso', 'Não foi possível enviar a foto. A peça será salva sem imagem.'); }
     }
 
     database.items[gavetaAtualAberta].push(novaPeca);
-    registrarLog(`cadastrou "${novaPeca.name}" na Coluna ${novaPeca.coluna}.`);
+    registrarLog(`cadastrou "${novaPeca.name}" na Divisória ${divisoria}.`);
     await salvarItensDaGaveta(gavetaAtualAberta);
-    fecharModalCadastro(); btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Peça';
-    renderizarPecasDaGaveta(gavetaAtualAberta);
+    fecharModalCadastro();
+
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Peça'; }
 }
 
 function abrirModalEditarPeca(idPeca) {
     pecaSendoEditadaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
-    document.getElementById('edit-peca-codigo').value    = peca.code || '';
+    document.getElementById('edit-peca-codigo').value    = peca.code    || '';
     document.getElementById('edit-peca-nome').value      = peca.name;
     document.getElementById('edit-peca-esperado').value  = peca.expected;
     document.getElementById('edit-peca-atual').value     = peca.current;
-    document.getElementById('edit-peca-coluna').value    = peca.coluna || 1;
-    document.getElementById('edit-peca-posicao').value   = peca.linha !== 'auto' ? peca.linha : '';
-    document.getElementById('edit-peca-tamanho').value   = peca.altura || 1;
+    document.getElementById('edit-peca-posicao').value   = (peca.position && peca.position !== 999) ? peca.position : '';
+    document.getElementById('edit-peca-divisoria').value = peca.divisoria || 'Geral';
+    document.getElementById('edit-peca-tamanho').value   = peca.size || 1;
     document.getElementById('edit-peca-imagem').value    = '';
     document.getElementById('modal-editar-peca').classList.remove('view-hidden');
+    setTimeout(() => document.getElementById('edit-peca-nome').focus(), 100);
 }
 
 function fecharModalEditarPeca() { document.getElementById('modal-editar-peca').classList.add('view-hidden'); }
 
 async function salvarEdicaoPeca() {
-    const nome = document.getElementById('edit-peca-nome').value.trim();
-    if (!nome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
-    const btnSalvar = document.querySelector('#modal-editar-peca .btn-save'); btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...';
+    const novoCodigo    = document.getElementById('edit-peca-codigo').value.trim();
+    const novoNome      = document.getElementById('edit-peca-nome').value.trim();
+    const novoEsperado  = parseInt(document.getElementById('edit-peca-esperado').value);
+    const novoAtual     = parseInt(document.getElementById('edit-peca-atual').value);
+    const novaPosicao   = parseInt(document.getElementById('edit-peca-posicao').value) || 999;
+    const novaDivisoria = document.getElementById('edit-peca-divisoria').value.trim() || 'Geral';
+    const novoTamanho   = parseInt(document.getElementById('edit-peca-tamanho').value) || 1;
+    const imgInput      = document.getElementById('edit-peca-imagem');
 
-    const peca    = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
-    peca.code     = document.getElementById('edit-peca-codigo').value.trim();
-    peca.name     = nome;
-    peca.expected = parseInt(document.getElementById('edit-peca-esperado').value);
-    peca.current  = parseInt(document.getElementById('edit-peca-atual').value);
-    peca.coluna   = parseInt(document.getElementById('edit-peca-coluna').value) || 1;
-    peca.linha    = document.getElementById('edit-peca-posicao').value.trim() ? parseInt(document.getElementById('edit-peca-posicao').value) : 'auto';
-    peca.altura   = parseInt(document.getElementById('edit-peca-tamanho').value) || 1;
+    if (!novoNome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
+
+    const btnSalvar = document.querySelector('#modal-editar-peca .btn-save');
+    if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
+
+    const peca      = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
+    peca.code       = novoCodigo;
+    peca.name       = novoNome;
+    peca.expected   = novoEsperado;
+    peca.current    = novoAtual;
+    peca.position   = novaPosicao;
+    peca.divisoria  = novaDivisoria;
+    peca.size       = novoTamanho;
 
     if (peca.current >= peca.expected) peca.requested = false;
 
-    const imgInput = document.getElementById('edit-peca-imagem');
+
     if (imgInput.files && imgInput.files[0]) {
-        try { peca.image = await uploadImagemCloudinary(imgInput.files[0]); } catch (err) {}
+        try { peca.image = await uploadImagemCloudinary(imgInput.files[0]); } 
+        catch (err) { mostrarAlerta('Aviso', 'Não foi possível enviar a nova foto. A imagem anterior foi mantida.'); }
     }
 
-    registrarLog(`editou as informações de "${peca.name}"`);
+    registrarLog(`editou as informações da peça "${peca.name}"`);
     await salvarItensDaGaveta(gavetaAtualAberta);
-    fecharModalEditarPeca(); btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Alterações';
-    renderizarPecasDaGaveta(gavetaAtualAberta);
+    fecharModalEditarPeca();
+
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Alterações'; }
 }
 
-// =========================================================================
-// CONTAGEM, MOVER E GAVETAS
-// =========================================================================
+
+
+
 function abrirModalConferencia(idPeca) {
     pecaSendoConferidaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
@@ -997,75 +1247,34 @@ function abrirModalConferencia(idPeca) {
     document.getElementById('conf-nome-peca').innerText = peca.name;
     document.getElementById('conf-qtd-atual').value     = peca.current;
     document.getElementById('modal-conferencia').classList.remove('view-hidden');
+    setTimeout(() => document.getElementById('conf-qtd-atual').focus(), 100);
 }
 
 function fecharModalConferencia() { document.getElementById('modal-conferencia').classList.add('view-hidden'); }
 
 function salvarConferencia() {
     const novaQtd = parseInt(document.getElementById('conf-qtd-atual').value);
-    if (isNaN(novaQtd) || novaQtd < 0) return mostrarAlerta('Erro', 'A quantidade deve ser um número válido.');
+    if (isNaN(novaQtd) || novaQtd < 0) return mostrarAlerta('Valor Inválido', 'A quantidade deve ser um número igual ou maior que zero.');
     const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoConferidaId);
     if (!peca) return;
     if (novaQtd !== peca.current) registrarLog(`alterou a contagem de "${peca.name}" de ${peca.current} para ${novaQtd}`);
     if (novaQtd < peca.current) peca.lastTakenBy = usuarioLogado.nome;
     peca.current = novaQtd;
     if (peca.current >= peca.expected) peca.requested = false;
-    salvarItensDaGaveta(gavetaAtualAberta); 
-    fecharModalConferencia(); 
-    renderizarPecasDaGaveta(gavetaAtualAberta);
-}
-
-function abrirModalMoverPeca(idPeca) {
-    pecaSendoMovidaId = idPeca;
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
-    if (!peca) return;
-    document.getElementById('mover-peca-nome').innerText = peca.name;
-    const select = document.getElementById('mover-destino-select'); select.innerHTML = '';
-    database.drawers.forEach(gaveta => {
-        if (gaveta.id === gavetaAtualAberta) return;
-        const option = document.createElement('option'); option.value = gaveta.id; option.innerText = `${gaveta.label} — ${gaveta.title}`; select.appendChild(option);
-    });
-    document.getElementById('modal-mover-peca').classList.remove('view-hidden');
-}
-
-function fecharModalMoverPeca() { document.getElementById('modal-mover-peca').classList.add('view-hidden'); pecaSendoMovidaId = null;}
-
-async function confirmarMoverPeca() {
-    const destinoId = parseInt(document.getElementById('mover-destino-select').value);
-    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoMovidaId);
-    database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== pecaSendoMovidaId);
-    if (!database.items[destinoId]) database.items[destinoId] = []; database.items[destinoId].push(peca);
-    registrarLog(`moveu a peça "${peca.name}" para outra gaveta`);
-    await salvarItensDaGaveta(gavetaAtualAberta); await salvarItensDaGaveta(destinoId); 
-    fecharModalMoverPeca(); renderizarPecasDaGaveta(gavetaAtualAberta);
-}
-
-function abrirModalEditarGaveta(eventoClick, idGaveta) {
-    eventoClick.stopPropagation(); gavetaSendoEditadaId = idGaveta;
-    const gaveta = database.drawers.find(d => d.id === idGaveta);
-    document.getElementById('edit-gaveta-nome').value = gaveta.title;
-    document.getElementById('modal-editar-gaveta').classList.remove('view-hidden');
-}
-
-function fecharModalEditarGaveta() { document.getElementById('modal-editar-gaveta').classList.add('view-hidden'); }
-
-function salvarNomeGaveta() {
-    const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
-    if (!novoNome) return mostrarAlerta('Erro', 'O nome da gaveta não pode ser vazio.');
-    const gaveta = database.drawers.find(d => d.id === gavetaSendoEditadaId);
-    registrarLog(`renomeou a gaveta ${gaveta.label} para "${novoNome}"`); gaveta.title = novoNome;
-    salvarConfig(); fecharModalEditarGaveta();
+    salvarItensDaGaveta(gavetaAtualAberta);
+    fecharModalConferencia();
 }
 
 function mostrarAlerta(titulo, mensagem) {
-    document.getElementById('alerta-titulo').innerText = titulo;
+    document.getElementById('alerta-titulo').innerText   = titulo;
     document.getElementById('alerta-mensagem').innerText = mensagem;
     document.getElementById('modal-alerta').classList.remove('view-hidden');
 }
+
 function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
 
 // =========================================================================
-// GERADOR DE PEDIDO DE COMPRA (RESTAURADO)
+// GERADOR DE PEDIDO DE COMPRA
 // =========================================================================
 function gerarEmailPedido() {
     const containerItens = document.getElementById('formulario-pedido-itens');
@@ -1084,7 +1293,11 @@ function gerarEmailPedido() {
 
     itensFaltando.forEach((item, index) => {
         const div = document.createElement('div');
-        div.style.border = '1px solid var(--border-color)'; div.style.padding = '15px'; div.style.marginBottom = '15px'; div.style.borderRadius = '8px'; div.style.backgroundColor = '#1e293b';
+        div.style.border          = '1px solid var(--border-color)';
+        div.style.padding         = '15px';
+        div.style.marginBottom    = '15px';
+        div.style.borderRadius    = '8px';
+        div.style.backgroundColor = '#f8fafc';
 
         div.innerHTML = `
             <p style="font-weight: bold; margin-bottom: 12px; color: var(--cabinet-blue); font-size: 1.05rem;">
@@ -1092,20 +1305,33 @@ function gerarEmailPedido() {
                 <span style="font-weight: normal; color: var(--text-secondary);">(Item: ${item.codigo || 'S/N'})</span>
             </p>
             <div class="form-group row" style="margin-bottom: 10px;">
-                <div class="col"><label>Ordem de Serviço (OS):</label><input type="text" id="os-${index}" placeholder="Ex: 12345678"></div>
-                <div class="col"><label>Almoxarifado:</label>
+                <div class="col">
+                    <label>Ordem de Serviço (OS):</label>
+                    <input type="text" id="os-${index}" placeholder="Ex: 12345678">
+                </div>
+                <div class="col">
+                    <label>Almoxarifado:</label>
                     <select id="almo-${index}" onchange="window.toggleCompradoFora(${index})">
-                        <option value="Automação">Automação</option><option value="Estoque">Estoque</option><option value="Comprado Fora">Comprado Fora</option>
+                        <option value="Automação">Automação</option>
+                        <option value="Estoque">Estoque</option>
+                        <option value="Comprado Fora">Comprado Fora</option>
                     </select>
                 </div>
             </div>
-            <div id="extra-${index}" class="view-hidden" style="border-top: 1px dashed #475569; padding-top: 10px; margin-top: 10px;">
+            <div id="extra-${index}" class="view-hidden" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;">
                 <div class="form-group row">
-                    <div class="col"><label>Fornecedor:</label><input type="text" id="forn-${index}" placeholder="Nome do fornecedor"></div>
-                    <div class="col"><label>Unid. Medida:</label><input type="text" id="unid-${index}" placeholder="Ex: PC, RL, CX"></div>
+                    <div class="col">
+                        <label>Fornecedor:</label>
+                        <input type="text" id="forn-${index}" placeholder="Nome do fornecedor">
+                    </div>
+                    <div class="col">
+                        <label>Unid. Medida:</label>
+                        <input type="text" id="unid-${index}" placeholder="Ex: PC, RL, CX">
+                    </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label>Justificativa:</label><input type="text" id="just-${index}" placeholder="Motivo da compra">
+                    <label>Justificativa:</label>
+                    <input type="text" id="just-${index}" placeholder="Motivo da compra">
                 </div>
             </div>
         `;
@@ -1117,14 +1343,18 @@ function gerarEmailPedido() {
     document.getElementById('btn-gerar-texto-pedido').classList.remove('view-hidden');
     document.getElementById('btn-copiar-pedido').classList.add('view-hidden');
     document.getElementById('pedido-subtitle').innerText = "Preencha os detalhes de cada item para gerar a solicitação.";
+
     window.itensFaltandoTemp = itensFaltando;
     document.getElementById('modal-pedido').classList.remove('view-hidden');
 }
 
 function toggleCompradoFora(index) {
-    const select = document.getElementById(`almo-${index}`).value;
+    const select   = document.getElementById(`almo-${index}`).value;
     const extraDiv = document.getElementById(`extra-${index}`);
-    if (select === 'Comprado Fora') extraDiv.classList.remove('view-hidden'); else extraDiv.classList.add('view-hidden');
+    if (select === 'Comprado Fora') extraDiv.classList.remove('view-hidden');
+    else extraDiv.classList.add('view-hidden');
+
+
 }
 
 function processarFormularioPedido() {
@@ -1132,15 +1362,21 @@ function processarFormularioPedido() {
     let textoFinal = `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes para o nosso gaveteiro elétrico:\n\n`;
 
     window.itensFaltandoTemp.forEach((item, index) => {
-        const os = document.getElementById(`os-${index}`).value || 'Não informada'; const almo = document.getElementById(`almo-${index}`).value;
+        const os   = document.getElementById(`os-${index}`).value    || 'Não informada';
+        const almo = document.getElementById(`almo-${index}`).value;
+
         textoFinal += `- ${item.falta} un. | ${item.nome} (Item: ${item.codigo || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
+
         if (almo === 'Comprado Fora') {
-            const forn = document.getElementById(`forn-${index}`).value || 'Não informado'; const unid = document.getElementById(`unid-${index}`).value || 'Não informada'; const just = document.getElementById(`just-${index}`).value || 'Não informada';
+            const forn = document.getElementById(`forn-${index}`).value || 'Não informado';
+            const unid = document.getElementById(`unid-${index}`).value || 'Não informada';
+            const just = document.getElementById(`just-${index}`).value || 'Não informada';
             textoFinal += `  > Detalhes Compra Externa - Fornecedor: ${forn} | UM: ${unid} | Justificativa: ${just}\n`;
         }
     });
 
     textoFinal += `\nFico no aguardo.\nObrigado,\n${nomeSolicitante}`;
+
     document.getElementById('texto-pedido-gerado').value = textoFinal;
     document.getElementById('formulario-pedido-itens').classList.add('view-hidden');
     document.getElementById('texto-pedido-gerado').classList.remove('view-hidden');
@@ -1152,19 +1388,28 @@ function processarFormularioPedido() {
 function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
 
 function copiarTextoPedido(event) {
-    const ta = document.getElementById('texto-pedido-gerado');
+    const ta  = document.getElementById('texto-pedido-gerado');
     const btn = (event && event.currentTarget) ? event.currentTarget : document.getElementById('btn-copiar-pedido');
+
     const finalizar = () => {
-        const orig = btn.innerHTML; btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`; btn.style.backgroundColor = 'var(--status-verde)';
+        const orig = btn.innerHTML;
+        btn.innerHTML             = `<i class="fa-solid fa-check"></i> Copiado!`;
+        btn.style.backgroundColor = 'var(--status-verde)';
         registrarLog('copiou a lista de pedido de peças para envio.');
         setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = 'var(--drawer-blue)'; }, 2000);
     };
-    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(ta.value).then(finalizar).catch(() => { ta.select(); document.execCommand('copy'); finalizar(); }); } 
-    else { ta.select(); document.execCommand('copy'); finalizar(); }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).then(finalizar).catch(() => {
+            ta.select(); document.execCommand('copy'); finalizar();
+        });
+    } else {
+        ta.select(); document.execCommand('copy'); finalizar();
+    }
 }
 
 // =========================================================================
-// EXPOSIÇÃO GLOBAL DE FUNÇÕES NO WINDOW
+// EXPOSIÇÃO GLOBAL DE FUNÇÕES (NECESSÁRIO POR SER type="module")
 // =========================================================================
 window.toggleMenuMobile          = toggleMenuMobile;
 window.autorizarDispositivo      = autorizarDispositivo;
