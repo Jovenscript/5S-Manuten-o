@@ -6,7 +6,13 @@ import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstat
 
 const firebaseConfig = {
     apiKey: "AIzaSyBRddH3U2K6DAW8gAQZC1gZu7XUVSWgebE",
-@@ -16,722 +13,216 @@ const firebaseConfig = {
+    authDomain: "fir-manut.firebaseapp.com",
+    projectId: "fir-manut",
+    storageBucket: "fir-manut.firebasestorage.app",
+    messagingSenderId: "509518361914",
+    appId: "1:509518361914:web:456e0eb1f3d97cdf8ccc03"
+};
+
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
@@ -335,14 +341,12 @@ async function iniciarSincronizacaoFirebase() {
         if (snap.exists()) historicoLogs = snap.data().logs || [];
         atualizarSeLogado();
     });
-
 }
 
 function registrarListenersGavetas() {
     database.drawers.forEach(gaveta => {
         onSnapshot(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), (snap) => {
             database.items[gaveta.id] = snap.exists() ? (snap.data().items || []) : [];
-
             database.items[gaveta.id].forEach(p => {
                 if (p.requested   === undefined) p.requested   = false;
                 if (p.lastTakenBy === undefined) p.lastTakenBy = null;
@@ -384,7 +388,6 @@ function configurarEventosEnter() {
         });
     });
 }
-
 
 function autorizarDispositivo() {
     const key = document.getElementById('input-device-key').value;
@@ -721,7 +724,6 @@ function renderArmarioVertical() {
                 div.classList.remove('dragging');
                 draggedDrawerIndex = null;
             };
-
         }
 
         chassi.appendChild(div);
@@ -733,7 +735,10 @@ function renderArmarioVertical() {
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
-@@ -742,609 +233,336 @@ function abrirGaveta(idGaveta) {
+    const gaveta = database.drawers.find(d => d.id === idGaveta);
+    document.getElementById('titulo-gaveta-aberta').innerText = `${gaveta.label}: ${gaveta.title}`;
+    renderizarPecasDaGaveta(idGaveta);
+    mostrarTela('view-compartimentos');
 }
 
 function renderizarPecasDaGaveta(idGaveta) {
@@ -741,7 +746,6 @@ function renderizarPecasDaGaveta(idGaveta) {
     if (!mainContainer) return;
     mainContainer.innerHTML = '';
     const pecasBrutas = database.items[idGaveta] || [];
-
 
     if (pecasBrutas.length === 0) {
         mainContainer.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.1rem; padding:40px;">Nenhuma peça cadastrada nesta gaveta.</p>';
@@ -754,31 +758,6 @@ function renderizarPecasDaGaveta(idGaveta) {
         if (!grupos[divi]) grupos[divi] = [];
         grupos[divi].push(peca);
     });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     const nomesDivisorias = Object.keys(grupos).sort();
 
@@ -955,73 +934,6 @@ function renderizarPecasDaGaveta(idGaveta) {
     });
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function ajusteRapidoEstoque(idPeca, delta) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
@@ -1053,7 +965,6 @@ function excluirPeca(idPeca) {
         database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== idPeca);
         registrarLog(`excluiu a peça "${peca.name}" do sistema`);
         salvarItensDaGaveta(gavetaAtualAberta);
-
     }
 }
 
@@ -1157,15 +1068,7 @@ async function salvarNovoItem() {
         code:        codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
         name:        nome, expected: esperado, current: atual, position: posicao,
         divisoria:   divisoria, size: tamanho, requested: false, lastTakenBy: null, image: null
-
-
-
-
-
-
-
     };
-
 
     if (imgInput.files && imgInput.files[0]) {
         try { novaPeca.image = await uploadImagemCloudinary(imgInput.files[0]); } 
@@ -1224,7 +1127,6 @@ async function salvarEdicaoPeca() {
 
     if (peca.current >= peca.expected) peca.requested = false;
 
-
     if (imgInput.files && imgInput.files[0]) {
         try { peca.image = await uploadImagemCloudinary(imgInput.files[0]); } 
         catch (err) { mostrarAlerta('Aviso', 'Não foi possível enviar a nova foto. A imagem anterior foi mantida.'); }
@@ -1236,9 +1138,6 @@ async function salvarEdicaoPeca() {
 
     if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Alterações'; }
 }
-
-
-
 
 function abrirModalConferencia(idPeca) {
     pecaSendoConferidaId = idPeca;
@@ -1353,8 +1252,6 @@ function toggleCompradoFora(index) {
     const extraDiv = document.getElementById(`extra-${index}`);
     if (select === 'Comprado Fora') extraDiv.classList.remove('view-hidden');
     else extraDiv.classList.add('view-hidden');
-
-
 }
 
 function processarFormularioPedido() {
