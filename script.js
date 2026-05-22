@@ -62,37 +62,56 @@ let pecaSendoMovidaId    = null;
 
 let usuarioAguardandoRedefinicao = null;
 
-// Drag and Drop
-let draggedDrawerIndex = null;
-let draggedPecaId      = null;
-
-// Variáveis do Carrossel de Imagens
+// Carrossel
 let carrosselInterval = null;
 let carrosselImagens  = [];
 let carrosselIndex    = 0;
 
-// =========================================================================
-// INICIALIZAÇÃO PWA E FIREBASE
-// =========================================================================
-window.onload = () => {
-    iniciarPWA();
-    iniciarSincronizacaoFirebase();
-    configurarEventosEnter();
+// Reorganização de gavetas (drag-and-drop)
+let modoReorganizar = false;
+let drag = null;
 
-    const deviceAuthorized = localStorage.getItem('5s_device_authorized');
-    if (deviceAuthorized === 'true') {
-        document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
-        document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
-    }
-};
+// Confirmação customizada
+let confirmCallback = null;
 
-function iniciarPWA() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('PWA Service Worker registrado com sucesso.', reg.scope))
-            .catch(err => console.error('Erro ao registrar Service Worker PWA:', err));
-    }
+// PWA install
+let deferredInstallPrompt = null;
+
+// =========================================================================
+// PWA — REGISTRO DO SERVICE WORKER  (ESTAVA FALTANDO — POR ISSO NÃO INSTALAVA)
+// =========================================================================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then(() => console.log('Service Worker registrado.'))
+            .catch(err => console.warn('Falha ao registrar Service Worker:', err));
+    });
 }
+
+// PWA — captura o evento de instalação e mostra o botão "Instalar App"
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btn = document.getElementById('btn-instalar-pwa');
+    if (btn) btn.classList.remove('view-hidden');
+});
+
+function instalarPWA() {
+    if (!deferredInstallPrompt) {
+        return mostrarAlerta('Instalação', 'Se o botão não funcionar, use o menu do navegador → "Adicionar à tela inicial". No iPhone (Safari): botão Compartilhar → "Adicionar à Tela de Início".');
+    }
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.finally(() => {
+        deferredInstallPrompt = null;
+        const btn = document.getElementById('btn-instalar-pwa');
+        if (btn) btn.classList.add('view-hidden');
+    });
+}
+
+window.addEventListener('appinstalled', () => {
+    const btn = document.getElementById('btn-instalar-pwa');
+    if (btn) btn.classList.add('view-hidden');
+});
 
 // =========================================================================
 // VALIDADOR DE SENHA FORTE
@@ -107,28 +126,21 @@ function validarSenhaForte(senha) {
 // =========================================================================
 function getGavetaStatus(pecas) {
     if (!pecas || pecas.length === 0) return 'verde';
-    const temZerado  = pecas.some(p => p.current === 0);
-    const temCritico = pecas.some(p => p.current > 0 && p.current < p.expected * 0.25);
-    const temBaixo   = pecas.some(p => p.current > 0 && p.current < p.expected * 0.5);
-    const temAlerta  = pecas.some(p => p.current < p.expected);
-    if (temZerado)  return 'vermelho';
-    if (temCritico) return 'laranja';
-    if (temBaixo)   return 'amarelo';
-    if (temAlerta)  return 'amarelo';
+    if (pecas.some(p => p.current === 0))                          return 'vermelho';
+    if (pecas.some(p => p.current > 0 && p.current < p.expected * 0.25)) return 'laranja';
+    if (pecas.some(p => p.current < p.expected))                   return 'amarelo';
     return 'verde';
 }
 
 function getPecaStatus(peca) {
-    if (peca.current === 0) return 'vermelho';
+    if (peca.current === 0)                  return 'vermelho';
     if (peca.current < peca.expected * 0.25) return 'laranja';
-    if (peca.current < peca.expected * 0.5) return 'amarelo';
-    if (peca.current < peca.expected) return 'amarelo';
+    if (peca.current < peca.expected)        return 'amarelo';
     return 'verde';
 }
 
 function getStatusText(status) {
-    const map = { verde: 'OK', amarelo: 'Atenção', laranja: 'Crítico', vermelho: 'Zerado' };
-    return map[status] || 'OK';
+    return { verde: 'OK', amarelo: 'Atenção', laranja: 'Crítico', vermelho: 'Zerado' }[status] || 'OK';
 }
 
 // =========================================================================
@@ -179,8 +191,9 @@ function solicitarPermissaoNotificacao() {
 function enviarNotificacao(titulo, corpo) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
-        try { new Notification(titulo, { body: corpo, icon: 'icon-192x192.png' }); } 
-        catch (e) {}
+        try {
+            new Notification(titulo, { body: corpo, icon: 'icon-192x192.png' });
+        } catch (e) { /* silencioso */ }
     }
 }
 
@@ -188,10 +201,8 @@ function enviarNotificacao(titulo, corpo) {
 // MENU MOBILE
 // =========================================================================
 function toggleMenuMobile() {
-    const sidebar = document.getElementById('sidebar-menu');
-    const overlay = document.getElementById('mobile-overlay');
-    sidebar.classList.toggle('open');
-    overlay.classList.toggle('open');
+    document.getElementById('sidebar-menu').classList.toggle('open');
+    document.getElementById('mobile-overlay').classList.toggle('open');
 }
 
 // =========================================================================
@@ -212,7 +223,7 @@ async function uploadImagemCloudinary(file) {
 }
 
 // =========================================================================
-// FIRESTORE
+// FIRESTORE — DOCUMENTOS SEPARADOS
 // =========================================================================
 async function salvarConfig() {
     try {
@@ -250,14 +261,14 @@ async function salvarItensDaGaveta(idGaveta) {
 // =========================================================================
 function fazerBackup() {
     const payload = {
-        versao: 'v3', geradoEm: new Date().toISOString(),
-        database, usuarios: usuariosSalvos, historico: historicoLogs
+        versao: 'v4',
+        geradoEm: new Date().toISOString(),
+        database,
+        usuarios: usuariosSalvos,
+        historico: historicoLogs
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url; a.download = `backup_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.json`;
-    a.click(); URL.revokeObjectURL(url);
+    baixarArquivo(blob, `backup_5s_${dataArquivo()}.json`);
     registrarLog('gerou um arquivo de backup do sistema.');
 }
 
@@ -268,17 +279,17 @@ function restaurarBackup(event) {
     reader.onload = async (e) => {
         try {
             const dados = JSON.parse(e.target.result);
-            if (!dados.database || !dados.usuarios) return mostrarAlerta('Arquivo Inválido', 'O arquivo selecionado não é um backup válido.');
-
+            if (!dados.database || !dados.usuarios) {
+                return mostrarAlerta('Arquivo Inválido', 'O arquivo selecionado não é um backup válido do sistema.');
+            }
             database       = dados.database;
             usuariosSalvos = dados.usuarios;
             historicoLogs  = dados.historico || [];
 
             await salvarConfig();
             await salvarHistorico();
-            for (const gaveta of database.drawers) {
-                await salvarItensDaGaveta(gaveta.id);
-            }
+            for (const gaveta of GAVETAS_PADRAO) await salvarItensDaGaveta(gaveta.id);
+
             registrarLog('restaurou o sistema a partir de um arquivo de backup.');
             mostrarAlerta('Sucesso', 'Backup restaurado com sucesso! O sistema foi atualizado.');
             atualizarDashboard();
@@ -298,41 +309,55 @@ function exportarEstoqueCSV() {
             csv += `"${gaveta.title}";"${gaveta.label}";"${p.divisoria || 'Geral'}";"${p.code || ''}";"${p.name}";${p.expected};${p.current};"${status}";"${p.requested ? 'Sim' : 'Não'}"\n`;
         });
     });
-    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url; a.download = `estoque_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
-    a.click(); URL.revokeObjectURL(url);
+    baixarArquivo(new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }), `estoque_5s_${dataArquivo()}.csv`);
     registrarLog('exportou o relatório de estoque em CSV.');
 }
 
 function exportarHistoricoCSV() {
     let csv = 'Data;Hora;Usuário;Ação\n';
-    historicoLogs.forEach(log => {
-        csv += `"${log.data}";"${log.hora}";"${log.nome}";"${log.acao}"\n`;
-    });
-    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url; a.download = `historico_5s_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
-    a.click(); URL.revokeObjectURL(url);
+    historicoLogs.forEach(log => { csv += `"${log.data}";"${log.hora}";"${log.nome}";"${log.acao}"\n`; });
+    baixarArquivo(new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }), `historico_5s_${dataArquivo()}.csv`);
     registrarLog('exportou o histórico de atividades em CSV.');
 }
 
+function baixarArquivo(blob, nome) {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href = url; a.download = nome; a.click();
+    URL.revokeObjectURL(url);
+}
+function dataArquivo() { return new Date().toLocaleDateString('pt-BR').replace(/\//g, '-'); }
+
 // =========================================================================
-// SINCRONIZAÇÃO FIREBASE
+// INICIALIZAÇÃO, MIGRAÇÃO E SINCRONIZAÇÃO FIREBASE
 // =========================================================================
+window.addEventListener('load', () => {
+    iniciarSincronizacaoFirebase();
+    configurarEventosEnter();
+
+    if (localStorage.getItem('5s_device_authorized') === 'true') {
+        document.getElementById('view-device-auth').classList.replace('view-active', 'view-hidden');
+        document.getElementById('view-login').classList.replace('view-hidden', 'view-active');
+    }
+});
+
 async function iniciarSincronizacaoFirebase() {
+    setupListeners();
+    migrarDadosLegados();
+}
+
+function setupListeners() {
     onSnapshot(doc(db, "manutencao_5s", "config"), (snap) => {
         if (snap.exists()) {
             const d = snap.data();
-            database.drawers = d.drawers  || [...GAVETAS_PADRAO];
-            usuariosSalvos   = d.usuarios || [];
+            // Não sobrescreve a ordem enquanto o admin está arrastando gavetas
+            if (!modoReorganizar) {
+                database.drawers = d.drawers || [...GAVETAS_PADRAO];
+            }
+            usuariosSalvos = d.usuarios || [];
             database.drawers.forEach(g => { if (!database.items[g.id]) database.items[g.id] = []; });
-            registrarListenersGavetas();
         } else {
             salvarConfig();
-            registrarListenersGavetas();
         }
         atualizarSeLogado();
     });
@@ -341,10 +366,8 @@ async function iniciarSincronizacaoFirebase() {
         if (snap.exists()) historicoLogs = snap.data().logs || [];
         atualizarSeLogado();
     });
-}
 
-function registrarListenersGavetas() {
-    database.drawers.forEach(gaveta => {
+    GAVETAS_PADRAO.forEach(gaveta => {
         onSnapshot(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), (snap) => {
             database.items[gaveta.id] = snap.exists() ? (snap.data().items || []) : [];
             database.items[gaveta.id].forEach(p => {
@@ -361,8 +384,34 @@ function registrarListenersGavetas() {
 
 function atualizarSeLogado() {
     const container = document.getElementById('app-container');
-    if (container && container.classList.contains('view-active')) {
-        atualizarDashboard();
+    if (container && container.classList.contains('view-active')) atualizarDashboard();
+}
+
+async function migrarDadosLegados() {
+    if (localStorage.getItem('5s_migrado_v3')) return;
+    try {
+        const legadoSnap = await getDoc(doc(db, "manutencao_5s", "dados_sistema"));
+        const configSnap = await getDoc(doc(db, "manutencao_5s", "config"));
+        if (!legadoSnap.exists() || configSnap.exists()) {
+            localStorage.setItem('5s_migrado_v3', 'true');
+            return;
+        }
+        const legado    = legadoSnap.data();
+        const db_legado = legado.database || {};
+        await setDoc(doc(db, "manutencao_5s", "config"), {
+            drawers:  db_legado.drawers || [...GAVETAS_PADRAO],
+            usuarios: legado.usuarios   || []
+        });
+        await setDoc(doc(db, "manutencao_5s", "historico"), { logs: legado.historico || [] });
+        for (const gaveta of GAVETAS_PADRAO) {
+            const itens = ((db_legado.items || {})[gaveta.id] || []).map(p => ({
+                ...p, image: null, position: 999, divisoria: 'Geral', size: 1
+            }));
+            await setDoc(doc(db, "manutencao_5s", `itens_g${gaveta.id}`), { items: itens });
+        }
+        localStorage.setItem('5s_migrado_v3', 'true');
+    } catch (e) {
+        console.warn("Aviso na migração:", e);
     }
 }
 
@@ -371,15 +420,15 @@ function atualizarSeLogado() {
 // =========================================================================
 function configurarEventosEnter() {
     const map = [
-        { inputId: 'input-device-key',    btnAcao: autorizarDispositivo   },
+        { inputId: 'input-device-key',    btnAcao: autorizarDispositivo  },
         { inputId: 'input-login-id',      btnAcao: realizarLogin          },
         { inputId: 'input-login-senha',   btnAcao: realizarLogin          },
-        { inputId: 'reg-senha',           btnAcao: registrarUsuario        },
-        { inputId: 'conf-qtd-atual',      btnAcao: salvarConferencia       },
-        { inputId: 'edit-gaveta-nome',    btnAcao: salvarNomeGaveta        },
-        { inputId: 'novo-atual',          btnAcao: salvarNovoItem          },
-        { inputId: 'edit-peca-atual',     btnAcao: salvarEdicaoPeca        },
-        { inputId: 'nova-senha-confirma', btnAcao: salvarSenhaObrigatoria  }
+        { inputId: 'reg-senha',           btnAcao: registrarUsuario       },
+        { inputId: 'conf-qtd-atual',      btnAcao: salvarConferencia      },
+        { inputId: 'edit-gaveta-nome',    btnAcao: salvarNomeGaveta       },
+        { inputId: 'novo-atual',          btnAcao: salvarNovoItem         },
+        { inputId: 'edit-peca-atual',     btnAcao: salvarEdicaoPeca       },
+        { inputId: 'nova-senha-confirma', btnAcao: salvarSenhaObrigatoria }
     ];
     map.forEach(item => {
         const el = document.getElementById(item.inputId);
@@ -419,7 +468,6 @@ function registrarUsuario() {
 
     if (!nome || !cracha || !senha) return mostrarAlerta('Erro', 'Preencha todos os campos!');
     if (usuariosSalvos.find(u => u.cracha === cracha)) return mostrarAlerta('Erro', 'Crachá já cadastrado!');
-
     if (!validarSenhaForte(senha)) return mostrarAlerta('Senha Fraca', 'A senha deve ter no mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo.');
 
     const novoUser = { nome, cracha, senha, role: 'USER' };
@@ -452,15 +500,16 @@ function realizarLogin() {
 async function salvarSenhaObrigatoria() {
     const novaSenha = document.getElementById('nova-senha-obrigatoria').value.trim();
     const confirma  = document.getElementById('nova-senha-confirma').value.trim();
-
     if (novaSenha !== confirma) return mostrarAlerta('Erro', 'As senhas não coincidem.');
     if (!validarSenhaForte(novaSenha)) return mostrarAlerta('Senha Fraca', 'A nova senha não atende aos requisitos.');
 
     usuarioAguardandoRedefinicao.senha = novaSenha;
     await salvarConfig();
+
     document.getElementById('nova-senha-obrigatoria').value = '';
     document.getElementById('nova-senha-confirma').value    = '';
     document.getElementById('modal-redefinir-senha').classList.add('view-hidden');
+
     registrarLog('atualizou a própria senha para o novo padrão corporativo.');
     aplicarLogin(usuarioAguardandoRedefinicao);
     usuarioAguardandoRedefinicao = null;
@@ -500,6 +549,9 @@ function aplicarLogin(user) {
 // NAVEGAÇÃO
 // =========================================================================
 function mostrarTela(id) {
+    // Sair do modo reorganizar ao trocar de tela (salva a ordem)
+    if (modoReorganizar && id !== 'view-gavetas') finalizarReorganizacao();
+
     ['view-dashboard', 'view-gavetas', 'view-compartimentos', 'view-historico', 'view-config'].forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.replace('view-active', 'view-hidden');
@@ -508,10 +560,11 @@ function mostrarTela(id) {
     const alvo = document.getElementById(id);
     if (alvo) alvo.classList.replace('view-hidden', 'view-active');
 
-    document.querySelectorAll('.nav-item').forEach(l => l.classList.remove('active'));
-    if (typeof event !== 'undefined' && event && event.currentTarget && event.currentTarget.classList) {
-        event.currentTarget.classList.add('active');
-    }
+    // Destaca o item de menu correto (sem depender de "event" global)
+    const navAtivo = (id === 'view-compartimentos') ? 'view-gavetas' : id;
+    document.querySelectorAll('.nav-item').forEach(l => {
+        l.classList.toggle('active', l.dataset.view === navAtivo);
+    });
 
     document.getElementById('sidebar-menu').classList.remove('open');
     document.getElementById('mobile-overlay').classList.remove('open');
@@ -534,7 +587,7 @@ function voltarParaGavetas() { mostrarTela('view-gavetas'); }
 function sairDoSistema()     { location.reload(); }
 
 // =========================================================================
-// DASHBOARD, BUSCA E CARROSSEL
+// CARROSSEL DASHBOARD
 // =========================================================================
 function atualizarImagensCarrossel() {
     carrosselImagens = [];
@@ -543,7 +596,6 @@ function atualizarImagensCarrossel() {
             if (peca.image && peca.image.trim() !== '') carrosselImagens.push(peca.image);
         });
     });
-
     if (carrosselImagens.length === 0) {
         carrosselImagens = [
             'https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop',
@@ -558,23 +610,23 @@ function iniciarCarrosselDashboard() {
     atualizarImagensCarrossel();
     const wrapper = document.querySelector('.dashboard-wrapper');
     if (!wrapper) return;
-
     if (carrosselIndex >= carrosselImagens.length) carrosselIndex = 0;
     wrapper.style.backgroundImage = `url('${carrosselImagens[carrosselIndex]}')`;
-
     carrosselInterval = setInterval(() => {
-        carrosselIndex++;
-        if (carrosselIndex >= carrosselImagens.length) carrosselIndex = 0;
+        carrosselIndex = (carrosselIndex + 1) % carrosselImagens.length;
         wrapper.style.backgroundImage = `url('${carrosselImagens[carrosselIndex]}')`;
-    }, 4500); 
+    }, 4500);
 }
 
 function pararCarrosselDashboard() {
     if (carrosselInterval) { clearInterval(carrosselInterval); carrosselInterval = null; }
 }
 
+// =========================================================================
+// BUSCA GLOBAL
+// =========================================================================
 function buscarPecasGlobal() {
-    const termo = document.getElementById('input-busca-global').value.toLowerCase();
+    const termo         = document.getElementById('input-busca-global').value.toLowerCase();
     const resultadosDiv = document.getElementById('resultados-busca-global');
     resultadosDiv.innerHTML = '';
 
@@ -598,7 +650,7 @@ function buscarPecasGlobal() {
     achados.forEach(item => {
         const div = document.createElement('div');
         div.className = 'resultado-card';
-        div.onclick   = () => {
+        div.onclick = () => {
             document.getElementById('input-busca-global').value = '';
             resultadosDiv.classList.add('view-hidden');
             abrirGaveta(item.gaveta.id);
@@ -606,23 +658,25 @@ function buscarPecasGlobal() {
         div.innerHTML = `
             <div class="res-info">
                 <h4>${item.peca.name}</h4>
-                <p>Item: ${item.peca.code || 'S/N'} &nbsp;|&nbsp; <strong>${item.gaveta.label}</strong> (Div: ${item.peca.divisoria || 'Geral'})</p>
+                <p>Item: ${item.peca.code || 'S/N'} &nbsp;|&nbsp; <strong>${item.gaveta.label}</strong> (Div: ${item.peca.divisoria || 'Geral'} - Pos: ${item.peca.position === 999 ? 'Livre' : item.peca.position})</p>
             </div>
-            <div class="res-tag"><i class="fa-solid fa-box-open"></i> ${item.peca.current} un</div>
-        `;
+            <div class="res-tag"><i class="fa-solid fa-box-open"></i> ${item.peca.current} un</div>`;
         resultadosDiv.appendChild(div);
     });
     resultadosDiv.classList.remove('view-hidden');
 }
 
+// =========================================================================
+// DASHBOARD / KPIs / ARMÁRIO
+// =========================================================================
 function atualizarDashboard() {
-    renderArmarioVertical();
+    if (!modoReorganizar) renderArmarioVertical();
     calcularKPIs();
     verificarEstoqueZerado();
     renderizarHistorico();
-
     atualizarImagensCarrossel();
-    const dashAtivo = document.getElementById('view-dashboard') && document.getElementById('view-dashboard').classList.contains('view-active');
+
+    const dashAtivo = document.getElementById('view-dashboard')?.classList.contains('view-active');
     if (dashAtivo && !carrosselInterval && carrosselImagens.length > 0) iniciarCarrosselDashboard();
 
     if (gavetaAtualAberta !== null) renderizarPecasDaGaveta(gavetaAtualAberta);
@@ -637,7 +691,8 @@ function verificarEstoqueZerado() {
     if (!banner) return;
     if (qtdZerados > 0) {
         banner.classList.remove('view-hidden');
-        document.getElementById('texto-alerta-zerado').innerHTML = `<strong>Atenção:</strong> Existem <strong>${qtdZerados} item(ns)</strong> com estoque ZERADO no armário!`;
+        document.getElementById('texto-alerta-zerado').innerHTML =
+            `<strong>Atenção:</strong> Existem <strong>${qtdZerados} item(ns)</strong> com estoque ZERADO no armário!`;
     } else {
         banner.classList.add('view-hidden');
     }
@@ -660,78 +715,135 @@ function calcularKPIs() {
     if (kpiEl) kpiEl.innerText = alerts;
 }
 
-// =========================================================================
-// ARMÁRIO VERTICAL COM DRAG AND DROP
-// =========================================================================
 function renderArmarioVertical() {
     const chassi = document.getElementById('menu-gavetas');
     if (!chassi) return;
     chassi.innerHTML = '';
-    database.drawers.forEach((gaveta, index) => {
+    chassi.classList.toggle('modo-reorganizar', modoReorganizar);
+
+    database.drawers.forEach((gaveta, idx) => {
         const status = getGavetaStatus(database.items[gaveta.id] || []);
         const div = document.createElement('div');
         div.className = 'btn-gaveta';
+        div.dataset.id = gaveta.id;
 
-        div.innerHTML = `
-            <div class="gaveta-content">
-                <i class="fa-solid fa-grip-vertical drag-handle admin-only" title="Arraste para reordenar a gaveta" style="cursor: grab; font-size: 1.2rem; color: rgba(255,255,255,0.5);"></i>
-                <span class="gnumber">${gaveta.label}</span>
-                <span class="glabel">${gaveta.title}</span>
-                <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
-                    <i class="fa-solid fa-pen"></i>
-                </button>
-                <div class="gstatus-light ${status}"></div>
-            </div>`;
-
-        div.onclick = (e) => {
-            if (e.target.closest('.btn-edit-gaveta') || e.target.closest('.drag-handle')) return;
-            abrirGaveta(gaveta.id);
-        };
-
-        if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
-            div.draggable = true;
-
-            div.ondragstart = (e) => {
-                draggedDrawerIndex = index;
-                e.dataTransfer.effectAllowed = 'move';
-                setTimeout(() => div.classList.add('dragging'), 0);
-            };
-
-            div.ondragover = (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                div.classList.add('drag-over');
-            };
-
-            div.ondragleave = () => { div.classList.remove('drag-over'); };
-
-            div.ondrop = async (e) => {
-                e.preventDefault();
-                div.classList.remove('drag-over');
-                if (draggedDrawerIndex === null || draggedDrawerIndex === index) return;
-
-                const gavetaArrastada = database.drawers[draggedDrawerIndex];
-                database.drawers.splice(draggedDrawerIndex, 1);
-                database.drawers.splice(index, 0, gavetaArrastada);
-
-                registrarLog(`reordenou a ${gavetaArrastada.label} para a nova posição no armário.`);
-
-                await salvarConfig();
-                renderArmarioVertical(); 
-            };
-
-            div.ondragend = () => {
-                div.classList.remove('dragging');
-                draggedDrawerIndex = null;
-            };
+        if (modoReorganizar) {
+            div.classList.add('reordenando');
+            div.innerHTML = `
+                <div class="gaveta-content">
+                    <span class="reorder-handle"><i class="fa-solid fa-grip-lines"></i></span>
+                    <span class="gnumber">${gaveta.label}</span>
+                    <span class="glabel">${gaveta.title}</span>
+                    <div class="reorder-arrows">
+                        <button class="btn-arrow" ${idx === 0 ? 'disabled' : ''} onclick="window.moverGaveta(${gaveta.id}, -1)" title="Subir"><i class="fa-solid fa-chevron-up"></i></button>
+                        <button class="btn-arrow" ${idx === database.drawers.length - 1 ? 'disabled' : ''} onclick="window.moverGaveta(${gaveta.id}, 1)" title="Descer"><i class="fa-solid fa-chevron-down"></i></button>
+                    </div>
+                    <div class="gstatus-light ${status}"></div>
+                </div>`;
+            // Drag via Pointer Events (funciona em toque e mouse)
+            div.addEventListener('pointerdown', (e) => gavetaPointerDown(e, gaveta.id));
+        } else {
+            div.onclick = () => abrirGaveta(gaveta.id);
+            div.innerHTML = `
+                <div class="gaveta-content">
+                    <span class="gnumber">${gaveta.label}</span>
+                    <span class="glabel">${gaveta.title}</span>
+                    <button class="btn-edit-gaveta admin-only" onclick="window.abrirModalEditarGaveta(event, ${gaveta.id})" title="Renomear Gaveta">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <div class="gstatus-light ${status}"></div>
+                </div>`;
         }
-
         chassi.appendChild(div);
     });
 }
 
 // =========================================================================
-// INTERIOR DA GAVETA E DRAG AND DROP DAS PEÇAS
+// REORGANIZAR GAVETAS (DRAG-AND-DROP + SETAS)
+// =========================================================================
+function alternarModoReorganizar() {
+    if (modoReorganizar) { finalizarReorganizacao(); return; }
+    modoReorganizar = true;
+    const btn  = document.getElementById('btn-toggle-reorganizar');
+    btn.classList.add('ativo');
+    btn.querySelector('span').innerText = 'Concluir';
+    btn.querySelector('i').className = 'fa-solid fa-check';
+    document.getElementById('dica-reorganizar').classList.remove('view-hidden');
+    renderArmarioVertical();
+}
+
+function finalizarReorganizacao() {
+    modoReorganizar = false;
+    const btn = document.getElementById('btn-toggle-reorganizar');
+    if (btn) {
+        btn.classList.remove('ativo');
+        btn.querySelector('span').innerText = 'Reorganizar';
+        btn.querySelector('i').className = 'fa-solid fa-up-down-left-right';
+    }
+    document.getElementById('dica-reorganizar')?.classList.add('view-hidden');
+    salvarConfig();
+    registrarLog('reorganizou a ordem das gavetas no armário.');
+    renderArmarioVertical();
+}
+
+function moverGaveta(idGaveta, direcao) {
+    const idx = database.drawers.findIndex(d => d.id === idGaveta);
+    const novo = idx + direcao;
+    if (novo < 0 || novo >= database.drawers.length) return;
+    const arr = database.drawers;
+    [arr[idx], arr[novo]] = [arr[novo], arr[idx]];
+    renderArmarioVertical();
+}
+
+function gavetaPointerDown(e, id) {
+    if (!modoReorganizar) return;
+    // ignora cliques nos botões de seta
+    if (e.target.closest('.btn-arrow')) return;
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    drag = { id, el, startY: e.clientY, moved: false, pointerId: e.pointerId };
+    el.classList.add('arrastando');
+    el.addEventListener('pointermove', gavetaPointerMove);
+    el.addEventListener('pointerup', gavetaPointerUp);
+    el.addEventListener('pointercancel', gavetaPointerUp);
+}
+
+function gavetaPointerMove(e) {
+    if (!drag) return;
+    e.preventDefault();
+    drag.moved = true;
+    const dy = e.clientY - drag.startY;
+    drag.el.style.transform = `translateY(${dy}px) scale(1.02)`;
+}
+
+function gavetaPointerUp(e) {
+    if (!drag) return;
+    const el = drag.el;
+    el.style.transform = '';
+    el.classList.remove('arrastando');
+    el.removeEventListener('pointermove', gavetaPointerMove);
+    el.removeEventListener('pointerup', gavetaPointerUp);
+    el.removeEventListener('pointercancel', gavetaPointerUp);
+
+    if (drag.moved) {
+        const chassi  = document.getElementById('menu-gavetas');
+        const outros  = [...chassi.children].filter(c => c !== el);
+        const y = e.clientY;
+        let posInsercao = outros.length;
+        for (let i = 0; i < outros.length; i++) {
+            const r = outros[i].getBoundingClientRect();
+            if (y < r.top + r.height / 2) { posInsercao = i; break; }
+        }
+        const idsOrdenados = outros.map(c => parseInt(c.dataset.id));
+        idsOrdenados.splice(posInsercao, 0, drag.id);
+        database.drawers.sort((a, b) => idsOrdenados.indexOf(a.id) - idsOrdenados.indexOf(b.id));
+        renderArmarioVertical();
+    }
+    drag = null;
+}
+
+// =========================================================================
+// DENTRO DA GAVETA (DIVISÓRIAS E GRID)
 // =========================================================================
 function abrirGaveta(idGaveta) {
     gavetaAtualAberta = idGaveta;
@@ -755,179 +867,58 @@ function renderizarPecasDaGaveta(idGaveta) {
     const grupos = {};
     pecasBrutas.forEach(peca => {
         const divi = (peca.divisoria || 'Geral').toUpperCase();
-        if (!grupos[divi]) grupos[divi] = [];
-        grupos[divi].push(peca);
+        (grupos[divi] = grupos[divi] || []).push(peca);
     });
 
-    const nomesDivisorias = Object.keys(grupos).sort();
-
-    nomesDivisorias.forEach(nomeDivisoria => {
-        const headerDivi      = document.createElement('div');
-        headerDivi.className  = 'divisoria-header';
-        headerDivi.innerHTML  = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
+    Object.keys(grupos).sort().forEach(nomeDivisoria => {
+        const headerDivi = document.createElement('div');
+        headerDivi.className = 'divisoria-header';
+        headerDivi.innerHTML = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
         mainContainer.appendChild(headerDivi);
 
-        const gridDivi      = document.createElement('div');
-        gridDivi.className  = 'grid-pecas';
+        const gridDivi = document.createElement('div');
+        gridDivi.className = 'grid-pecas';
 
-        const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
-
-        pecasOrdenadas.forEach(peca => {
-            const statusPeca   = getPecaStatus(peca);
-            const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
-
-            const imgHtml      = peca.image 
-                ? `<img src="${peca.image}" alt="${peca.name}" style="max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply;">` 
-                : `<i class="fa-solid fa-microchip" style="font-size: 3rem; color: #94a3b8;"></i>`;
-
-            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
-
+        grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999)).forEach(peca => {
+            const statusPeca = getPecaStatus(peca);
+            const corQtd     = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
+            const imgHtml    = peca.image ? `<img src="${peca.image}" alt="${peca.name}" loading="lazy">` : `<i class="fa-solid fa-microchip"></i>`;
+            const retiradaHtml = peca.lastTakenBy
+                ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
             const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
-            const tamanhoReal     = Math.max(parseInt(peca.size) || 1, 1);
+            const displaySize     = peca.size || 1;
 
-            // Detecta espaços vazios: peças nomeadas "vazio" representam compartimentos físicos sem peça
-            const isVazio = (peca.name || '').trim().toLowerCase() === 'vazio';
-
-            // Para garantir que TODOS os cards apareçam com imagem + botões visíveis:
-            // clampamos o span mínimo em 6 linhas (~420px, suficiente pro card completo).
-            // Espaços "vazio" usam o tamanho real (podem ser pequenos, ex: span 1 ou 2).
-            const MIN_SPAN_VISIVEL = 6;
-            const spanFinal = isVazio ? tamanhoReal : Math.max(tamanhoReal, MIN_SPAN_VISIVEL);
-
-            const div      = document.createElement('div');
-            div.className  = isVazio ? 'compartimento-card slot-vazio' : 'compartimento-card';
-
-            // ALTURA FÍSICA: a peça ocupa "span N" linhas de 60px da colmeia.
-            // (Cards reais: mínimo 6 pra tudo aparecer; grandes = tamanho real maior).
-            // (Vazios: tamanho real sem clamp, pra mostrar o buraco físico exato).
-            div.style.setProperty('--span-size', spanFinal);
-            div.style.display       = 'flex';
-            div.style.flexDirection = 'column';
-            div.style.height        = '100%';
-            div.style.minHeight     = '0';
-
-            if (isVazio) {
-                // Renderizar espaço vazio: compartimento físico sem peça (dashed translúcido)
-                div.innerHTML = `
-                    <div class="slot-vazio-top">
-                        <span class="card-local">📌 Pos: ${displayPosition}</span>
-                        <span style="display:flex; gap:4px;">
-                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
-                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir"><i class="fa-solid fa-trash"></i></button>
-                        </span>
+            const div = document.createElement('div');
+            div.className = 'compartimento-card';
+            div.style.setProperty('--span-size', displaySize);
+            div.innerHTML = `
+                <div class="card-top">
+                    <div class="card-top-left">
+                        <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
+                        <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
                     </div>
-                    <div class="slot-vazio-corpo">
-                        <i class="fa-solid fa-box-open"></i>
-                        <span>Espaço vazio</span>
-                    </div>`;
-            } else {
-                // Card normal: com imagem, botões, tudo visível (span clampado em 6 mínimo)
-                const imgBoxStyle = 'flex: 1 1 auto; min-height: 0;';
-                div.innerHTML = `
-                    <div class="card-top">
-                        <div>
-                            <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
-                            <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
-                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
-                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
+                    <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
+                </div>
+                <div class="card-title">${peca.name}</div>
+                <div class="card-image-box">${imgHtml}</div>
+                <div class="card-data-row">
+                    <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
+                    <div class="data-box">
+                        <span>Física Atual</span>
+                        <div class="quick-control">
+                            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+                            <strong style="color:${corQtd}">${peca.current}</strong>
+                            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
                         </div>
-                        <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
                     </div>
-                    
-                    <div class="card-title">${peca.name}</div>
-                    
-                    <div class="card-image-box" style="${imgBoxStyle} background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 6px 0; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden;">
-                        ${imgHtml}
-                    </div>
-                    
-                    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
-                        <div class="card-data-row">
-                            <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
-                            <div class="data-box">
-                                <span>Física Atual</span>
-                                <div class="quick-control">
-                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                                    <strong style="color:${corQtd}">${peca.current}</strong>
-                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                        ${retiradaHtml}
-                        <div class="botoes-acao-card">
-                            <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
-                                <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
-                            </button>
-                            <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
-                                <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
-                            </button>
-                            <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
-                                <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
-                            </button>
-                        </div>
-                    </div>`;
-            }
-
-            // Lógica Drag and Drop de Peças (Somente ADMIN)
-            if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
-                div.draggable = true;
-
-                div.ondragstart = (e) => {
-                    if(e.target.closest('.btn-quick') || e.target.closest('button')) {
-                        e.preventDefault();
-                        return;
-                    }
-                    draggedPecaId = peca.id;
-                    e.dataTransfer.effectAllowed = 'move';
-                    setTimeout(() => div.classList.add('dragging'), 0);
-                };
-
-                div.ondragover = (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    div.classList.add('drag-over');
-                };
-
-                div.ondragleave = () => { div.classList.remove('drag-over'); };
-
-                div.ondrop = async (e) => {
-                    e.preventDefault();
-                    div.classList.remove('drag-over');
-
-                    if (!draggedPecaId || draggedPecaId === peca.id) return;
-
-                    let itensGaveta = database.items[gavetaAtualAberta];
-
-                    const pecaArrastada = itensGaveta.find(p => p.id === draggedPecaId);
-                    const pecaAlvo = peca;
-
-                    if(!pecaArrastada || !pecaAlvo) return;
-
-                    pecaArrastada.divisoria = pecaAlvo.divisoria;
-
-                    let divisoriaItems = itensGaveta.filter(p => p.divisoria === pecaAlvo.divisoria).sort((a, b) => (a.position || 999) - (b.position || 999));
-
-                    divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
-
-                    const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
-
-                    divisoriaItems.splice(novoIndexAlvo, 0, pecaArrastada);
-
-                    divisoriaItems.forEach((p, index) => {
-                        p.position = index + 1;
-                    });
-
-                    registrarLog(`reordenou a peça "${pecaArrastada.name}" na gaveta`);
-
-                    await salvarItensDaGaveta(gavetaAtualAberta);
-                    renderizarPecasDaGaveta(gavetaAtualAberta);
-                };
-
-                div.ondragend = () => {
-                    div.classList.remove('dragging');
-                    draggedPecaId = null;
-                };
-            }
-
+                </div>
+                ${retiradaHtml}
+                <div class="botoes-acao-card">
+                    <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})"><i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata</button>
+                    <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})"><i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}</button>
+                    <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})"><i class="fa-solid fa-right-left"></i> Mover para outra Gaveta</button>
+                </div>`;
             gridDivi.appendChild(div);
         });
         mainContainer.appendChild(gridDivi);
@@ -940,10 +931,10 @@ function ajusteRapidoEstoque(idPeca, delta) {
     let novaQtd = Math.max(0, peca.current + delta);
     if (delta < 0 && peca.current > 0) {
         peca.lastTakenBy = usuarioLogado.nome;
-        registrarLog(`retirou 1 unidade da peça "${peca.name}"`);
+        registrarLog(`retirou 1 unidade da peça "${peca.name}" (Item: ${peca.code})`);
         enviarNotificacao("Peça Retirada", `Você retirou 1x ${peca.name}. Restaram ${novaQtd} peça(s).`);
     } else if (delta > 0) {
-        registrarLog(`adicionou 1 unidade da peça "${peca.name}"`);
+        registrarLog(`adicionou 1 unidade da peça "${peca.name}" (Item: ${peca.code})`);
     }
     peca.current = novaQtd;
     if (peca.current >= peca.expected) peca.requested = false;
@@ -961,11 +952,11 @@ function alternarStatusRequisitado(idPeca) {
 function excluirPeca(idPeca) {
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
-    if (confirm(`Tem certeza que deseja excluir a peça "${peca.name}" da gaveta?`)) {
+    mostrarConfirmar('Excluir Peça', `Tem certeza que deseja excluir a peça "${peca.name}" da gaveta?`, () => {
         database.items[gavetaAtualAberta] = database.items[gavetaAtualAberta].filter(p => p.id !== idPeca);
         registrarLog(`excluiu a peça "${peca.name}" do sistema`);
         salvarItensDaGaveta(gavetaAtualAberta);
-    }
+    });
 }
 
 // =========================================================================
@@ -979,9 +970,9 @@ function abrirModalMoverPeca(idPeca) {
     select.innerHTML = '';
     database.drawers.forEach(gaveta => {
         if (gaveta.id === gavetaAtualAberta) return;
-        const option      = document.createElement('option');
-        option.value      = gaveta.id;
-        option.innerText  = `${gaveta.label} — ${gaveta.title}`;
+        const option = document.createElement('option');
+        option.value = gaveta.id;
+        option.innerText = `${gaveta.label} — ${gaveta.title}`;
         select.appendChild(option);
     });
     document.getElementById('modal-mover-peca').classList.remove('view-hidden');
@@ -1002,12 +993,15 @@ async function confirmarMoverPeca() {
     if (!database.items[destinoId]) database.items[destinoId] = [];
     database.items[destinoId].push(peca);
 
-    registrarLog(`moveu a peça "${peca.name}" da ${gavetaOrigem.label} para ${gavetaDestino.label}`);
+    registrarLog(`moveu a peça "${peca.name}" da ${gavetaOrigem.label} para ${gavetaDestino.label} (${gavetaDestino.title})`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     await salvarItensDaGaveta(destinoId);
     fecharModalMoverPeca();
 }
 
+// =========================================================================
+// EDITAR NOME DA GAVETA
+// =========================================================================
 function abrirModalEditarGaveta(eventoClick, idGaveta) {
     eventoClick.stopPropagation();
     gavetaSendoEditadaId = idGaveta;
@@ -1024,9 +1018,9 @@ function fecharModalEditarGaveta() {
 function salvarNomeGaveta() {
     const novoNome = document.getElementById('edit-gaveta-nome').value.trim();
     if (!novoNome) return mostrarAlerta('Atenção', 'O nome da gaveta não pode ficar vazio.');
-    const gaveta     = database.drawers.find(d => d.id === gavetaSendoEditadaId);
+    const gaveta = database.drawers.find(d => d.id === gavetaSendoEditadaId);
     const nomeAntigo = gaveta.title;
-    gaveta.title     = novoNome;
+    gaveta.title = novoNome;
     registrarLog(`alterou o nome da gaveta ${gaveta.label} de "${nomeAntigo}" para "${novoNome}"`);
     salvarConfig();
     fecharModalEditarGaveta();
@@ -1046,7 +1040,9 @@ function abrirModalCadastro() {
     setTimeout(() => document.getElementById('novo-nome').focus(), 100);
 }
 
-function fecharModalCadastro() { document.getElementById('modal-cadastro').classList.add('view-hidden'); }
+function fecharModalCadastro() {
+    document.getElementById('modal-cadastro').classList.add('view-hidden');
+}
 
 async function salvarNovoItem() {
     const codigo    = document.getElementById('novo-codigo').value.trim();
@@ -1064,22 +1060,21 @@ async function salvarNovoItem() {
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
 
     const novaPeca = {
-        id:          Date.now(),
-        code:        codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
-        name:        nome, expected: esperado, current: atual, position: posicao,
-        divisoria:   divisoria, size: tamanho, requested: false, lastTakenBy: null, image: null
+        id: Date.now(),
+        code: codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
+        name: nome, expected: esperado, current: atual, position: posicao,
+        divisoria, size: tamanho, requested: false, lastTakenBy: null, image: null
     };
 
     if (imgInput.files && imgInput.files[0]) {
-        try { novaPeca.image = await uploadImagemCloudinary(imgInput.files[0]); } 
-        catch (err) { mostrarAlerta('Aviso', 'Não foi possível enviar a foto. A peça será salva sem imagem.'); }
+        try { novaPeca.image = await uploadImagemCloudinary(imgInput.files[0]); }
+        catch (err) { console.error("Erro Cloudinary:", err); mostrarAlerta('Aviso', 'Não foi possível enviar a foto. A peça será salva sem imagem.'); }
     }
 
     database.items[gavetaAtualAberta].push(novaPeca);
     registrarLog(`cadastrou "${novaPeca.name}" na Divisória ${divisoria}.`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     fecharModalCadastro();
-
     if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Peça'; }
 }
 
@@ -1087,7 +1082,7 @@ function abrirModalEditarPeca(idPeca) {
     pecaSendoEditadaId = idPeca;
     const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
     if (!peca) return;
-    document.getElementById('edit-peca-codigo').value    = peca.code    || '';
+    document.getElementById('edit-peca-codigo').value    = peca.code || '';
     document.getElementById('edit-peca-nome').value      = peca.name;
     document.getElementById('edit-peca-esperado').value  = peca.expected;
     document.getElementById('edit-peca-atual').value     = peca.current;
@@ -1099,7 +1094,9 @@ function abrirModalEditarPeca(idPeca) {
     setTimeout(() => document.getElementById('edit-peca-nome').focus(), 100);
 }
 
-function fecharModalEditarPeca() { document.getElementById('modal-editar-peca').classList.add('view-hidden'); }
+function fecharModalEditarPeca() {
+    document.getElementById('modal-editar-peca').classList.add('view-hidden');
+}
 
 async function salvarEdicaoPeca() {
     const novoCodigo    = document.getElementById('edit-peca-codigo').value.trim();
@@ -1112,30 +1109,26 @@ async function salvarEdicaoPeca() {
     const imgInput      = document.getElementById('edit-peca-imagem');
 
     if (!novoNome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
+    if (isNaN(novoEsperado) || isNaN(novoAtual)) return mostrarAlerta('Erro', 'Valores numéricos inválidos.');
 
     const btnSalvar = document.querySelector('#modal-editar-peca .btn-save');
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
 
-    const peca      = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
-    peca.code       = novoCodigo;
-    peca.name       = novoNome;
-    peca.expected   = novoEsperado;
-    peca.current    = novoAtual;
-    peca.position   = novaPosicao;
-    peca.divisoria  = novaDivisoria;
-    peca.size       = novoTamanho;
-
+    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaSendoEditadaId);
+    Object.assign(peca, {
+        code: novoCodigo, name: novoNome, expected: novoEsperado, current: novoAtual,
+        position: novaPosicao, divisoria: novaDivisoria, size: novoTamanho
+    });
     if (peca.current >= peca.expected) peca.requested = false;
 
     if (imgInput.files && imgInput.files[0]) {
-        try { peca.image = await uploadImagemCloudinary(imgInput.files[0]); } 
-        catch (err) { mostrarAlerta('Aviso', 'Não foi possível enviar a nova foto. A imagem anterior foi mantida.'); }
+        try { peca.image = await uploadImagemCloudinary(imgInput.files[0]); }
+        catch (err) { console.error("Erro Cloudinary:", err); mostrarAlerta('Aviso', 'Não foi possível enviar a nova foto. A imagem anterior foi mantida.'); }
     }
 
     registrarLog(`editou as informações da peça "${peca.name}"`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     fecharModalEditarPeca();
-
     if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Alterações'; }
 }
 
@@ -1149,7 +1142,9 @@ function abrirModalConferencia(idPeca) {
     setTimeout(() => document.getElementById('conf-qtd-atual').focus(), 100);
 }
 
-function fecharModalConferencia() { document.getElementById('modal-conferencia').classList.add('view-hidden'); }
+function fecharModalConferencia() {
+    document.getElementById('modal-conferencia').classList.add('view-hidden');
+}
 
 function salvarConferencia() {
     const novaQtd = parseInt(document.getElementById('conf-qtd-atual').value);
@@ -1164,13 +1159,27 @@ function salvarConferencia() {
     fecharModalConferencia();
 }
 
+// =========================================================================
+// ALERTA E CONFIRMAÇÃO CUSTOMIZADOS
+// =========================================================================
 function mostrarAlerta(titulo, mensagem) {
     document.getElementById('alerta-titulo').innerText   = titulo;
     document.getElementById('alerta-mensagem').innerText = mensagem;
     document.getElementById('modal-alerta').classList.remove('view-hidden');
 }
-
 function fecharAlerta() { document.getElementById('modal-alerta').classList.add('view-hidden'); }
+
+function mostrarConfirmar(titulo, mensagem, onOk) {
+    document.getElementById('confirmar-titulo').innerText   = titulo;
+    document.getElementById('confirmar-mensagem').innerText = mensagem;
+    confirmCallback = onOk;
+    document.getElementById('btn-confirmar-ok').onclick = () => { fecharConfirmar(); if (confirmCallback) confirmCallback(); };
+    document.getElementById('modal-confirmar').classList.remove('view-hidden');
+}
+function fecharConfirmar() {
+    document.getElementById('modal-confirmar').classList.add('view-hidden');
+    confirmCallback = null;
+}
 
 // =========================================================================
 // GERADOR DE PEDIDO DE COMPRA
@@ -1192,24 +1201,13 @@ function gerarEmailPedido() {
 
     itensFaltando.forEach((item, index) => {
         const div = document.createElement('div');
-        div.style.border          = '1px solid var(--border-color)';
-        div.style.padding         = '15px';
-        div.style.marginBottom    = '15px';
-        div.style.borderRadius    = '8px';
-        div.style.backgroundColor = '#f8fafc';
-
+        div.className = 'pedido-item-card';
         div.innerHTML = `
-            <p style="font-weight: bold; margin-bottom: 12px; color: var(--cabinet-blue); font-size: 1.05rem;">
-                <i class="fa-solid fa-box-open"></i> ${item.falta} un. | ${item.nome}
-                <span style="font-weight: normal; color: var(--text-secondary);">(Item: ${item.codigo || 'S/N'})</span>
-            </p>
+            <p class="pedido-item-titulo"><i class="fa-solid fa-box-open"></i> ${item.falta} un. | ${item.nome}
+                <span class="pedido-item-cod">(Item: ${item.codigo || 'S/N'})</span></p>
             <div class="form-group row" style="margin-bottom: 10px;">
-                <div class="col">
-                    <label>Ordem de Serviço (OS):</label>
-                    <input type="text" id="os-${index}" placeholder="Ex: 12345678">
-                </div>
-                <div class="col">
-                    <label>Almoxarifado:</label>
+                <div class="col"><label>Ordem de Serviço (OS):</label><input type="text" id="os-${index}" placeholder="Ex: 12345678"></div>
+                <div class="col"><label>Almoxarifado:</label>
                     <select id="almo-${index}" onchange="window.toggleCompradoFora(${index})">
                         <option value="Automação">Automação</option>
                         <option value="Estoque">Estoque</option>
@@ -1217,23 +1215,13 @@ function gerarEmailPedido() {
                     </select>
                 </div>
             </div>
-            <div id="extra-${index}" class="view-hidden" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;">
+            <div id="extra-${index}" class="view-hidden pedido-extra">
                 <div class="form-group row">
-                    <div class="col">
-                        <label>Fornecedor:</label>
-                        <input type="text" id="forn-${index}" placeholder="Nome do fornecedor">
-                    </div>
-                    <div class="col">
-                        <label>Unid. Medida:</label>
-                        <input type="text" id="unid-${index}" placeholder="Ex: PC, RL, CX">
-                    </div>
+                    <div class="col"><label>Fornecedor:</label><input type="text" id="forn-${index}" placeholder="Nome do fornecedor"></div>
+                    <div class="col"><label>Unid. Medida:</label><input type="text" id="unid-${index}" placeholder="Ex: PC, RL, CX"></div>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label>Justificativa:</label>
-                    <input type="text" id="just-${index}" placeholder="Motivo da compra">
-                </div>
-            </div>
-        `;
+                <div class="form-group" style="margin-bottom: 0;"><label>Justificativa:</label><input type="text" id="just-${index}" placeholder="Motivo da compra"></div>
+            </div>`;
         containerItens.appendChild(div);
     });
 
@@ -1248,9 +1236,8 @@ function gerarEmailPedido() {
 }
 
 function toggleCompradoFora(index) {
-    const select   = document.getElementById(`almo-${index}`).value;
     const extraDiv = document.getElementById(`extra-${index}`);
-    if (select === 'Comprado Fora') extraDiv.classList.remove('view-hidden');
+    if (document.getElementById(`almo-${index}`).value === 'Comprado Fora') extraDiv.classList.remove('view-hidden');
     else extraDiv.classList.add('view-hidden');
 }
 
@@ -1259,11 +1246,9 @@ function processarFormularioPedido() {
     let textoFinal = `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes para o nosso gaveteiro elétrico:\n\n`;
 
     window.itensFaltandoTemp.forEach((item, index) => {
-        const os   = document.getElementById(`os-${index}`).value    || 'Não informada';
+        const os   = document.getElementById(`os-${index}`).value || 'Não informada';
         const almo = document.getElementById(`almo-${index}`).value;
-
         textoFinal += `- ${item.falta} un. | ${item.nome} (Item: ${item.codigo || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
-
         if (almo === 'Comprado Fora') {
             const forn = document.getElementById(`forn-${index}`).value || 'Não informado';
             const unid = document.getElementById(`unid-${index}`).value || 'Não informada';
@@ -1271,7 +1256,6 @@ function processarFormularioPedido() {
             textoFinal += `  > Detalhes Compra Externa - Fornecedor: ${forn} | UM: ${unid} | Justificativa: ${just}\n`;
         }
     });
-
     textoFinal += `\nFico no aguardo.\nObrigado,\n${nomeSolicitante}`;
 
     document.getElementById('texto-pedido-gerado').value = textoFinal;
@@ -1282,69 +1266,43 @@ function processarFormularioPedido() {
     document.getElementById('pedido-subtitle').innerText = "Copie o texto pronto abaixo para enviar diretamente no seu Outlook ou Teams.";
 }
 
-function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
+function fecharModalPedido() {
+    document.getElementById('modal-pedido').classList.add('view-hidden');
+}
 
-function copiarTextoPedido(event) {
-    const ta  = document.getElementById('texto-pedido-gerado');
-    const btn = (event && event.currentTarget) ? event.currentTarget : document.getElementById('btn-copiar-pedido');
-
-    const finalizar = () => {
-        const orig = btn.innerHTML;
-        btn.innerHTML             = `<i class="fa-solid fa-check"></i> Copiado!`;
-        btn.style.backgroundColor = 'var(--status-verde)';
+function copiarTextoPedido(ev) {
+    const ta = document.getElementById('texto-pedido-gerado');
+    const texto = ta.value;
+    const btn = ev ? ev.currentTarget : null;
+    const feedback = () => {
+        if (btn) {
+            const orig = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
+            btn.style.backgroundColor = 'var(--status-verde)';
+            setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = ''; }, 2000);
+        }
         registrarLog('copiou a lista de pedido de peças para envio.');
-        setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = 'var(--drawer-blue)'; }, 2000);
     };
-
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(ta.value).then(finalizar).catch(() => {
-            ta.select(); document.execCommand('copy'); finalizar();
-        });
+        navigator.clipboard.writeText(texto).then(feedback).catch(() => { ta.select(); document.execCommand('copy'); feedback(); });
     } else {
-        ta.select(); document.execCommand('copy'); finalizar();
+        ta.select(); document.execCommand('copy'); feedback();
     }
 }
 
 // =========================================================================
-// EXPOSIÇÃO GLOBAL DE FUNÇÕES (NECESSÁRIO POR SER type="module")
+// EXPOSIÇÃO GLOBAL DE FUNÇÕES (necessário por type="module")
 // =========================================================================
-window.toggleMenuMobile          = toggleMenuMobile;
-window.autorizarDispositivo      = autorizarDispositivo;
-window.realizarLogin             = realizarLogin;
-window.alternarTelaLogin         = alternarTelaLogin;
-window.registrarUsuario          = registrarUsuario;
-window.mostrarTela               = mostrarTela;
-window.gerarEmailPedido          = gerarEmailPedido;
-window.sairDoSistema             = sairDoSistema;
-window.fazerBackup               = fazerBackup;
-window.restaurarBackup           = restaurarBackup;
-window.exportarEstoqueCSV        = exportarEstoqueCSV;
-window.exportarHistoricoCSV      = exportarHistoricoCSV;
-window.voltarParaGavetas         = voltarParaGavetas;
-window.abrirModalCadastro        = abrirModalCadastro;
-window.fecharModalCadastro       = fecharModalCadastro;
-window.salvarNovoItem            = salvarNovoItem;
-window.abrirModalEditarPeca      = abrirModalEditarPeca;
-window.fecharModalEditarPeca     = fecharModalEditarPeca;
-window.salvarEdicaoPeca          = salvarEdicaoPeca;
-window.abrirModalConferencia     = abrirModalConferencia;
-window.fecharModalConferencia    = fecharModalConferencia;
-window.salvarConferencia         = salvarConferencia;
-window.abrirModalEditarGaveta    = abrirModalEditarGaveta;
-window.fecharModalEditarGaveta   = fecharModalEditarGaveta;
-window.salvarNomeGaveta          = salvarNomeGaveta;
-window.fecharModalPedido         = fecharModalPedido;
-window.copiarTextoPedido         = copiarTextoPedido;
-window.fecharAlerta              = fecharAlerta;
-window.abrirGaveta               = abrirGaveta;
-window.ajusteRapidoEstoque       = ajusteRapidoEstoque;
-window.alternarStatusRequisitado = alternarStatusRequisitado;
-window.excluirPeca               = excluirPeca;
-window.abrirModalMoverPeca       = abrirModalMoverPeca;
-window.fecharModalMoverPeca      = fecharModalMoverPeca;
-window.confirmarMoverPeca        = confirmarMoverPeca;
-window.toggleCompradoFora        = toggleCompradoFora;
-window.processarFormularioPedido = processarFormularioPedido;
-window.salvarSenhaObrigatoria    = salvarSenhaObrigatoria;
-window.cancelarRedefinicaoSenha  = cancelarRedefinicaoSenha;
-window.buscarPecasGlobal         = buscarPecasGlobal;
+Object.assign(window, {
+    toggleMenuMobile, autorizarDispositivo, realizarLogin, alternarTelaLogin, registrarUsuario,
+    mostrarTela, gerarEmailPedido, sairDoSistema, fazerBackup, restaurarBackup,
+    exportarEstoqueCSV, exportarHistoricoCSV, voltarParaGavetas, abrirModalCadastro,
+    fecharModalCadastro, salvarNovoItem, abrirModalEditarPeca, fecharModalEditarPeca,
+    salvarEdicaoPeca, abrirModalConferencia, fecharModalConferencia, salvarConferencia,
+    abrirModalEditarGaveta, fecharModalEditarGaveta, salvarNomeGaveta, fecharModalPedido,
+    copiarTextoPedido, fecharAlerta, fecharConfirmar, abrirGaveta, ajusteRapidoEstoque,
+    alternarStatusRequisitado, excluirPeca, abrirModalMoverPeca, fecharModalMoverPeca,
+    confirmarMoverPeca, toggleCompradoFora, processarFormularioPedido, salvarSenhaObrigatoria,
+    cancelarRedefinicaoSenha, buscarPecasGlobal, instalarPWA,
+    alternarModoReorganizar, moverGaveta
+});
