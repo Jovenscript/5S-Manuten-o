@@ -1,1329 +1,406 @@
-========================================================================
-   VARIÁVEIS DE CORES E TEMA
-========================================================================= */
-:root {
-    --bg-grey: #f1f5f9;
-    --sidebar-bg: #0f172a;
-    --main-bg: #ffffff;
-    --border-color: #e2e8f0;
-    --cabinet-blue: #1e3a5f;
-    --drawer-blue: #2a5288;
-    --text-primary: #0f172a;
-    --text-secondary: #64748b;
-    --danger: #ef4444;
-
-    /* Cores de Status 5S */
-    --status-verde: #10b981;
-    --status-laranja: #f97316;
-    --status-vermelho: #ef4444;
-    --status-amarelo: #eab308;
-
-    /* Grade física do gaveteiro (colmeia industrial) */
-    --slot-altura: 60px;   /* altura de 1 encaixe físico */
-    --slot-gap: 12px;      /* espaço entre encaixes */
-    --slot-colunas: 5;     /* divisórias verticais metálicas */
-    --slot-linhas-min: 10; /* repartições horizontais mínimas */
-}
-
-/* =========================================================================
-   RESET E CONFIGURAÇÕES GERAIS
-========================================================================= */
-* { 
-    box-sizing: border-box; 
-    margin: 0; 
-    padding: 0; 
-    font-family: 'Segoe UI', Arial, sans-serif; 
-}
-
-body { 
-    background-color: var(--bg-grey); 
-    color: var(--text-primary); 
-    height: 100vh; 
-    overflow: hidden; 
-}
-
-.view-hidden { display: none !important; }
-
-.view-active { 
-    display: block; 
-    animation: fadeIn 0.3s ease-in-out; 
-}
-
-@keyframes fadeIn { 
-    from { opacity: 0; } 
-    to { opacity: 1; } 
-}
-
-body:not(.is-admin) .admin-only { display: none !important; }
-
-.text-center { text-align: center; }
-.centralizado { justify-content: center; }
-.espacado { justify-content: space-between; }
-.btn-full { width: 100%; }
-
-/* =========================================================================
-   TELA DE BLOQUEIO DE DISPOSITIVO E LOGIN
-========================================================================= */
-#view-device-auth.view-active, #view-login.view-active { 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    min-height: 100vh; 
-    background-color: var(--sidebar-bg); 
-    padding: 1rem; 
-}
-
-.lock-container { border-top: 5px solid var(--danger); }
-
-.lock-icon { 
-    font-size: 3rem; 
-    color: var(--danger); 
-    margin-bottom: 1rem;
-}
-
-.login-container { 
-    background: var(--main-bg); 
-    padding: 3rem 2rem; 
-    border-radius: 12px; 
-    width: 100%; 
-    max-width: 400px; 
-    text-align: center; 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5); 
-}
-
-.login-container h2 { 
-    color: var(--drawer-blue); 
-    margin-bottom: 0.5rem; 
-    font-size: 1.5rem; 
-}
-
-.login-container p { 
-    color: var(--text-secondary); 
-    margin-bottom: 2rem; 
-    font-size: 0.9rem; 
-}
-
-.form-group { 
-    margin-bottom: 1.5rem; 
-    text-align: left; 
-}
-
-.form-group label { 
-    display: block; 
-    margin-bottom: 0.5rem; 
-    font-weight: bold; 
-    font-size: 0.9rem; 
-}
-
-.form-group input, .form-group select { 
-    width: 100%; 
-    padding: 1rem; 
-    border: 1px solid var(--border-color); 
-    border-radius: 8px; 
-    font-size: 1rem; 
-    background-color: white;
-}
-
-.btn-login { 
-    width: 100%; 
-    padding: 1rem; 
-    background-color: #3b82f6; 
-    color: white; 
-    border: none; 
-    border-radius: 8px; 
-    font-size: 1.1rem; 
-    font-weight: bold; 
-    cursor: pointer; 
-    transition: background 0.3s; 
-}
-
-.btn-login:hover { background-color: #2563eb; }
-.btn-registrar { background-color: #10b981; }
-.btn-registrar:hover { background-color: #059669; }
-.btn-auth { background-color: var(--text-primary); }
-
-.link-toggle { 
-    color: #3b82f6; 
-    cursor: pointer; 
-    font-size: 0.9rem; 
-    margin-top: 1.5rem; 
-    text-decoration: underline; 
-    font-weight: 500; 
-}
-
-/* =========================================================================
-   ESTRUTURA PRINCIPAL DO SISTEMA E NAVEGAÇÃO
-========================================================================= */
-#app-container.view-active { 
-    display: flex; 
-    height: 100vh; 
-    width: 100%; 
-}
-
-.sidebar { 
-    width: 110px; 
-    background: var(--sidebar-bg); 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    padding: 20px 0; 
-    flex-shrink: 0; 
-    z-index: 3000; 
-    transition: transform 0.3s ease; 
-}
-
-.logo { 
-    color: #38bdf8; 
-    font-size: 26px; 
-    font-weight: 800; 
-    margin-bottom: 40px; 
-}
-
-.nav-items { 
-    flex: 1; 
-    width: 100%; 
-}
-
-.nav-item { 
-    color: #94a3b8; 
-    padding: 20px 0; 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    cursor: pointer; 
-    font-size: 11px; 
-    font-weight: bold; 
-    gap: 8px; 
-    transition: background 0.2s;
-}
-
-.nav-item i { font-size: 24px; }
-
-.nav-item.active, .nav-item:hover { 
-    color: white; 
-    background: rgba(255,255,255,0.05); 
-    border-left: 4px solid #38bdf8; 
-}
-
-.nav-footer { 
-    color: var(--status-vermelho); 
-    cursor: pointer; 
-    padding: 20px 0; 
-    width: 100%; 
-    text-align: center; 
-    font-size: 11px; 
-    font-weight: bold; 
-    transition: background 0.2s;
-}
-
-.nav-footer:hover { background: rgba(239, 68, 68, 0.1); }
-
-.nav-footer i { 
-    font-size: 22px; 
-    display: block; 
-    margin-bottom: 5px; 
-}
-
-.menu-toggle-mobile { 
-    display: none; 
-    font-size: 1.5rem; 
-    color: var(--cabinet-blue); 
-    cursor: pointer; 
-}
-
-.sidebar-overlay { 
-    display: none; 
-    position: fixed; 
-    top: 0; 
-    left: 0; 
-    right: 0; 
-    bottom: 0; 
-    background: rgba(0,0,0,0.5); 
-    z-index: 2999; 
-}
-
-.sidebar-overlay.open { display: block; }
-
-.content-area { 
-    flex: 1; 
-    display: flex; 
-    flex-direction: column; 
-    overflow: hidden; 
-}
-
-.top-bar { 
-    background: var(--main-bg); 
-    height: 70px; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    padding: 0 2rem; 
-    border-bottom: 1px solid var(--border-color); 
-    flex-shrink: 0; 
-}
-
-.page-info { display: flex; align-items: center; gap: 15px; }
-.page-info h1 { font-size: 1.2rem; margin: 0; }
-
-.user-profile { display: flex; align-items: center; gap: 1rem; }
-.user-text { text-align: right; }
-.user-name { font-weight: bold; font-size: 0.95rem; }
-.user-code { font-size: 0.8rem; color: var(--text-secondary); }
-
-.badge-admin { 
-    background-color: var(--drawer-blue); 
-    color: white; 
-    font-size: 0.65rem; 
-    padding: 2px 6px; 
-    border-radius: 4px; 
-    font-weight: bold; 
-    display: inline-block; 
-    margin-top: 2px; 
-}
-
-.user-avatar { 
-    width: 45px; 
-    height: 45px; 
-    background: #e2e8f0; 
-    border-radius: 50%; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    font-size: 20px; 
-    flex-shrink: 0; 
-}
-
-.main-padding { 
-    flex: 1; 
-    padding: 0; 
-    overflow-y: auto; 
-    position: relative; 
-    scroll-behavior: smooth;
-}
-
-#view-gavetas, #view-historico, #view-config, #view-compartimentos, #alerta-global-zerado {
-    padding: 2rem;
-}
-
-/* =========================================================================
-   DASHBOARD DE BUSCA (CARROSSEL DINÂMICO JS E GLASSMORPHISM)
-========================================================================= */
-.dashboard-wrapper {
-    min-height: calc(100vh - 70px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 2rem;
-    position: relative;
-    background-color: var(--sidebar-bg);
-    background-size: cover;
-    background-position: center;
-    transition: background-image 1.5s ease-in-out;
-}
-
-.dashboard-overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(15, 23, 42, 0.45);
-    z-index: 1;
-}
-
-.glass-panel {
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 20px;
-    padding: 3rem;
-    width: 100%;
-    max-width: 750px;
-    text-align: center;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    z-index: 2; 
-    transition: transform 0.3s ease;
-}
-
-.search-box-container {
-    position: relative;
-    width: 100%;
-    margin-bottom: 1.5rem;
-}
-
-.search-icon {
-    position: absolute;
-    left: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1.5rem;
-    color: #64748b;
-}
-
-.search-input-glass {
-    width: 100%;
-    padding: 1.2rem 1.2rem 1.2rem 60px;
-    border-radius: 50px;
-    border: 2px solid rgba(255, 255, 255, 0.6);
-    background: rgba(255, 255, 255, 0.9);
-    font-size: 1.2rem;
-    color: var(--text-primary);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    transition: all 0.3s ease;
-    outline: none;
-}
-
-.search-input-glass:focus {
-    background: #ffffff;
-    box-shadow: 0 4px 25px rgba(56, 189, 248, 0.6);
-    border-color: #38bdf8;
-}
-
-.resultados-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 15px;
-    max-height: 350px;
-    overflow-y: auto;
-    padding-right: 5px;
-}
-
-.resultados-grid::-webkit-scrollbar { width: 8px; }
-.resultados-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 4px; }
-.resultados-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 4px; }
-
-.resultado-card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    padding: 1.2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    text-align: left;
-    border: 1px solid rgba(255,255,255,0.5);
-}
-
-.resultado-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
-    background: #ffffff;
-}
-
-.res-info h4 { color: var(--cabinet-blue); font-size: 1.1rem; margin-bottom: 5px; }
-.res-info p { color: var(--text-secondary); font-size: 0.9rem; margin: 0; }
-.res-tag {
-    background: var(--drawer-blue);
-    color: white;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-/* =========================================================================
-   TELA: CONFIGURAÇÕES E BACKUP (SÓ ADM)
-========================================================================= */
-.config-grid { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-    gap: 1.5rem; 
-    margin-top: 1rem;
-}
-
-.config-card { 
-    background: var(--main-bg); 
-    border-radius: 12px; 
-    padding: 1.5rem; 
-    border: 1px solid var(--border-color); 
-    transition: box-shadow 0.3s;
-}
-
-.config-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-
-.config-card h3 { 
-    color: var(--cabinet-blue); 
-    margin-bottom: 10px; 
-    display: flex; 
-    align-items: center; 
-    gap: 10px; 
-}
-
-.config-card p { 
-    color: var(--text-secondary); 
-    font-size: 0.9rem; 
-    line-height: 1.4; 
-}
-
-.config-buttons { 
-    display: flex; 
-    gap: 10px; 
-    margin-top: 15px; 
-    flex-wrap: wrap; 
-}
-
-/* =========================================================================
-   TELA: HISTÓRICO DE ATIVIDADES (LOGS)
-========================================================================= */
-.subtitulo-historico {
-    color: var(--text-secondary); 
-    margin-bottom: 1.5rem;
-}
-
-.historico-lista { 
-    background: var(--main-bg); 
-    border-radius: 12px; 
-    padding: 1.5rem; 
-    border: 1px solid var(--border-color); 
-    display: flex; 
-    flex-direction: column; 
-    gap: 10px; 
-}
-
-.log-item { 
-    display: flex; 
-    align-items: center; 
-    gap: 15px; 
-    padding: 12px; 
-    background-color: #f8fafc; 
-    border-radius: 8px; 
-    border-left: 4px solid var(--drawer-blue); 
-    transition: transform 0.2s;
-}
-
-.log-item:hover { transform: translateX(5px); }
-
-.log-time { 
-    color: var(--text-secondary); 
-    font-size: 0.85rem; 
-    font-weight: 600; 
-    min-width: 130px; 
-}
-
-.log-text { 
-    font-size: 0.95rem; 
-    color: var(--text-primary); 
-}
-
-.log-text strong { color: var(--cabinet-blue); }
-
-/* =========================================================================
-   ALERTA GLOBAL (NOTIFICAÇÃO DE ESTOQUE ZERADO)
-========================================================================= */
-.alerta-global { 
-    background-color: #fef2f2; 
-    border: 1px solid #f87171; 
-    color: #b91c1c; 
-    padding: 1.2rem; 
-    border-radius: 8px; 
-    margin-bottom: 1.5rem; 
-    display: flex; 
-    align-items: center; 
-    gap: 15px; 
-    font-size: 1.05rem; 
-    box-shadow: 0 4px 6px rgba(239, 68, 68, 0.15); 
-    animation: pulse-border 2s infinite; 
-}
-
-@keyframes pulse-border { 
-    0% { border-color: #f87171; box-shadow: 0 0 0 rgba(239, 68, 68, 0); } 
-    50% { border-color: #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); } 
-    100% { border-color: #f87171; box-shadow: 0 0 0 rgba(239, 68, 68, 0); } 
-}
-
-/* =========================================================================
-   VISÃO GERAL DO ARMÁRIO E GAVETAS DRAG AND DROP
-========================================================================= */
-.relatorio-geral { 
-    background: var(--main-bg); 
-    border-radius: 12px; 
-    padding: 1.5rem; 
-    margin-bottom: 1rem; 
-    border: 1px solid var(--border-color); 
-}
-
-.kpi-grid { 
-    display: flex; 
-    gap: 2rem; 
-    margin-top: 15px; 
-}
-
-.kpi-summary { 
-    width: 30%; 
-    border-right: 1px solid var(--border-color); 
-    display: flex; 
-    align-items: center; 
-    padding-right: 15px;
-}
-
-.kpi-big-number { 
-    display: flex; 
-    align-items: center; 
-    gap: 15px; 
-    color: var(--text-primary); 
-}
-
-.kpi-big-number span { 
-    font-size: 3.8rem; 
-    font-weight: 900; 
-    line-height: 1; 
-    color: var(--cabinet-blue); 
-}
-
-.kpi-big-number p { 
-    font-size: 0.95rem; 
-    font-weight: bold; 
-    margin: 0; 
-    line-height: 1.3; 
-    text-align: left;
-}
-
-.kpi-status-list { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
-    gap: 10px; 
-    flex: 1; 
-    max-height: 150px; 
-    overflow-y: auto; 
-}
-
-.kpi-status-item { 
-    font-size: 0.85rem; 
-    font-weight: 700; 
-    display: flex; 
-    align-items: center; 
-    gap: 8px; 
-}
-
-.kpi-status-item.verde { color: var(--status-verde); }
-.kpi-status-item.amarelo { color: var(--status-amarelo); } 
-.kpi-status-item.laranja { color: var(--status-laranja); }
-.kpi-status-item.vermelho { color: var(--status-vermelho); }
-
-.cabinet-vertical { 
-    display: flex; 
-    flex-direction: column; 
-    background-color: var(--cabinet-blue); 
-    padding: 15px; 
-    border-radius: 8px; 
-    gap: 6px; 
-    width: 100%; 
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.5); 
-}
-
-.btn-gaveta { 
-    background: linear-gradient(to bottom, #4477b5, var(--drawer-blue)); 
-    border: 1px solid #1a385f; 
-    border-bottom: 5px solid #132a47; 
-    border-radius: 4px; 
-    height: 90px; 
-    cursor: pointer; 
-    display: flex; 
-    justify-content: flex-start; 
-    align-items: center; 
-    padding: 0 2rem; 
-    position: relative; 
-    transition: transform 0.2s, filter 0.2s, opacity 0.2s, border 0.2s;
-}
-
-.btn-gaveta:hover { filter: brightness(1.15); }
-
-/* Classes para o Drag and Drop */
-.btn-gaveta.dragging {
-    opacity: 0.5;
-    border: 2px dashed #38bdf8;
-    transform: scale(0.98);
-}
-
-.btn-gaveta.drag-over {
-    border-top: 4px solid #38bdf8;
-    margin-top: 10px;
-    filter: brightness(1.3);
-}
-
-.drag-handle {
-    margin-right: 15px;
-    opacity: 0.6;
-    transition: opacity 0.2s;
-}
-
-.drag-handle:hover {
-    opacity: 1;
-    color: white !important;
-}
-
-.gaveta-content { 
-    display: flex; 
-    align-items: center; 
-    gap: 1.5rem; 
-    width: 100%; 
-    color: white; 
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.6); 
-    pointer-events: none; 
-}
-
-.gaveta-content .btn-edit-gaveta, .gaveta-content .drag-handle {
-    pointer-events: auto;
-}
-
-.gnumber { 
-    font-size: 1.4rem; 
-    font-weight: 800; 
-    background: rgba(255,255,255,0.2); 
-    padding: 5px 15px; 
-    border-radius: 4px; 
-}
-
-.glabel { 
-    font-size: 1.3rem; 
-    font-weight: 600; 
-    flex: 1; 
-    text-align: left; 
-}
-
-.btn-edit-gaveta {
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
-    border: none;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-right: 5px;
-    transition: all 0.2s;
-    z-index: 10;
-}
-
-.btn-edit-gaveta:hover { background: rgba(255, 255, 255, 0.3); }
-
-.btn-gaveta::after { 
-    content: ""; 
-    position: absolute; 
-    bottom: 15px; 
-    left: 50%; 
-    transform: translateX(-50%); 
-    width: 250px; 
-    height: 12px; 
-    background: linear-gradient(to bottom, #cbd5e1, #94a3b8); 
-    border-radius: 6px; 
-    box-shadow: 0 3px 5px rgba(0,0,0,0.4); 
-    pointer-events: none;
-}
-
-.gstatus-light { 
-    width: 18px; 
-    height: 18px; 
-    border-radius: 50%; 
-    border: 2px solid rgba(0,0,0,0.4); 
-    flex-shrink: 0;
-    margin-left: auto;
-}
-
-.gstatus-light.verde { background-color: var(--status-verde); box-shadow: 0 0 10px var(--status-verde); }
-.gstatus-light.amarelo { background-color: var(--status-amarelo); box-shadow: 0 0 10px var(--status-amarelo); }
-.gstatus-light.laranja { background-color: var(--status-laranja); box-shadow: 0 0 10px var(--status-laranja); }
-.gstatus-light.vermelho { background-color: var(--status-vermelho); box-shadow: 0 0 10px var(--status-vermelho); }
-
-/* =========================================================================
-   DENTRO DA GAVETA — DIVISÓRIAS
-========================================================================= */
-.header-gaveta { 
-    display: flex; 
-    align-items: center; 
-    gap: 1rem; 
-    margin-bottom: 1rem; 
-    background: var(--main-bg); 
-    padding: 1rem 1.5rem; 
-    border-radius: 8px; 
-    border: 1px solid var(--border-color); 
-    flex-wrap: wrap; 
-}
-
-.btn-voltar, .btn-add-item { 
-    color: white; 
-    border: none; 
-    padding: 0.8rem 1.2rem; 
-    border-radius: 6px; 
-    cursor: pointer; 
-    font-weight: bold; 
-    font-size: 0.95rem; 
-    transition: transform 0.2s, filter 0.2s;
-}
-
-.btn-voltar:hover, .btn-add-item:hover { filter: brightness(0.9); transform: scale(1.02); }
-
-.btn-voltar { background: var(--text-secondary); }
-.btn-add-item { background: #3b82f6; }
-
-#titulo-gaveta-aberta { 
-    flex: 1; 
-    text-align: center; 
-    font-size: 1.5rem; 
-    color: var(--cabinet-blue); 
-    min-width: 200px; 
-}
-
-.divisoria-header {
-    background: #e2e8f0;
-    color: var(--drawer-blue);
-    padding: 10px 15px;
-    border-radius: 6px;
-    font-size: 1.2rem;
-    font-weight: bold;
-    margin: 20px 0 15px 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-left: 5px solid var(--drawer-blue);
-}
-
-/* =========================================================================
-   COLMEIA / GAVETEIRO FÍSICO  (5 COLUNAS x LINHAS DINÂMICAS DE 60px)
-   - As COLUNAS são as 5 divisórias verticais metálicas do gaveteiro.
-   - As LINHAS crescem automaticamente; cada encaixe ocupa "span N" linhas
-     conforme a altura física real da peça (1 = pequena ... 10 = gigante).
-========================================================================= */
-.grid-pecas {
-    display: grid;
-    grid-template-columns: repeat(var(--slot-colunas), minmax(0, 1fr));
-    grid-auto-rows: var(--slot-altura);
-    /* REMOVIDO: grid-auto-flow: dense; 
-       Agora o grid NÃO empacota agressivamente → deixa espaços vazios naturais */
-    gap: var(--slot-gap);
-    padding: var(--slot-gap);
-    margin-bottom: 1.5rem;
-
-    /* Moldura do gaveteiro: garante a "altura mínima de 10 linhas" mesmo vazio
-       e cresce sozinho conforme os spans vão empilhando. */
-    min-height: calc(
-        var(--slot-altura) * var(--slot-linhas-min)
-        + var(--slot-gap) * (var(--slot-linhas-min) - 1)
-        + var(--slot-gap) * 2
-    );
-    background:
-        repeating-linear-gradient(
-            to bottom,
-            rgba(30, 58, 95, 0.04) 0,
-            rgba(30, 58, 95, 0.04) var(--slot-altura),
-            transparent var(--slot-altura),
-            transparent calc(var(--slot-altura) + var(--slot-gap))
-        ),
-        var(--cabinet-blue);
-    border-radius: 10px;
-    box-shadow: inset 0 0 18px rgba(0,0,0,0.45);
-}
-
-.compartimento-card { 
-    background: var(--main-bg); 
-    border-radius: 10px; 
-    padding: 12px; 
-    border: 1px solid var(--border-color); 
-    box-shadow: 0 4px 8px rgba(0,0,0,0.12); 
-    position: relative; 
-    display: flex; 
-    flex-direction: column; 
-
-    /* A altura física: ocupa "span N" linhas de 60px da colmeia */
-    grid-row: span var(--span-size, 1);
-
-    height: 100%;
-    min-height: 0;       /* deixa o conteúdo encolher para caber no encaixe */
-    overflow: hidden;    /* impede que peças pequenas "vazem" para fora */
-    transition: transform 0.15s, box-shadow 0.15s;
-}
-
-
-.compartimento-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 18px rgba(0,0,0,0.18);
-
-    z-index: 5;
-
-}
-
-/* SLOT VAZIO: espaços vazios físicos da gaveta (compartimentos sem peça) */
-.slot-vazio {
-    background: rgba(42, 82, 136, 0.08);
-    border: 2px dashed rgba(148, 163, 184, 0.4);
-    box-shadow: none;
-    color: #94a3b8;
-    padding: 8px;
-}
-.slot-vazio:hover {
-    transform: none;
-    box-shadow: none;
-    background: rgba(42, 82, 136, 0.15);
-    border-color: rgba(148, 163, 184, 0.6);
-}
-.slot-vazio-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-}
-.slot-vazio-top .card-local {
-    background: rgba(148, 163, 184, 0.25);
-    color: #64748b;
-    font-size: 0.7rem;
-}
-.slot-vazio-corpo {
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    align-items: center;
-    justify-content: center;
-    opacity: 0.5;
-}
-.slot-vazio-corpo i {
-    font-size: 2rem;
-    color: #cbd5e1;
-}
-.slot-vazio-corpo span {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #94a3b8;
-}
-
-/* Efeitos Drag and Drop PEÇAS */
-.compartimento-card.dragging {
-    opacity: 0.5;
-    border: 2px dashed #38bdf8;
-    transform: scale(0.98);
-}
-.compartimento-card.drag-over {
-    border: 2px solid #38bdf8;
-    box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
-}
-
-.drag-handle-item {
-    cursor: grab;
-    color: #94a3b8;
-    margin-right: 10px;
-    font-size: 1.2rem;
-    transition: color 0.2s;
-}
-
-.drag-handle-item:hover { color: #38bdf8; }
-
-
-
-
-.card-top { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-bottom: 0.6rem; 
-    flex-shrink: 0;
-}
-
-.card-top > div {
-    display: flex;
-    align-items: center;
-}
-
-.card-local { 
-    background: var(--bg-grey); 
-    padding: 4px 10px; 
-    border-radius: 4px; 
-    font-weight: bold; 
-    color: var(--text-secondary); 
-    font-size: 0.75rem; 
-}
-
-.btn-edit-peca { 
-    background: #e0f2fe; 
-    color: #0284c7; 
-    border: none; 
-    padding: 6px 10px; 
-    border-radius: 4px; 
-    cursor: pointer; 
-    margin-left: 10px; 
-    transition: background 0.2s;
-}
-.btn-edit-peca:hover { background: #0284c7; color: white; }
-
-.btn-excluir { 
-    background: #fee2e2; 
-    color: var(--status-vermelho); 
-    border: none; 
-    padding: 6px 10px; 
-    border-radius: 4px; 
-    cursor: pointer; 
-    margin-left: 5px; 
-    transition: background 0.2s;
-}
-.btn-excluir:hover { background: var(--status-vermelho); color: white; }
-
-.badge-status { 
-    padding: 4px 10px; 
-    border-radius: 4px; 
-    font-size: 0.7rem; 
-    font-weight: 800; 
-    text-transform: uppercase; 
-    text-align: center; 
-    flex-shrink: 0;
-}
-
-.badge-status.verde { background-color: #d1fae5; color: #047857; border: 1px solid #10b981; }
-.badge-status.amarelo { background-color: #fef08a; color: #854d0e; border: 1px solid #eab308; }
-.badge-status.laranja { background-color: #ffedd5; color: #c2410c; border: 1px solid #f97316; }
-.badge-status.vermelho { background-color: #fee2e2; color: #b91c1c; border: 1px solid #ef4444; }
-
-.card-title { 
-    font-size: 1.05rem; 
-    font-weight: bold; 
-    margin-bottom: 0.6rem; 
-    flex-shrink: 0;
-    line-height: 1.2;
-}
-
-/* Caixa de imagem: agora SEMPRE flexível para preencher a altura do encaixe.
-   Em peças baixas (span pequeno) ela encolhe; em peças altas, estica. */
-.card-image-box { 
-    width: 100%; 
-    flex: 1 1 auto; 
-    min-height: 0; 
-    background: #f8fafc; 
-    border-radius: 8px; 
-    margin-bottom: 0.6rem; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    overflow: hidden; 
-    border: 1px solid #e2e8f0; 
-    padding: 8px;
-}
-
-.peca-img { 
-    max-width: 100%; 
-    max-height: 100%; 
-    object-fit: contain;
-    mix-blend-mode: multiply;
-}
-
-.peca-icon-placeholder { 
-    font-size: 3.5rem; 
-    color: #cbd5e1; 
-}
-
-.card-data-row { 
-    display: flex; 
-    justify-content: space-between; 
-    margin-bottom: 0.6rem; 
-    background: var(--bg-grey); 
-    padding: 8px; 
-    border-radius: 8px; 
-    gap: 10px; 
-    flex-shrink: 0;
-}
-
-.data-box { 
-    text-align: center; 
-    flex: 1; 
-    display: flex; 
-    flex-direction: column; 
-    justify-content: center; 
-}
-
-.data-box span { 
-    font-size: 0.75rem; 
-    color: var(--text-secondary); 
-    margin-bottom: 4px; 
-}
-
-.data-box strong { 
-    font-size: 1.4rem; 
-    font-weight: 800; 
-}
-
-.quick-control { 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    gap: 10px; 
-    background: white; 
-    border: 1px solid var(--border-color); 
-    border-radius: 6px; 
-    padding: 4px; 
-}
-
-.btn-quick { 
-    background: #f1f5f9; 
-    border: none; 
-    width: 30px; 
-    height: 30px; 
-    border-radius: 4px; 
-    font-size: 1rem; 
-    color: var(--cabinet-blue); 
-    cursor: pointer; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    transition: background 0.1s;
-}
-
-.btn-quick:hover { background: #e2e8f0; }
-.btn-quick:active { background: #cbd5e1; transform: scale(0.95); }
-
-.quick-control strong { 
-    font-size: 1.4rem; 
-    min-width: 25px; 
-    text-align: center; 
-}
-
-.last-taken-info { 
-    background: #f8fafc; 
-    color: var(--text-secondary); 
-    font-size: 0.72rem; 
-    text-align: center; 
-    padding: 5px; 
-    border-radius: 6px; 
-    margin-bottom: 0.6rem; 
-    font-style: italic; 
-    border: 1px dashed #cbd5e1; 
-}
-
-.botoes-acao-card { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 6px; 
-    margin-top: auto; 
-    flex-shrink: 0;
-}
-
-.btn-conferir, .btn-requisitado, .btn-mover { 
-    width: 100%; 
-    padding: 0.55rem; 
-    border-radius: 6px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    font-size: 0.8rem; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    gap: 8px; 
-    transition: all 0.2s;
-}
-
-.btn-conferir { background: var(--cabinet-blue); color: white; border: none; }
-.btn-conferir:hover { background: var(--drawer-blue); }
-
-.btn-requisitado { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-.btn-requisitado:hover { background: #e2e8f0; }
-.btn-requisitado.ativo { background: #fef08a; color: #854d0e; border-color: #eab308; }
-
-.btn-mover { background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; }
-.btn-mover:hover { background: #7c3aed; color: white; }
-
-/* =========================================================================
-   MODAIS E ALERTAS
-========================================================================= */
-.modal-overlay { 
-    position: fixed; 
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%; 
-    background: rgba(15, 23, 42, 0.7); 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    z-index: 4000; 
-    animation: fadeIn 0.2s; 
-    padding: 1rem; 
-}
-
-.modal-content { 
-    background: var(--main-bg); 
-    padding: 2rem; 
-    border-radius: 12px; 
-    width: 100%; 
-    max-width: 500px; 
-    box-shadow: 0 20px 25px rgba(0,0,0,0.2); 
-    max-height: 90vh; 
-    overflow-y: auto; 
-    animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-}
-
-.modal-pequeno { max-width: 400px; }
-.modal-largo { max-width: 600px; }
-
-.modal-subtitle {
-    color: #64748b; 
-    margin-bottom: 15px; 
-    font-size: 0.9rem;
-}
-
-.form-group.row { display: flex; gap: 15px; }
-.form-group.row .col { flex: 1; }
-.input-grande { font-size: 2rem; text-align: center; height: 60px; }
-.file-input { border: 1px dashed var(--border-color) !important; padding: 15px !important; background: #f8fafc; cursor: pointer; }
-
-.modal-actions { 
-    display: flex; 
-    justify-content: flex-end; 
-    gap: 10px; 
-    margin-top: 1.5rem; 
-    flex-wrap: wrap; 
-}
-
-.btn-cancel, .btn-save { 
-    padding: 0.8rem 1.5rem; 
-    border-radius: 6px; 
-    cursor: pointer; 
-    font-weight: bold; 
-    font-size: 1rem; 
-    border: none; 
-    flex: 1; 
-    min-width: 120px; 
-    text-align: center; 
-    transition: filter 0.2s;
-}
-
-.btn-cancel:hover, .btn-save:hover { filter: brightness(0.9); }
-.btn-cancel { background: #e2e8f0; color: #475569; }
-.btn-save { background: #3b82f6; color: white; }
-.btn-copiar { background-color: var(--drawer-blue); width: 200px; }
-
-.textarea-pedido {
-    width: 100%; 
-    padding: 15px; 
-    border-radius: 6px; 
-    border: 1px solid var(--border-color); 
-    margin-bottom: 15px; 
-    font-family: inherit; 
-    resize: none; 
-    background-color: #f8fafc; 
-    font-size: 0.95rem;
-}
-
-.icone-alerta-grande { font-size: 3rem; color: #ef4444; margin-bottom: 15px; }
-.titulo-alerta { margin-bottom: 10px; }
-.mensagem-alerta { margin-bottom: 25px; color: #475569; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* =========================================================================
-   MEDIA QUERIES PARA MOBILE (CELULARES) - RESPONSIVIDADE COMPLETA
-========================================================================= */
-@media (max-width: 768px) {
-    .menu-toggle-mobile { display: block; } 
-
-    .sidebar { 
-        position: fixed; 
-        top: 0; 
-        left: 0; 
-        height: 100vh; 
-        width: 260px; 
-        transform: translateX(-100%); 
-        padding-top: 30px; 
-    }
-    .sidebar.open { transform: translateX(0); } 
-
-    .nav-item { 
-        flex-direction: row; 
-        justify-content: flex-start; 
-        padding: 15px 25px; 
-        font-size: 14px; 
-        gap: 15px; 
-        width: 100%; 
-        border-left: 4px solid transparent; 
-    }
-    .nav-item i { font-size: 20px; width: 30px; text-align: center; }
-    .nav-item.active { border-left: 4px solid #38bdf8; }
-
-    .nav-footer { 
-        margin-top: auto; 
-        padding: 20px 25px; 
-        display: flex; 
-        flex-direction: row; 
-        gap: 15px; 
-        font-size: 14px; 
-        justify-content: flex-start; 
-        align-items: center; 
-    }
-    .nav-footer i { margin-bottom: 0; width: 30px; text-align: center; }
-
-    .top-bar { padding: 0 1rem; height: 60px; }
-    .page-info h1 { font-size: 1rem; }
-    .user-profile { gap: 0.5rem; }
-    .user-avatar { width: 35px; height: 35px; font-size: 16px; }
-
-    .dashboard-wrapper { padding: 1rem; min-height: calc(100vh - 60px); }
-    .glass-panel { padding: 1.5rem; }
-    .glass-panel h2 { font-size: 1.8rem !important; }
-    .search-input-glass { padding: 1rem 1rem 1rem 50px; font-size: 1rem; }
-
-    #view-gavetas, #view-historico, #view-config, #view-compartimentos, #alerta-global-zerado { padding: 1rem; }
-
-    .kpi-grid { flex-direction: column; gap: 1rem; }
-    .kpi-summary { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
-
-    .btn-gaveta { padding: 0 1rem; height: 80px; }
-    .gaveta-content { gap: 1rem; }
-    .gnumber { font-size: 1.1rem; padding: 4px 10px; }
-    .glabel { font-size: 1rem; }
-    .btn-gaveta::after { width: 80%; }
-
-    /* No celular MANTEMOS as 5 colunas físicas do gaveteiro real,
-       só apertamos o gap/padding e deixamos as colunas encolherem (minmax 0). */
-    .grid-pecas {
-        --slot-gap: 6px;
-        --slot-altura: 54px;
-        padding: 6px;
-    }
-    .compartimento-card { padding: 7px; }
-    .card-title { font-size: 0.8rem; }
-    .card-local { font-size: 0.62rem; padding: 3px 6px; }
-    .badge-status { font-size: 0.58rem; padding: 3px 6px; }
-    .data-box strong, .quick-control strong { font-size: 1.05rem; }
-    .btn-conferir, .btn-requisitado, .btn-mover { font-size: 0.65rem; padding: 0.45rem; gap: 4px; }
-    .btn-quick { width: 26px; height: 26px; }
-
-    .header-gaveta { flex-direction: column; gap: 10px; text-align: center; }
-    #titulo-gaveta-aberta { width: 100%; order: -1; } 
-    .btn-voltar, .btn-add-item { width: 100%; }
-
-    .form-group.row { flex-direction: column; gap: 0; }
-    .log-item { flex-direction: column; align-items: flex-start; gap: 5px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    * { animation: none !important; transition: none !important; }
-}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>5S Manutenção - Gaveteiro Elétrico</title>
+
+    <meta name="theme-color" content="#1e3a5f">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+
+@@ -16,7 +16,6 @@
+
+    <div id="mobile-overlay" class="sidebar-overlay" onclick="window.toggleMenuMobile()"></div>
+
+    <!-- TELA DE AUTORIZAÇÃO DO DISPOSITIVO -->
+    <section id="view-device-auth" class="view-active lock-screen">
+        <div class="login-container lock-container">
+            <i class="fa-solid fa-lock lock-icon"></i>
+@@ -31,7 +30,6 @@
+        </div>
+    </section>
+
+    <!-- TELA DE LOGIN / REGISTRO -->
+    <section id="view-login" class="view-hidden">
+        <div class="login-container">
+            <h2>Sistema de Manutenção 5S</h2>
+@@ -72,7 +70,6 @@
+        </div>
+    </section>
+
+    <!-- APLICAÇÃO PRINCIPAL -->
+    <main id="app-container" class="view-hidden">
+
+        <nav class="sidebar" id="sidebar-menu">
+@@ -125,31 +122,28 @@
+
+            <div class="main-padding" id="area-conteudo-scroll">
+
+                <!-- ALERTA GLOBAL DE ESTOQUE ZERADO -->
+                <div id="alerta-global-zerado" class="alerta-global view-hidden">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem;"></i>
+                    <span id="texto-alerta-zerado"><strong>Atenção:</strong> Existem itens com estoque ZERADO no armário!</span>
+                </div>
+
+                <!-- VIEW: DASHBOARD DE BUSCA -->
+                <section id="view-dashboard" class="view-active">
+                    <div class="dashboard-wrapper">
+                        <div class="dashboard-overlay"></div>
+                        <div class="glass-panel">
+                            <h2 style="color: white; font-size: 2.5rem; margin-bottom: 15px; text-shadow: 2px 2px 8px rgba(0,0,0,0.8);">O que você procura hoje?</h2>
+                            <p style="color: #e2e8f0; margin-bottom: 35px; font-size: 1.2rem; text-shadow: 1px 1px 4px rgba(0,0,0,0.8);">Busque componentes em todos os compartimentos do sistema.</p>
+
+                            <div class="search-box-container">
+                                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                <input type="text" id="input-busca-global" class="search-input-glass" oninput="window.buscarPecasGlobal()" placeholder="Digite o nome ou local do item...">
+                            </div>
+
+                            <div id="resultados-busca-global" class="resultados-grid view-hidden"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: ARMÁRIO / LISTA DE GAVETAS -->
+                <section id="view-gavetas" class="view-hidden">
+                    <div class="relatorio-geral">
+                        <h3>Visão Geral do Armário</h3>
+@@ -164,36 +158,34 @@
+                        </div>
+                    </div>
+                    <p class="admin-only" style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9rem;">
+                        <i class="fa-solid fa-info-circle"></i> Como admin, você pode clicar e arrastar as gavetas abaixo para reorganizar a ordem do armário.
+                    </p>
+                    <div class="cabinet-vertical" id="menu-gavetas"></div>
+                </section>
+
+                <!-- VIEW: HISTÓRICO DE ATIVIDADES -->
+                <section id="view-historico" class="view-hidden">
+                    <div class="header-gaveta">
+                        <h2><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Atividades</h2>
+                    </div>
+                    <p class="subtitulo-historico">Acompanhe todas as retiradas, adições e modificações feitas no sistema.</p>
+                    <div id="lista-historico" class="historico-lista"></div>
+                </section>
+
+                <!-- VIEW: CONFIGURAÇÕES (SOMENTE ADMIN) -->
+                <section id="view-config" class="view-hidden">
+                    <div class="header-gaveta"><h2><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2></div>
+                    <div class="config-grid">
+                        <div class="config-card">
+                            <h3><i class="fa-solid fa-database"></i> Backup do Sistema</h3>
+                            <p>Baixe todos os dados salvos ou restaure um arquivo de backup anterior para o sistema.</p>
+                            <div class="config-buttons">
+                                <button class="btn-save" onclick="window.fazerBackup()"><i class="fa-solid fa-download"></i> Baixar Arquivo</button>
+                                <button class="btn-cancel" onclick="document.getElementById('input-restore').click()"><i class="fa-solid fa-upload"></i> Restaurar</button>
+                                <input type="file" id="input-restore" style="display: none;" accept=".json" onchange="window.restaurarBackup(event)">
+                            </div>
+                        </div>
+                        <div class="config-card">
+                            <h3><i class="fa-solid fa-file-excel"></i> Planilhas Excel (CSV)</h3>
+                            <p>Exporte o relatório atualizado do estoque do armário ou baixe os registros do histórico.</p>
+                            <div class="config-buttons">
+                                <button class="btn-save" style="background-color: #10b981;" onclick="window.exportarEstoqueCSV()"><i class="fa-solid fa-boxes-stacked"></i> Estoque</button>
+                                <button class="btn-save" style="background-color: #3b82f6;" onclick="window.exportarHistoricoCSV()"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+@@ -202,72 +194,122 @@
+                    </div>
+                </section>
+
+                <!-- VIEW: INTERIOR DA GAVETA (COLMEIA INDUSTRIAL 5 COLUNAS) -->
+                <section id="view-compartimentos" class="view-hidden">
+                    <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%;">
+                        <button class="btn-voltar" onclick="window.voltarParaGavetas()">⬅ Voltar</button>
+                        <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1;">Gaveta X</h2>
+                        <button class="btn-add-item admin-only" onclick="window.abrirModalCadastro()">
+                            <i class="fa-solid fa-plus"></i> Nova Peça
+                        </button>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem; text-align: center;">
+                        <i class="fa-solid fa-table-cells"></i> Vista interna do gaveteiro: 5 colunas físicas. A altura de cada encaixe segue o campo <strong>"Altura Física (Slots)"</strong> da peça.
+                    </p>
+                    <div id="container-divisorias"></div>
+
+
+
+
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL: CADASTRAR NOVA PEÇA -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="modal-cadastro" class="modal-overlay view-hidden">
+        <div class="modal-content">
+            <h3>Cadastrar Novo Componente</h3>
+            <p id="modal-gaveta-alvo" class="modal-subtitle"></p>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Item/Local (Opcional):</label>
+                    <input type="text" id="novo-codigo" placeholder="Ex: G2-01">
+                </div>
+                <div class="col">
+                    <label>Nome da Peça:</label>
+                    <input type="text" id="novo-nome" placeholder="Ex: Contatora">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Padrão 5S (Qtd Ideal):</label>
+                    <input type="number" id="novo-esperado" min="1" value="1">
+                </div>
+                <div class="col">
+                    <label>Qtd Física Atual:</label>
+                    <input type="number" id="novo-atual" min="0" value="0">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Divisória (Letra/Nome):</label>
+                    <input type="text" id="novo-divisoria" placeholder="Ex: A, B, Geral..." value="Geral">
+                </div>
+                <div class="col">
+                    <label>Altura Física (Slots):</label>
+                    <input type="number" id="novo-tamanho" placeholder="Ex: 1, 2, 3, 6, 10..." min="1" value="1">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Ordem na Gaveta (Ex: 1, 2, 3...):</label>
+                    <input type="number" id="novo-posicao" placeholder="Deixe em branco para o final" min="1">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Foto do Componente (Opcional):</label>
+                <input type="file" id="novo-imagem" accept="image/*" class="file-input">
+            </div>
+
+@@ -278,176 +320,85 @@
+        </div>
+    </div>
+
+    <!-- MODAL: EDITAR PEÇA -->
+    <div id="modal-editar-peca" class="modal-overlay view-hidden">
+        <div class="modal-content">
+            <h3>Editar Componente</h3>
+            <p class="modal-subtitle">Altere as informações da peça selecionada.</p>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Item/Local:</label>
+                    <input type="text" id="edit-peca-codigo">
+                </div>
+                <div class="col">
+                    <label>Nome da Peça:</label>
+                    <input type="text" id="edit-peca-nome">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Padrão 5S (Qtd Ideal):</label>
+                    <input type="number" id="edit-peca-esperado" min="1">
+                </div>
+                <div class="col">
+                    <label>Qtd Física Atual:</label>
+                    <input type="number" id="edit-peca-atual" min="0">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Divisória (Letra/Nome):</label>
+                    <input type="text" id="edit-peca-divisoria" placeholder="Ex: A, B, Geral...">
+                </div>
+                <div class="col">
+                    <label>Altura Física (Slots):</label>
+                    <input type="number" id="edit-peca-tamanho" placeholder="Ex: 1, 2, 3, 6, 10..." min="1">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div class="col">
+                    <label>Ordem na Gaveta (Ex: 1, 2, 3...):</label>
+                    <input type="number" id="edit-peca-posicao" placeholder="Deixe em branco para o final" min="1">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Nova Foto (Deixe em branco para manter a atual):</label>
+                <input type="file" id="edit-peca-imagem" accept="image/*" class="file-input">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="window.fecharModalEditarPeca()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarEdicaoPeca()">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CONTAGEM FÍSICA -->
+    <div id="modal-conferencia" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3 id="conf-nome-peca">Nome da Peça</h3>
+            <p class="modal-subtitle">Informe a quantidade física exata na gaveta agora.</p>
+            
+            <div class="form-group text-center">
+                <label>Quantidade Atual:</label>
+                <input type="number" id="conf-qtd-atual" min="0" class="input-grande">
+            </div>
+            
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="window.fecharModalConferencia()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarConferencia()">Confirmar Contagem</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: RENOMEAR GAVETA -->
+    <div id="modal-editar-gaveta" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3>Editar Nome da Gaveta</h3>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Novo Nome:</label>
+                <input type="text" id="edit-gaveta-nome" placeholder="Ex: Sensores">
+            </div>
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="window.fecharModalEditarGaveta()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarNomeGaveta()">Salvar Alteração</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PEDIDO DE PEÇAS -->
+    <div id="modal-pedido" class="modal-overlay view-hidden">
+        <div class="modal-content modal-largo">
+            <h3>Solicitação de Compra</h3>
+            <p class="modal-subtitle" id="pedido-subtitle">Preencha os detalhes de cada item para gerar a solicitação.</p>
+            
+            <div id="formulario-pedido-itens" style="max-height: 55vh; overflow-y: auto; margin-bottom: 15px; padding-right: 10px;">
+            </div>
+
+            <textarea id="texto-pedido-gerado" readonly rows="14" class="textarea-pedido view-hidden"></textarea>
+            
+            <div class="modal-actions espacado">
+                <button class="btn-cancel" onclick="window.fecharModalPedido()">Fechar</button>
+                
+                <button id="btn-gerar-texto-pedido" class="btn-save" onclick="window.processarFormularioPedido()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Texto
+                </button>
+                
+                <button id="btn-copiar-pedido" class="btn-save btn-copiar view-hidden" onclick="window.copiarTextoPedido(event)">
+                    <i class="fa-solid fa-copy"></i> Copiar Mensagem
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: REDEFINIR SENHA OBRIGATÓRIA -->
+    <div id="modal-redefinir-senha" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3 style="color: var(--status-vermelho);"><i class="fa-solid fa-shield-halved"></i> Atualização de Segurança</h3>
+            <p class="modal-subtitle" style="margin-top: 10px;">Sua senha atual não atende aos novos requisitos corporativos de segurança. Por favor, crie uma nova senha forte para acessar o sistema.</p>
+            
+            <ul style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px; padding-left: 20px;">
+                <li>No mínimo 8 caracteres</li>
+                <li>Pelo menos uma letra maiúscula</li>
+                <li>Pelo menos uma letra minúscula</li>
+                <li>Pelo menos um número</li>
+                <li>Pelo menos um símbolo especial (@, !, #, $, etc.)</li>
+            </ul>
+
+            <div class="form-group">
+                <label>Nova Senha Forte:</label>
+                <input type="password" id="nova-senha-obrigatoria" placeholder="Digite a nova senha">
+            </div>
+            <div class="form-group">
+                <label>Confirme a Nova Senha:</label>
+                <input type="password" id="nova-senha-confirma" placeholder="Repita a senha">
+            </div>
+            
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="window.cancelarRedefinicaoSenha()">Cancelar Login</button>
+                <button class="btn-save" onclick="window.salvarSenhaObrigatoria()">Salvar e Entrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ALERTA GENÉRICO -->
+    <div id="modal-alerta" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno text-center">
+            <i class="fa-solid fa-circle-exclamation icone-alerta-grande"></i>
+            <h3 id="alerta-titulo" class="titulo-alerta">Atenção</h3>
+            <p id="alerta-mensagem" class="mensagem-alerta">Mensagem de erro aqui.</p>
+            <button class="btn-save btn-full" onclick="window.fecharAlerta()">Entendi</button>
+        </div>
+    </div>
+
+    <!-- MODAL: MOVER PEÇA DE GAVETA -->
+    <div id="modal-mover-peca" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3>Mover Peça de Gaveta</h3>
+            <p id="mover-peca-nome" class="modal-subtitle" style="font-weight:bold;font-size:1rem;color:#0f172a;"></p>
+            <div class="form-group" style="margin-top:15px;">
+                <label>Mover para a Gaveta:</label>
+                <select id="mover-destino-select" style="width:100%;padding:0.8rem;border:1px solid #e2e8f0;border-radius:8px;font-size:1rem;"></select>
+            </div>
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="window.fecharModalMoverPeca()">Cancelar</button>
+                <button class="btn-save" onclick="window.confirmarMoverPeca()">Confirmar Mover</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
