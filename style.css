@@ -305,7 +305,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
     padding: 2rem;
 }
 
-
 /* =========================================================================
    DASHBOARD DE BUSCA (CARROSSEL DINÂMICO JS E GLASSMORPHISM)
 ========================================================================= */
@@ -838,13 +837,10 @@ body:not(.is-admin) .admin-only { display: none !important; }
     transition: transform 0.15s, box-shadow 0.15s;
 }
 
-
 .compartimento-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 10px 18px rgba(0,0,0,0.18);
-
     z-index: 5;
-
 }
 
 /* SLOT VAZIO: espaços vazios físicos da gaveta (compartimentos sem peça) */
@@ -913,9 +909,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 
 .drag-handle-item:hover { color: #38bdf8; }
-
-
-
 
 .card-top { 
     display: flex; 
@@ -1117,18 +1110,12 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .btn-conferir { background: var(--cabinet-blue); color: white; border: none; }
 .btn-conferir:hover { background: var(--drawer-blue); }
 
-
-
-
-
-
 .btn-requisitado { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 .btn-requisitado:hover { background: #e2e8f0; }
 .btn-requisitado.ativo { background: #fef08a; color: #854d0e; border-color: #eab308; }
 
 .btn-mover { background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; }
 .btn-mover:hover { background: #7c3aed; color: white; }
-
 
 /* =========================================================================
    MODAIS E ALERTAS
@@ -1220,88 +1207,6 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .icone-alerta-grande { font-size: 3rem; color: #ef4444; margin-bottom: 15px; }
 .titulo-alerta { margin-bottom: 10px; }
 .mensagem-alerta { margin-bottom: 25px; color: #475569; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* =========================================================================
    MEDIA QUERIES PARA MOBILE (CELULARES) - RESPONSIVIDADE COMPLETA
