@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>5S Manutenção - Gaveteiro Elétrico</title>
-
+    
     <meta name="theme-color" content="#1e3a5f">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192x192.png">
-
-@@ -16,7 +16,6 @@
-
-
-
+    
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
 
     <div id="mobile-overlay" class="sidebar-overlay" onclick="window.toggleMenuMobile()"></div>
 
@@ -20,14 +20,14 @@
     <section id="view-device-auth" class="view-active lock-screen">
         <div class="login-container lock-container">
             <i class="fa-solid fa-lock lock-icon"></i>
-@@ -31,7 +30,6 @@
-
-
-
-
-
-
-
+            <h2>Acesso Restrito</h2>
+            <p>Este dispositivo não está autorizado para acessar a rede 5S da Manutenção.</p>
+            
+            <div class="form-group" style="margin-top: 2rem;">
+                <label>Chave de Liberação (Somente ADM)</label>
+                <input type="password" id="input-device-key" placeholder="Digite a chave mestre">
+            </div>
+            <button class="btn-login btn-auth" onclick="window.autorizarDispositivo()">Liberar Dispositivo</button>
         </div>
     </section>
 
@@ -35,96 +35,97 @@
     <section id="view-login" class="view-hidden">
         <div class="login-container">
             <h2>Sistema de Manutenção 5S</h2>
-@@ -72,7 +70,6 @@
+            <p id="login-subtitle">Controle de Gaveteiro Elétrico</p>
+            
+            <div id="form-entrar">
+                <div class="form-group">
+                    <label for="input-login-id">Crachá (WEG) ou E-mail (Admin)</label>
+                    <input type="text" id="input-login-id" placeholder="Usuario ou cadastro">
+                </div>
+                <div class="form-group">
+                    <label for="input-login-senha">Senha</label>
+                    <input type="password" id="input-login-senha" placeholder="Sua senha">
+                </div>
+                <button class="btn-login" onclick="window.realizarLogin()">Entrar no Sistema</button>
+                <p class="link-toggle" onclick="window.alternarTelaLogin()">Primeiro Acesso? Crie seu cadastro</p>
+            </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            <div id="form-registrar" class="view-hidden">
+                <div class="form-group">
+                    <label for="reg-nome">Nome do Colaborador</label>
+                    <input type="text" id="reg-nome" placeholder="Ex: Usuario">
+                </div>
+                <div class="form-group">
+                    <label for="reg-cracha">Código do Crachá (WEG)</label>
+                    <input type="text" id="reg-cracha" placeholder="Ex: 123456">
+                </div>
+                <div class="form-group">
+                    <label for="reg-senha">Crie uma Senha</label>
+                    <input type="password" id="reg-senha" placeholder="Sua senha secreta">
+                    <small style="display:block; margin-top:5px; color:var(--text-secondary); font-size:0.75rem; line-height: 1.2;">
+                        Mín. 8 caracteres, contendo 1 maiúscula, 1 minúscula, 1 número e 1 símbolo.
+                    </small>
+                </div>
+                <button class="btn-login btn-registrar" onclick="window.registrarUsuario()">Cadastrar e Entrar</button>
+                <p class="link-toggle" onclick="window.alternarTelaLogin()">Já possui cadastro? Voltar ao login</p>
+            </div>
         </div>
     </section>
 
     <!-- APLICAÇÃO PRINCIPAL -->
     <main id="app-container" class="view-hidden">
-
+        
         <nav class="sidebar" id="sidebar-menu">
-@@ -125,31 +122,28 @@
+            <div class="logo">5S</div>
+            <div class="nav-items">
+                <div class="nav-item active" onclick="window.mostrarTela('view-dashboard')">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <span>Início</span>
+                </div>
+                <div class="nav-item" onclick="window.mostrarTela('view-gavetas')">
+                    <i class="fa-solid fa-house"></i>
+                    <span>Armário</span>
+                </div>
+                <div class="nav-item admin-only" onclick="window.mostrarTela('view-historico')">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Histórico</span>
+                </div>
+                <div class="nav-item admin-only" onclick="window.mostrarTela('view-config')">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Ajustes</span>
+                </div>
+                <div class="nav-item" onclick="window.gerarEmailPedido()">
+                    <i class="fa-solid fa-envelope-open-text"></i>
+                    <span>Pedir Peças</span>
+                </div>
+            </div>
+            <div class="nav-footer" onclick="window.sairDoSistema()">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Sair</span>
+            </div>
+        </nav>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        <div class="content-area">
+            <header class="top-bar">
+                <div class="page-info">
+                    <div class="menu-toggle-mobile" onclick="window.toggleMenuMobile()">
+                        <i class="fa-solid fa-bars"></i>
+                    </div>
+                    <h1>5S Manutenção - Controle</h1>
+                </div>
+                <div class="user-profile">
+                    <div class="user-text">
+                        <p class="user-name" id="usuario-logado-nome">---</p>
+                        <p class="user-code" id="usuario-logado-codigo">---</p>
+                        <span id="badge-admin" class="badge-admin view-hidden">ADMIN</span>
+                    </div>
+                    <div class="user-avatar"><i class="fa-solid fa-user-gear"></i></div>
+                </div>
+            </header>
 
             <div class="main-padding" id="area-conteudo-scroll">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                
                 <!-- ALERTA GLOBAL DE ESTOQUE ZERADO -->
-
                 <div id="alerta-global-zerado" class="alerta-global view-hidden">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem;"></i>
                     <span id="texto-alerta-zerado"><strong>Atenção:</strong> Existem itens com estoque ZERADO no armário!</span>
@@ -137,7 +138,7 @@
                         <div class="glass-panel">
                             <h2 style="color: white; font-size: 2.5rem; margin-bottom: 15px; text-shadow: 2px 2px 8px rgba(0,0,0,0.8);">O que você procura hoje?</h2>
                             <p style="color: #e2e8f0; margin-bottom: 35px; font-size: 1.2rem; text-shadow: 1px 1px 4px rgba(0,0,0,0.8);">Busque componentes em todos os compartimentos do sistema.</p>
-
+                            
                             <div class="search-box-container">
                                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
                                 <input type="text" id="input-busca-global" class="search-input-glass" oninput="window.buscarPecasGlobal()" placeholder="Digite o nome ou local do item...">
@@ -152,14 +153,14 @@
                 <section id="view-gavetas" class="view-hidden">
                     <div class="relatorio-geral">
                         <h3>Visão Geral do Armário</h3>
-@@ -164,36 +158,34 @@
-
-
-
-
-
-
-
+                        <div class="kpi-grid">
+                            <div class="kpi-summary">
+                                <div class="kpi-big-number">
+                                    <span id="kpi-pendencias-count">0</span>
+                                    <p>Gavetas com<br>Alertas</p>
+                                </div>
+                            </div>
+                            <div class="kpi-status-list" id="kpi-lista-gavetas"></div>
                         </div>
                     </div>
                     <p class="admin-only" style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9rem;">
@@ -196,8 +197,8 @@
                             <div class="config-buttons">
                                 <button class="btn-save" style="background-color: #10b981;" onclick="window.exportarEstoqueCSV()"><i class="fa-solid fa-boxes-stacked"></i> Estoque</button>
                                 <button class="btn-save" style="background-color: #3b82f6;" onclick="window.exportarHistoricoCSV()"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
-@@ -202,72 +194,122 @@
-
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -214,10 +215,6 @@
                         <i class="fa-solid fa-table-cells"></i> Vista interna do gaveteiro: 5 colunas físicas. A altura de cada encaixe segue o campo <strong>"Altura Física (Slots)"</strong> da peça.
                     </p>
                     <div id="container-divisorias"></div>
-
-
-
-
                 </section>
 
             </div>
@@ -225,72 +222,11 @@
     </main>
 
     <!-- MODAL: CADASTRAR NOVA PEÇA -->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     <div id="modal-cadastro" class="modal-overlay view-hidden">
         <div class="modal-content">
             <h3>Cadastrar Novo Componente</h3>
             <p id="modal-gaveta-alvo" class="modal-subtitle"></p>
-
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Item/Local (Opcional):</label>
@@ -301,7 +237,7 @@
                     <input type="text" id="novo-nome" placeholder="Ex: Contatora">
                 </div>
             </div>
-
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Padrão 5S (Qtd Ideal):</label>
@@ -330,16 +266,15 @@
                     <input type="number" id="novo-posicao" placeholder="Deixe em branco para o final" min="1">
                 </div>
             </div>
-
             <div class="form-group">
                 <label>Foto do Componente (Opcional):</label>
                 <input type="file" id="novo-imagem" accept="image/*" class="file-input">
             </div>
-
-@@ -278,176 +320,85 @@
-
-
-
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="window.fecharModalCadastro()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarNovoItem()">Salvar Peça</button>
+            </div>
         </div>
     </div>
 
@@ -348,7 +283,7 @@
         <div class="modal-content">
             <h3>Editar Componente</h3>
             <p class="modal-subtitle">Altere as informações da peça selecionada.</p>
-
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Item/Local:</label>
@@ -359,7 +294,7 @@
                     <input type="text" id="edit-peca-nome">
                 </div>
             </div>
-
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Padrão 5S (Qtd Ideal):</label>
@@ -388,12 +323,11 @@
                     <input type="number" id="edit-peca-posicao" placeholder="Deixe em branco para o final" min="1">
                 </div>
             </div>
-
             <div class="form-group">
                 <label>Nova Foto (Deixe em branco para manter a atual):</label>
                 <input type="file" id="edit-peca-imagem" accept="image/*" class="file-input">
             </div>
-
+            
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="window.fecharModalEditarPeca()">Cancelar</button>
                 <button class="btn-save" onclick="window.salvarEdicaoPeca()">Salvar Alterações</button>
@@ -517,3 +451,4 @@
 
     <script type="module" src="script.js"></script>
 </body>
+</html>
