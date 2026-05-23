@@ -1,49 +1,100 @@
-const CACHE_NAME = '5s-manutencao-v4';
+/* =========================================================================
+   SERVICE WORKER — 5S Manutenção
+   Estratégia:
+   - Navegação (HTML): network-first  -> sempre tenta a versão nova online,
+     cai no cache só quando estiver offline. Isso evita "app travado" numa
+     versão antiga depois de um deploy.
+   - Estáticos (css/js/png/manifest): stale-while-revalidate -> abre rápido
+     do cache e atualiza em segundo plano.
+   - Cross-origin (Firebase, Cloudinary, gstatic): NÃO intercepta. Deixa o
+     navegador cuidar. O SW só gerencia os arquivos do próprio app.
+========================================================================= */
+const CACHE_NAME = '5s-manutencao-v5';
 const ASSETS_TO_CACHE = [
-    './',
-    './index.html',
-    './style.css',
-    './script.js',
-    './manifest.json',
-    './icon-192x192.png',
-    './icon-512x512.png'
+  './',
+  './index.html',
+  './style.css',
+  './script.js',
+  './manifest.json',
+  './icon-192x192.png',
+  './icon-512x512.png',
+  './icon-maskable-192x192.png',
+  './icon-maskable-512x512.png',
+  './apple-touch-icon.png'
 ];
 
-self.addEventListener('install', event => {
-    self.skipWaiting();
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('5S Manutenção: Arquivos armazenados em cache.');
-                return cache.addAll(ASSETS_TO_CACHE);
-            })
-    );
+// INSTALL — pré-cacheia o app shell
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+  );
+  self.skipWaiting();
 });
 
-self.addEventListener('fetch', event => {
+// ACTIVATE — limpa caches antigos
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((names) =>
+      Promise.all(
+        names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))
+      )
+    ).then(() => self.clients.claim())
+  );
+});
+
+// FETCH
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+
+  // Só cuidamos de GET e do mesmo domínio do app.
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // Firebase/Cloudinary/gstatic passam direto
+
+  // Navegação (abrir o app): network-first
+  if (req.mode === 'navigate') {
     event.respondWith(
-        caches.match(event.request)
-            .then(response => {
-                if (response) {
-                    return response;
-                }
-                return fetch(event.request);
-            })
-    );
-});
-
-self.addEventListener('activate', event => {
-    const cacheWhitelist = [CACHE_NAME];
-    event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    if (cacheWhitelist.indexOf(cacheName) === -1) {
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put('./index.html', copy));
+          return res;
         })
+        .catch(() => caches.match('./index.html').then((r) => r || caches.match('./')))
     );
-    self.clients.claim();
+    return;
+  }
+
+  // CSS e JS: network-first -> sempre tenta o arquivo NOVO online; usa cache só offline.
+  // Isso garante que uma atualização de código apareça IMEDIATAMENTE (sem 2º reload).
+  if (url.pathname.endsWith('.css') || url.pathname.endsWith('.js')) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Demais estáticos (imagens, manifest): stale-while-revalidate
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      const network = fetch(req)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })
+  );
 });
