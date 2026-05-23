@@ -1203,22 +1203,32 @@ function distribuirEmColunas(pecas) {
     // Ordena pela posição definida pelo usuário (mantém intenção de ordem)
     const ordenadas = [...pecas].sort((a, b) => (a.position || 999) - (b.position || 999));
 
+    // FASE 1: peças com COLUNA ATRIBUÍDA manualmente (via arraste) vão direto pra ela
     ordenadas.forEach(peca => {
-        const tam = getTamanhoPeca(peca);
+        const col = parseInt(peca.coluna);
+        if (col >= 1 && col <= COLUNAS_GAVETA) {
+            const tam = getTamanhoPeca(peca);
+            colunas[col - 1].itens.push({ peca, tam });
+            colunas[col - 1].ocupacao += tam;
+        }
+    });
 
-        // BEST-FIT: acha a coluna mais vazia que ainda comporte a peça (≤ 10)
+    // FASE 2: peças SEM coluna definida → encaixe automático (best-fit balanceado)
+    ordenadas.forEach(peca => {
+        const col = parseInt(peca.coluna);
+        if (col >= 1 && col <= COLUNAS_GAVETA) return;  // já posicionada na fase 1
+
+        const tam = getTamanhoPeca(peca);
         let alvo = null, menorOcupacao = Infinity;
-        for (const col of colunas) {
-            if (col.ocupacao + tam <= ESPACOS_POR_COL && col.ocupacao < menorOcupacao) {
-                menorOcupacao = col.ocupacao;
-                alvo = col;
+        for (const c of colunas) {
+            if (c.ocupacao + tam <= ESPACOS_POR_COL && c.ocupacao < menorOcupacao) {
+                menorOcupacao = c.ocupacao;
+                alvo = c;
             }
         }
-        // Se não cabe em nenhuma respeitando o limite, usa a coluna mais curta (transbordo c/ scroll)
         if (!alvo) {
             alvo = colunas.reduce((min, c) => (c.ocupacao < min.ocupacao ? c : min), colunas[0]);
         }
-
         alvo.itens.push({ peca, tam });
         alvo.ocupacao += tam;
     });
@@ -1226,15 +1236,20 @@ function distribuirEmColunas(pecas) {
     return colunas;
 }
 
-// Monta o conteúdo interno de uma peça, adaptando o nível de detalhe ao tamanho.
-// Peças pequenas (1-2) ficam compactas; médias (3-4) mostram controle de qtd;
-// grandes (5+) mostram imagem. Toda a peça é clicável e abre o painel de ações.
+// Monta o conteúdo interno de uma peça. AGORA TODAS mostram foto:
+// - pequenas (1-2): layout HORIZONTAL (mini-foto à esquerda + nome/qtd à direita)
+// - médias/grandes (3+): layout VERTICAL com foto crescendo conforme o tamanho
+// Toda a peça é clicável e abre o painel de ações.
 function montarConteudoPeca(peca, tam, statusPeca) {
     const corQtd = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
     const tagDivisoria = (peca.divisoria && peca.divisoria !== 'Geral')
         ? `<span class="peca-tag-div">${peca.divisoria}</span>` : '';
 
-    // Controle rápido de quantidade (+/-) — aparece em médias e grandes
+    const imgHtml = peca.image
+        ? `<img src="${peca.image}" alt="${peca.name}">`
+        : `<i class="fa-solid fa-microchip peca-img-placeholder"></i>`;
+
+    // Controle rápido de quantidade (+/-)
     const controleQtd = `
         <div class="peca-qtd" onclick="event.stopPropagation()">
             <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
@@ -1243,33 +1258,21 @@ function montarConteudoPeca(peca, tam, statusPeca) {
         </div>`;
 
     if (tam <= 2) {
-        // COMPACTA: bolinha de status + nome + qtd. Toque abre ações.
+        // PEQUENA: horizontal — mini-foto + nome + quantidade. Mostra imagem também!
         return `
-            <div class="peca-cabecalho">
-                <span class="peca-status-dot ${statusPeca}"></span>
-                <span class="peca-nome-mini" title="${peca.name}">${peca.name}</span>
-                <span class="peca-qtd-mini" style="color:${corQtd}">${peca.current}</span>
+            <div class="peca-mini-conteudo">
+                <div class="peca-mini-img">${imgHtml}</div>
+                <div class="peca-mini-texto">
+                    <div class="peca-mini-topo">
+                        <span class="peca-status-dot ${statusPeca}"></span>
+                        <span class="peca-nome-mini" title="${peca.name}">${peca.name}</span>
+                    </div>
+                    ${controleQtd}
+                </div>
             </div>`;
     }
 
-    if (tam <= 4) {
-        // MÉDIA: status + nome + controle de quantidade
-        return `
-            <div class="peca-cabecalho">
-                <span class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</span>
-                ${tagDivisoria}
-            </div>
-            <div class="peca-nome">${peca.name}</div>
-            <div class="peca-rodape">
-                <span class="peca-padrao">5S: ${peca.expected}</span>
-                ${controleQtd}
-            </div>`;
-    }
-
-    // GRANDE (5+): mostra imagem ocupando o espaço extra
-    const imgHtml = peca.image
-        ? `<img src="${peca.image}" alt="${peca.name}">`
-        : `<i class="fa-solid fa-microchip peca-img-placeholder"></i>`;
+    // MÉDIA / GRANDE: vertical com foto ocupando o espaço extra
     return `
         <div class="peca-cabecalho">
             <span class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</span>
@@ -1302,49 +1305,134 @@ function renderizarPecasDaGaveta(idGaveta) {
     const gaveta = document.createElement('div');
     gaveta.className = 'gaveta-fisica';
 
+    const ehAdmin = usuarioLogado && usuarioLogado.role === 'ADMIN';
+
     colunas.forEach((coluna, indexColuna) => {
         const colDiv = document.createElement('div');
         colDiv.className = 'gaveta-coluna';
+        colDiv.dataset.coluna = indexColuna + 1;   // 1 a 5 (usado no arraste)
 
         coluna.itens.forEach(({ peca, tam }) => {
             const statusPeca = getPecaStatus(peca);
             const isVazio = (peca.name || '').trim().toLowerCase() === 'vazio';
 
             const pecaDiv = document.createElement('div');
-            // Classe por faixa de tamanho (controla o nível de detalhe visual)
             const faixa = tam <= 2 ? 'peca-mini' : (tam <= 4 ? 'peca-media' : 'peca-grande');
             pecaDiv.className = `peca-fisica ${faixa} status-borda-${statusPeca}` + (isVazio ? ' peca-vazia' : '');
 
-            // ALTURA PROPORCIONAL: cada espaço vertical = altura de 1 slot.
-            // Uma peça de tamanho N ocupa N slots de altura.
+            // ALTURA PROPORCIONAL: tamanho N ocupa N espaços verticais
             pecaDiv.style.flex = `0 0 calc(var(--slot-altura) * ${tam} + var(--slot-gap) * ${tam - 1})`;
 
             if (isVazio) {
                 pecaDiv.innerHTML = `<div class="peca-vazia-label"><i class="fa-solid fa-box-open"></i> livre</div>`;
             } else {
                 pecaDiv.innerHTML = montarConteudoPeca(peca, tam, statusPeca);
-                // Toda a peça é clicável → abre o painel de ações
                 pecaDiv.onclick = () => abrirAcoesPeca(peca.id);
                 pecaDiv.style.cursor = 'pointer';
+            }
+
+            // ---- ARRASTAR (somente ADMIN): mover peça entre colunas/posições ----
+            if (ehAdmin) {
+                pecaDiv.draggable = true;
+
+                pecaDiv.ondragstart = (e) => {
+                    // Não inicia arraste ao mexer nos botões +/-
+                    if (e.target.closest('button')) { e.preventDefault(); return; }
+                    draggedPecaId = peca.id;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => pecaDiv.classList.add('arrastando'), 0);
+                };
+                pecaDiv.ondragend = () => {
+                    pecaDiv.classList.remove('arrastando');
+                    draggedPecaId = null;
+                };
+                pecaDiv.ondragover = (e) => { e.preventDefault(); pecaDiv.classList.add('drop-alvo'); };
+                pecaDiv.ondragleave = () => pecaDiv.classList.remove('drop-alvo');
+                pecaDiv.ondrop = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pecaDiv.classList.remove('drop-alvo');
+                    soltarPecaSobre(peca.id, indexColuna + 1);
+                };
             }
 
             colDiv.appendChild(pecaDiv);
         });
 
-        // ESPAÇO LIVRE: se a coluna não encheu os 10 espaços, mostra a sobra
-        // como área vazia (igual a divisória vazia numa gaveta real).
+        // ESPAÇO LIVRE: sobra da coluna (também é área onde se pode SOLTAR uma peça)
         if (coluna.ocupacao < ESPACOS_POR_COL) {
-            const livre = coluna.ocupacao;
+            const livre = ESPACOS_POR_COL - coluna.ocupacao;
             const vazio = document.createElement('div');
             vazio.className = 'coluna-espaco-livre';
-            vazio.innerHTML = `<span><i class="fa-solid fa-grip-lines"></i><br>${ESPACOS_POR_COL - livre} livre(s)</span>`;
+            vazio.innerHTML = `<span><i class="fa-solid fa-grip-lines"></i><br>${livre} livre(s)</span>`;
             colDiv.appendChild(vazio);
+        }
+
+        // A COLUNA INTEIRA é uma área de drop: soltar aqui joga a peça pro fim desta coluna
+        if (ehAdmin) {
+            colDiv.ondragover = (e) => { e.preventDefault(); colDiv.classList.add('coluna-drop'); };
+            colDiv.ondragleave = () => colDiv.classList.remove('coluna-drop');
+            colDiv.ondrop = (e) => {
+                e.preventDefault();
+                colDiv.classList.remove('coluna-drop');
+                soltarPecaNaColuna(indexColuna + 1);
+            };
         }
 
         gaveta.appendChild(colDiv);
     });
 
     mainContainer.appendChild(gaveta);
+}
+
+// =========================================================================
+// MOVIMENTAÇÃO MANUAL POR ARRASTE
+// -------------------------------------------------------------------------
+// Duas formas de soltar:
+//  - soltarPecaSobre: largou em cima de OUTRA peça → assume a coluna dela e
+//    fica logo antes dela na ordem (position).
+//  - soltarPecaNaColuna: largou num espaço livre/coluna → vai pro fim daquela coluna.
+// A peça arrastada recebe um campo "coluna" (1-5). Como a posição é manual,
+// o sistema respeita e nunca sobrepõe (as peças empilham em sequência).
+// =========================================================================
+async function soltarPecaSobre(idAlvo, colunaDestino) {
+    if (!draggedPecaId || draggedPecaId === idAlvo) return;
+    const itens = database.items[gavetaAtualAberta];
+    const arrastada = itens.find(p => p.id === draggedPecaId);
+    const alvo      = itens.find(p => p.id === idAlvo);
+    if (!arrastada || !alvo) return;
+
+    arrastada.coluna = colunaDestino;
+    // Reordena: coloca a arrastada imediatamente antes da peça alvo
+    arrastada.position = (alvo.position || 1) - 0.5;
+    renumerarPosicoes(itens);
+
+    registrarLog(`moveu a peça "${arrastada.name}" para a coluna ${colunaDestino}.`);
+    await salvarItensDaGaveta(gavetaAtualAberta);
+    renderizarPecasDaGaveta(gavetaAtualAberta);
+}
+
+async function soltarPecaNaColuna(colunaDestino) {
+    if (!draggedPecaId) return;
+    const itens = database.items[gavetaAtualAberta];
+    const arrastada = itens.find(p => p.id === draggedPecaId);
+    if (!arrastada) return;
+
+    arrastada.coluna = colunaDestino;
+    // Vai pro fim: maior position atual + 1
+    const maxPos = itens.reduce((m, p) => Math.max(m, p.position || 0), 0);
+    arrastada.position = maxPos + 1;
+    renumerarPosicoes(itens);
+
+    registrarLog(`moveu a peça "${arrastada.name}" para a coluna ${colunaDestino}.`);
+    await salvarItensDaGaveta(gavetaAtualAberta);
+    renderizarPecasDaGaveta(gavetaAtualAberta);
+}
+
+// Renumera as posições de 1 em diante (mantém a ordem, limpa frações)
+function renumerarPosicoes(itens) {
+    itens.sort((a, b) => (a.position || 999) - (b.position || 999))
+         .forEach((p, i) => { p.position = i + 1; });
 }
 
 // =========================================================================
