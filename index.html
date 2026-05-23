@@ -294,34 +294,20 @@
 
             <div class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 2px solid #cbd5e1;">
                 <h4 style="margin: 0 0 12px 0; color: var(--drawer-blue); font-size: 0.95rem;">
-                    📍 Posicionamento na Grade 10×5 (Tipo Planilha Excel)
+                    📐 Tamanho Físico da Peça (encaixe automático)
                 </h4>
                 <div class="form-group row">
                     <div class="col">
-                        <label>Coluna Inicial (1-5):</label>
-                        <input type="number" id="novo-coluna" min="1" max="5" value="1" placeholder="1 a 5" oninput="window.atualizarPreviewGrid('novo')">
-                    </div>
-                    <div class="col">
-                        <label>Linha Inicial (1-10):</label>
-                        <input type="number" id="novo-linha" min="1" max="10" value="1" placeholder="1 a 10" oninput="window.atualizarPreviewGrid('novo')">
+                        <label>Tamanho (1 a 10 espaços verticais):</label>
+                        <input type="number" id="novo-tamanho" min="1" max="10" value="2" placeholder="1 a 10" oninput="window.atualizarPreviewTamanho('novo')">
                     </div>
                 </div>
-                <div class="form-group row">
-                    <div class="col">
-                        <label>Quantas Colunas Ocupa:</label>
-                        <input type="number" id="novo-largura-colunas" min="1" max="5" value="1" placeholder="1 a 5" oninput="window.atualizarPreviewGrid('novo')">
-                    </div>
-                    <div class="col">
-                        <label>Quantas Linhas Ocupa:</label>
-                        <input type="number" id="novo-altura-linhas" min="1" max="10" value="6" placeholder="1 a 10" oninput="window.atualizarPreviewGrid('novo')">
-                    </div>
-                </div>
-                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin: 8px 0;">
-                    💡 Exemplo: coluna 1, linha 1, largura 1, altura 10 = ocupa a primeira coluna inteira.
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin: 4px 0 8px;">
+                    💡 1 = encaixe pequeno · 5 = metade da coluna · 10 = coluna inteira. O sistema encaixa a peça automaticamente no melhor espaço livre — sem você precisar escolher coluna/linha.
                 </small>
-                <div class="grid-preview-wrapper">
-                    <span class="grid-preview-label">Pré-visualização (azul = onde a peça vai ficar):</span>
-                    <div id="novo-grid-preview" class="grid-preview"></div>
+                <div class="tam-preview-wrapper">
+                    <span class="grid-preview-label">Quanto ocupa numa coluna:</span>
+                    <div id="novo-tam-preview" class="tam-preview"></div>
                 </div>
             </div>
 
@@ -380,34 +366,20 @@
 
             <div class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 2px solid #cbd5e1;">
                 <h4 style="margin: 0 0 12px 0; color: var(--drawer-blue); font-size: 0.95rem;">
-                    📍 Posicionamento na Grade 10×5 (Tipo Planilha Excel)
+                    📐 Tamanho Físico da Peça (encaixe automático)
                 </h4>
                 <div class="form-group row">
                     <div class="col">
-                        <label>Coluna Inicial (1-5):</label>
-                        <input type="number" id="edit-peca-coluna" min="1" max="5" placeholder="1 a 5" oninput="window.atualizarPreviewGrid('edit')">
-                    </div>
-                    <div class="col">
-                        <label>Linha Inicial (1-10):</label>
-                        <input type="number" id="edit-peca-linha" min="1" max="10" placeholder="1 a 10" oninput="window.atualizarPreviewGrid('edit')">
+                        <label>Tamanho (1 a 10 espaços verticais):</label>
+                        <input type="number" id="edit-peca-tamanho" min="1" max="10" placeholder="1 a 10" oninput="window.atualizarPreviewTamanho('edit')">
                     </div>
                 </div>
-                <div class="form-group row">
-                    <div class="col">
-                        <label>Quantas Colunas Ocupa:</label>
-                        <input type="number" id="edit-peca-largura-colunas" min="1" max="5" placeholder="1 a 5" oninput="window.atualizarPreviewGrid('edit')">
-                    </div>
-                    <div class="col">
-                        <label>Quantas Linhas Ocupa:</label>
-                        <input type="number" id="edit-peca-altura-linhas" min="1" max="10" placeholder="1 a 10" oninput="window.atualizarPreviewGrid('edit')">
-                    </div>
-                </div>
-                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin: 8px 0;">
-                    💡 Exemplo: coluna 1, linha 1, largura 1, altura 10 = ocupa a primeira coluna inteira.
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin: 4px 0 8px;">
+                    💡 1 = encaixe pequeno · 5 = metade da coluna · 10 = coluna inteira. O sistema reencaixa automaticamente.
                 </small>
-                <div class="grid-preview-wrapper">
-                    <span class="grid-preview-label">Pré-visualização (azul = onde a peça vai ficar):</span>
-                    <div id="edit-grid-preview" class="grid-preview"></div>
+                <div class="tam-preview-wrapper">
+                    <span class="grid-preview-label">Quanto ocupa numa coluna:</span>
+                    <div id="edit-tam-preview" class="tam-preview"></div>
                 </div>
             </div>
 
@@ -621,6 +593,20 @@
             <div class="modal-actions centralizado">
                 <button class="btn-cancel" onclick="window.fecharModalNovaGaveta()">Cancelar</button>
                 <button class="btn-save" onclick="window.salvarNovaGaveta()">Criar Gaveta</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PAINEL DE AÇÕES DA PEÇA (abre ao tocar numa peça da gaveta) -->
+    <div id="modal-acoes-peca" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3 id="acoes-peca-nome">Peça</h3>
+            <p class="modal-subtitle" id="acoes-peca-info"></p>
+            <div id="acoes-peca-imagem" style="display:flex; align-items:center; justify-content:center; min-height:120px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-bottom:12px;"></div>
+            <div id="acoes-peca-qtd" style="display:flex; align-items:center; justify-content:space-between; background:var(--bg-grey); padding:12px; border-radius:8px; margin-bottom:12px;"></div>
+            <div id="acoes-peca-botoes" class="botoes-acao-card"></div>
+            <div class="modal-actions centralizado" style="margin-top:12px;">
+                <button class="btn-cancel btn-full" onclick="window.fecharAcoesPeca()">Fechar</button>
             </div>
         </div>
     </div>
