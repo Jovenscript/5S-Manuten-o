@@ -1371,7 +1371,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
     background-image: linear-gradient(135deg, #24496f, #15304d);
     box-shadow: inset 0 0 28px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.2);
     overflow-x: auto;   /* em telas estreitas, rola na horizontal (mantém as 5 colunas) */
-    align-items: stretch;
+    align-items: flex-start;   /* NÃO estica colunas: cada uma tem altura própria de 10 espaços */
 }
 
 /* Cada uma das 5 colunas verticais (divisória metálica) */
@@ -1386,8 +1386,9 @@ body:not(.is-admin) .admin-only { display: none !important; }
     background: rgba(0,0,0,0.18);
     border-left: 2px solid rgba(255,255,255,0.06);
     border-right: 2px solid rgba(0,0,0,0.28);
-    /* Altura física = 10 espaços. Cresce além disso só em transbordo (scroll da página). */
-    min-height: calc(var(--slot-altura) * 10 + var(--slot-gap) * 9 + 12px);
+    /* ALTURA FIXA = exatamente 10 espaços verticais. Assim uma peça de tamanho 10
+       ocupa a coluna INTEIRA, e a coluna nunca estica por causa de outra. */
+    height: calc(var(--slot-altura) * 10 + var(--slot-gap) * 9 + 12px);
 }
 
 /* Uma peça encaixada. A altura é setada inline (proporcional ao tamanho 1-10). */
