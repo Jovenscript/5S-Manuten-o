@@ -1320,8 +1320,9 @@ function renderizarPecasDaGaveta(idGaveta) {
             const faixa = tam <= 2 ? 'peca-mini' : (tam <= 4 ? 'peca-media' : 'peca-grande');
             pecaDiv.className = `peca-fisica ${faixa} status-borda-${statusPeca}` + (isVazio ? ' peca-vazia' : '');
 
-            // ALTURA PROPORCIONAL: tamanho N ocupa N espaços verticais
-            pecaDiv.style.flex = `0 0 calc(var(--slot-altura) * ${tam} + var(--slot-gap) * ${tam - 1})`;
+            // ALTURA PROPORCIONAL EXATA: tamanho N = N espaços × altura do slot.
+            // Sem somar gaps (que quebravam a conta). Coluna = 10 espaços exatos.
+            pecaDiv.style.flex = `0 0 calc(var(--slot-altura) * ${tam})`;
 
             if (isVazio) {
                 pecaDiv.innerHTML = `<div class="peca-vazia-label"><i class="fa-solid fa-box-open"></i> livre</div>`;
