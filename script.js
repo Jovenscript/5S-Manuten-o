@@ -1146,47 +1146,143 @@ async function salvarNovaGaveta() {
 }
 
 // =========================================================================
-// PRÉ-VISUALIZAÇÃO DO GRID 10x5 (mini-mapa no modal de cadastro/edição)
+// PRÉ-VISUALIZAÇÃO DO TAMANHO (barra mostrando quantos espaços a peça ocupa)
 // -------------------------------------------------------------------------
-// Desenha uma gradezinha de 5 colunas × 10 linhas e pinta de azul as células
-// que a peça vai ocupar, conforme os campos coluna/linha/largura/altura.
-// Atualiza em tempo real conforme o usuário digita (evento oninput).
-// 'prefixo' = 'novo' (cadastro) ou 'edit' (edição).
+// Desenha uma coluna de 10 espaços e pinta de azul os N de baixo, mostrando
+// visualmente quanto da coluna a peça vai ocupar. 'prefixo' = 'novo' ou 'edit'.
 // =========================================================================
-function atualizarPreviewGrid(prefixo) {
-    // Mapeia os IDs dos campos conforme o modal (cadastro x edição)
-    const ids = prefixo === 'edit'
-        ? { col: 'edit-peca-coluna', lin: 'edit-peca-linha', larg: 'edit-peca-largura-colunas', alt: 'edit-peca-altura-linhas', preview: 'edit-grid-preview' }
-        : { col: 'novo-coluna',      lin: 'novo-linha',      larg: 'novo-largura-colunas',      alt: 'novo-altura-linhas',      preview: 'novo-grid-preview' };
+function atualizarPreviewTamanho(prefixo) {
+    const idCampo   = prefixo === 'edit' ? 'edit-peca-tamanho' : 'novo-tamanho';
+    const idPreview = prefixo === 'edit' ? 'edit-tam-preview'  : 'novo-tam-preview';
 
-    const preview = document.getElementById(ids.preview);
+    const preview = document.getElementById(idPreview);
     if (!preview) return;
 
-    // Lê os valores (com limites de segurança)
-    const coluna = Math.min(5,  Math.max(1, parseInt(document.getElementById(ids.col).value)  || 1));
-    const linha  = Math.min(10, Math.max(1, parseInt(document.getElementById(ids.lin).value)  || 1));
-    const larg   = Math.min(5,  Math.max(1, parseInt(document.getElementById(ids.larg).value) || 1));
-    const alt    = Math.min(10, Math.max(1, parseInt(document.getElementById(ids.alt).value)  || 1));
+    const tam = Math.min(10, Math.max(1, parseInt(document.getElementById(idCampo).value) || 1));
 
-    // Marca se vai ultrapassar os limites do gaveteiro (fica vermelho)
-    const estoura = (coluna + larg - 1 > 5) || (linha + alt - 1 > 10);
-
-    // Redesenha as 50 células (5 colunas × 10 linhas)
+    // Desenha 10 espaços; os 'tam' de baixo ficam preenchidos
     preview.innerHTML = '';
-    for (let r = 1; r <= 10; r++) {
-        for (let c = 1; c <= 5; c++) {
-            const cell = document.createElement('div');
-            cell.className = 'grid-preview-cell';
-            const dentro = (c >= coluna && c < coluna + larg) && (r >= linha && r < linha + alt);
-            if (dentro) cell.classList.add(estoura ? 'ocupada-erro' : 'ocupada');
-            preview.appendChild(cell);
-        }
+    for (let i = 10; i >= 1; i--) {
+        const slot = document.createElement('div');
+        slot.className = 'tam-preview-slot' + (i <= tam ? ' preenchido' : '');
+        if (i === tam) slot.innerHTML = `<span>${tam}/10</span>`;
+        preview.appendChild(slot);
     }
 }
 
 
 
 
+
+// =========================================================================
+// DISTRIBUIÇÃO AUTOMÁTICA EM COLUNAS (BIN-PACKING / ENCAIXE INTELIGENTE)
+// -------------------------------------------------------------------------
+// Coração do novo layout. Recebe a lista de peças e distribui automaticamente
+// entre 5 colunas físicas (cada uma com 10 espaços verticais). Cada peça ocupa
+// um "tamanho" (1 a 10 espaços). O algoritmo é BEST-FIT balanceado:
+//   1. percorre as peças na ordem (campo position);
+//   2. coloca cada peça na coluna MAIS VAZIA que ainda comporte o tamanho dela;
+//   3. se não couber em nenhuma respeitando a capacidade 10, coloca na coluna
+//      mais curta mesmo assim (transbordo controlado → a gaveta ganha scroll).
+// Resultado: nunca há sobreposição, o espaço é equilibrado e parece uma
+// gaveta industrial real.
+// =========================================================================
+const COLUNAS_GAVETA   = 5;   // 5 divisórias verticais físicas
+const ESPACOS_POR_COL  = 10;  // 10 encaixes verticais por coluna
+
+function getTamanhoPeca(peca) {
+    // Lê o tamanho físico vertical (1-10). Aceita campos antigos por compatibilidade.
+    const t = parseInt(peca.tamanho ?? peca.alturaLinhas ?? peca.size ?? 1);
+    return Math.min(ESPACOS_POR_COL, Math.max(1, isNaN(t) ? 1 : t));
+}
+
+function distribuirEmColunas(pecas) {
+    // Inicializa as 5 colunas vazias
+    const colunas = Array.from({ length: COLUNAS_GAVETA }, () => ({ itens: [], ocupacao: 0 }));
+
+    // Ordena pela posição definida pelo usuário (mantém intenção de ordem)
+    const ordenadas = [...pecas].sort((a, b) => (a.position || 999) - (b.position || 999));
+
+    ordenadas.forEach(peca => {
+        const tam = getTamanhoPeca(peca);
+
+        // BEST-FIT: acha a coluna mais vazia que ainda comporte a peça (≤ 10)
+        let alvo = null, menorOcupacao = Infinity;
+        for (const col of colunas) {
+            if (col.ocupacao + tam <= ESPACOS_POR_COL && col.ocupacao < menorOcupacao) {
+                menorOcupacao = col.ocupacao;
+                alvo = col;
+            }
+        }
+        // Se não cabe em nenhuma respeitando o limite, usa a coluna mais curta (transbordo c/ scroll)
+        if (!alvo) {
+            alvo = colunas.reduce((min, c) => (c.ocupacao < min.ocupacao ? c : min), colunas[0]);
+        }
+
+        alvo.itens.push({ peca, tam });
+        alvo.ocupacao += tam;
+    });
+
+    return colunas;
+}
+
+// Monta o conteúdo interno de uma peça, adaptando o nível de detalhe ao tamanho.
+// Peças pequenas (1-2) ficam compactas; médias (3-4) mostram controle de qtd;
+// grandes (5+) mostram imagem. Toda a peça é clicável e abre o painel de ações.
+function montarConteudoPeca(peca, tam, statusPeca) {
+    const corQtd = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
+    const tagDivisoria = (peca.divisoria && peca.divisoria !== 'Geral')
+        ? `<span class="peca-tag-div">${peca.divisoria}</span>` : '';
+
+    // Controle rápido de quantidade (+/-) — aparece em médias e grandes
+    const controleQtd = `
+        <div class="peca-qtd" onclick="event.stopPropagation()">
+            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
+            <strong style="color:${corQtd}">${peca.current}</strong>
+            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
+        </div>`;
+
+    if (tam <= 2) {
+        // COMPACTA: bolinha de status + nome + qtd. Toque abre ações.
+        return `
+            <div class="peca-cabecalho">
+                <span class="peca-status-dot ${statusPeca}"></span>
+                <span class="peca-nome-mini" title="${peca.name}">${peca.name}</span>
+                <span class="peca-qtd-mini" style="color:${corQtd}">${peca.current}</span>
+            </div>`;
+    }
+
+    if (tam <= 4) {
+        // MÉDIA: status + nome + controle de quantidade
+        return `
+            <div class="peca-cabecalho">
+                <span class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</span>
+                ${tagDivisoria}
+            </div>
+            <div class="peca-nome">${peca.name}</div>
+            <div class="peca-rodape">
+                <span class="peca-padrao">5S: ${peca.expected}</span>
+                ${controleQtd}
+            </div>`;
+    }
+
+    // GRANDE (5+): mostra imagem ocupando o espaço extra
+    const imgHtml = peca.image
+        ? `<img src="${peca.image}" alt="${peca.name}">`
+        : `<i class="fa-solid fa-microchip peca-img-placeholder"></i>`;
+    return `
+        <div class="peca-cabecalho">
+            <span class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</span>
+            ${tagDivisoria}
+            <span class="peca-codigo">${peca.code || 'S/N'}</span>
+        </div>
+        <div class="peca-nome">${peca.name}</div>
+        <div class="peca-imagem">${imgHtml}</div>
+        <div class="peca-rodape">
+            <span class="peca-padrao">5S: ${peca.expected}</span>
+            ${controleQtd}
+        </div>`;
+}
 
 function renderizarPecasDaGaveta(idGaveta) {
     const mainContainer = document.getElementById('container-divisorias');
@@ -1199,187 +1295,129 @@ function renderizarPecasDaGaveta(idGaveta) {
         return;
     }
 
-    const grupos = {};
-    pecasBrutas.forEach(peca => {
-        const divi = (peca.divisoria || 'Geral').toUpperCase();
-        if (!grupos[divi]) grupos[divi] = [];
-        grupos[divi].push(peca);
-    });
+    // Distribui TODAS as peças da gaveta nas 5 colunas físicas (sem sobreposição)
+    const colunas = distribuirEmColunas(pecasBrutas);
 
-    const nomesDivisorias = Object.keys(grupos).sort();
+    // Container físico da gaveta (as 5 colunas com divisórias metálicas)
+    const gaveta = document.createElement('div');
+    gaveta.className = 'gaveta-fisica';
 
-    nomesDivisorias.forEach(nomeDivisoria => {
-        const headerDivi      = document.createElement('div');
-        headerDivi.className  = 'divisoria-header';
-        headerDivi.innerHTML  = `<i class="fa-solid fa-layer-group"></i> Divisória: ${nomeDivisoria}`;
-        mainContainer.appendChild(headerDivi);
+    colunas.forEach((coluna, indexColuna) => {
+        const colDiv = document.createElement('div');
+        colDiv.className = 'gaveta-coluna';
 
-        const gridDivi      = document.createElement('div');
-        gridDivi.className  = 'grid-pecas';
-
-        const pecasOrdenadas = grupos[nomeDivisoria].sort((a, b) => (a.position || 999) - (b.position || 999));
-
-        pecasOrdenadas.forEach(peca => {
-            const statusPeca   = getPecaStatus(peca);
-            const corQtd       = statusPeca === 'verde' ? 'var(--status-verde)' : 'var(--text-primary)';
-
-            const imgHtml      = peca.image 
-                ? `<img src="${peca.image}" alt="${peca.name}" style="max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply;">` 
-                : `<i class="fa-solid fa-microchip" style="font-size: 3rem; color: #94a3b8;"></i>`;
-
-            const retiradaHtml = peca.lastTakenBy ? `<div class="last-taken-info"><i class="fa-solid fa-clock-rotate-left"></i> Último a retirar: <strong>${peca.lastTakenBy}</strong></div>` : '';
-
-            const displayPosition = (peca.position && peca.position !== 999) ? peca.position : '-';
-
-            // Detecta espaços vazios: peças nomeadas "vazio" representam compartimentos físicos sem peça
+        coluna.itens.forEach(({ peca, tam }) => {
+            const statusPeca = getPecaStatus(peca);
             const isVazio = (peca.name || '').trim().toLowerCase() === 'vazio';
 
-            // GRID EXPLÍCITO 10x5 (tipo planilha Excel):
-            // Cada peça tem coordenadas fixas: coluna inicial (1-5), linha inicial (1-10),
-            // quantas colunas ocupa (largura/colspan), quantas linhas ocupa (altura/rowspan).
-            // Defaults para dados antigos sem posicionamento:
-            const coluna = parseInt(peca.coluna) || 1;
-            const linha = parseInt(peca.linha) || 1;
-            const larguraColunas = parseInt(peca.larguraColunas) || 1;
-            const alturaLinhas = parseInt(peca.alturaLinhas) || (isVazio ? 1 : 6);  // Vazios pequenos, cards normais ocupam 6 linhas
+            const pecaDiv = document.createElement('div');
+            // Classe por faixa de tamanho (controla o nível de detalhe visual)
+            const faixa = tam <= 2 ? 'peca-mini' : (tam <= 4 ? 'peca-media' : 'peca-grande');
+            pecaDiv.className = `peca-fisica ${faixa} status-borda-${statusPeca}` + (isVazio ? ' peca-vazia' : '');
 
-            const div      = document.createElement('div');
-            div.className  = isVazio ? 'compartimento-card slot-vazio' : 'compartimento-card';
-
-            // POSICIONAMENTO EXPLÍCITO: CSS Grid positioning
-            div.style.gridColumn    = `${coluna} / span ${larguraColunas}`;
-            div.style.gridRow       = `${linha} / span ${alturaLinhas}`;
-            div.style.display       = 'flex';
-            div.style.flexDirection = 'column';
-            div.style.height        = '100%';
-            div.style.minHeight     = '0';
+            // ALTURA PROPORCIONAL: cada espaço vertical = altura de 1 slot.
+            // Uma peça de tamanho N ocupa N slots de altura.
+            pecaDiv.style.flex = `0 0 calc(var(--slot-altura) * ${tam} + var(--slot-gap) * ${tam - 1})`;
 
             if (isVazio) {
-                // Renderizar espaço vazio: compartimento físico sem peça (dashed translúcido)
-                div.innerHTML = `
-                    <div class="slot-vazio-top">
-                        <span class="card-local">📌 Pos: ${displayPosition}</span>
-                        <span style="display:flex; gap:4px;">
-                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
-                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir"><i class="fa-solid fa-trash"></i></button>
-                        </span>
-                    </div>
-                    <div class="slot-vazio-corpo">
-                        <i class="fa-solid fa-box-open"></i>
-                        <span>Espaço vazio</span>
-                    </div>`;
+                pecaDiv.innerHTML = `<div class="peca-vazia-label"><i class="fa-solid fa-box-open"></i> livre</div>`;
             } else {
-                // Card normal: com imagem, botões, tudo visível (span clampado em 6 mínimo)
-                const imgBoxStyle = 'flex: 1 1 auto; min-height: 0;';
-                div.innerHTML = `
-                    <div class="card-top">
-                        <div>
-                            <i class="fa-solid fa-grip drag-handle-item admin-only" title="Arraste para reordenar a peça"></i>
-                            <span class="card-local" title="Posição exata no gaveteiro">📌 Pos: ${displayPosition} | Item: ${peca.code || 'S/N'}</span>
-                            <button class="btn-edit-peca admin-only" onclick="window.abrirModalEditarPeca(${peca.id})" title="Editar Peça"><i class="fa-solid fa-pen"></i></button>
-                            <button class="btn-excluir admin-only" onclick="window.excluirPeca(${peca.id})" title="Excluir Peça"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                        <div class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</div>
-                    </div>
-                    
-                    <div class="card-title">${peca.name}</div>
-                    
-                    <div class="card-image-box" style="${imgBoxStyle} background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 6px 0; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden;">
-                        ${imgHtml}
-                    </div>
-                    
-                    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
-                        <div class="card-data-row">
-                            <div class="data-box"><span>Padrão 5S</span><strong>${peca.expected}</strong></div>
-                            <div class="data-box">
-                                <span>Física Atual</span>
-                                <div class="quick-control">
-                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)"><i class="fa-solid fa-minus"></i></button>
-                                    <strong style="color:${corQtd}">${peca.current}</strong>
-                                    <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                        ${retiradaHtml}
-                        <div class="botoes-acao-card">
-                            <button class="btn-conferir" onclick="window.abrirModalConferencia(${peca.id})">
-                                <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
-                            </button>
-                            <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id})">
-                                <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
-                            </button>
-                            <button class="btn-mover admin-only" onclick="window.abrirModalMoverPeca(${peca.id})">
-                                <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
-                            </button>
-                        </div>
-                    </div>`;
+                pecaDiv.innerHTML = montarConteudoPeca(peca, tam, statusPeca);
+                // Toda a peça é clicável → abre o painel de ações
+                pecaDiv.onclick = () => abrirAcoesPeca(peca.id);
+                pecaDiv.style.cursor = 'pointer';
             }
 
-            // Lógica Drag and Drop de Peças (Somente ADMIN)
-            if (usuarioLogado && usuarioLogado.role === 'ADMIN') {
-                div.draggable = true;
-
-                div.ondragstart = (e) => {
-                    if(e.target.closest('.btn-quick') || e.target.closest('button')) {
-                        e.preventDefault();
-                        return;
-                    }
-                    draggedPecaId = peca.id;
-                    e.dataTransfer.effectAllowed = 'move';
-                    setTimeout(() => div.classList.add('dragging'), 0);
-                };
-
-                div.ondragover = (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    div.classList.add('drag-over');
-                };
-
-                div.ondragleave = () => { div.classList.remove('drag-over'); };
-
-                div.ondrop = async (e) => {
-                    e.preventDefault();
-                    div.classList.remove('drag-over');
-
-                    if (!draggedPecaId || draggedPecaId === peca.id) return;
-
-                    let itensGaveta = database.items[gavetaAtualAberta];
-
-                    const pecaArrastada = itensGaveta.find(p => p.id === draggedPecaId);
-                    const pecaAlvo = peca;
-
-                    if(!pecaArrastada || !pecaAlvo) return;
-
-                    pecaArrastada.divisoria = pecaAlvo.divisoria;
-
-                    let divisoriaItems = itensGaveta.filter(p => p.divisoria === pecaAlvo.divisoria).sort((a, b) => (a.position || 999) - (b.position || 999));
-
-                    divisoriaItems = divisoriaItems.filter(p => p.id !== draggedPecaId);
-
-                    const novoIndexAlvo = divisoriaItems.findIndex(p => p.id === pecaAlvo.id);
-
-                    divisoriaItems.splice(novoIndexAlvo, 0, pecaArrastada);
-
-                    divisoriaItems.forEach((p, index) => {
-                        p.position = index + 1;
-                    });
-
-                    registrarLog(`reordenou a peça "${pecaArrastada.name}" na gaveta`);
-
-                    await salvarItensDaGaveta(gavetaAtualAberta);
-                    renderizarPecasDaGaveta(gavetaAtualAberta);
-                };
-
-                div.ondragend = () => {
-                    div.classList.remove('dragging');
-                    draggedPecaId = null;
-                };
-            }
-
-            gridDivi.appendChild(div);
+            colDiv.appendChild(pecaDiv);
         });
-        mainContainer.appendChild(gridDivi);
+
+        // ESPAÇO LIVRE: se a coluna não encheu os 10 espaços, mostra a sobra
+        // como área vazia (igual a divisória vazia numa gaveta real).
+        if (coluna.ocupacao < ESPACOS_POR_COL) {
+            const livre = coluna.ocupacao;
+            const vazio = document.createElement('div');
+            vazio.className = 'coluna-espaco-livre';
+            vazio.innerHTML = `<span><i class="fa-solid fa-grip-lines"></i><br>${ESPACOS_POR_COL - livre} livre(s)</span>`;
+            colDiv.appendChild(vazio);
+        }
+
+        gaveta.appendChild(colDiv);
     });
+
+    mainContainer.appendChild(gaveta);
+}
+
+// =========================================================================
+// PAINEL DE AÇÕES DA PEÇA
+// -------------------------------------------------------------------------
+// Como os cards na gaveta física são compactos (parecem encaixes reais),
+// todas as ações (conferir, requisitar, mover, editar, excluir) ficam num
+// painel que abre ao TOCAR na peça. Isso mantém a gaveta limpa e funciona
+// muito bem no celular.
+// =========================================================================
+let pecaAcoesId = null;
+
+function abrirAcoesPeca(idPeca) {
+    pecaAcoesId = idPeca;
+    const peca = database.items[gavetaAtualAberta].find(p => p.id === idPeca);
+    if (!peca) return;
+
+    const statusPeca = getPecaStatus(peca);
+    const ehAdmin = usuarioLogado && usuarioLogado.role === 'ADMIN';
+
+    document.getElementById('acoes-peca-nome').innerText = peca.name;
+    document.getElementById('acoes-peca-info').innerHTML =
+        `<span class="badge-status ${statusPeca}">${getStatusText(statusPeca)}</span> ` +
+        `Item: ${peca.code || 'S/N'} · Divisória: ${peca.divisoria || 'Geral'} · Tamanho: ${getTamanhoPeca(peca)} espaço(s)`;
+
+    // Imagem (se houver)
+    const imgBox = document.getElementById('acoes-peca-imagem');
+    imgBox.innerHTML = peca.image
+        ? `<img src="${peca.image}" alt="${peca.name}" style="max-width:100%; max-height:160px; object-fit:contain; mix-blend-mode:multiply;">`
+        : `<i class="fa-solid fa-microchip" style="font-size:3rem; color:#cbd5e1;"></i>`;
+
+    // Quantidade atual com controle rápido
+    document.getElementById('acoes-peca-qtd').innerHTML = `
+        <span>Padrão 5S: <strong>${peca.expected}</strong></span>
+        <div class="quick-control">
+            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, -1); window.atualizarPainelAcoes()"><i class="fa-solid fa-minus"></i></button>
+            <strong id="acoes-qtd-valor">${peca.current}</strong>
+            <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1); window.atualizarPainelAcoes()"><i class="fa-solid fa-plus"></i></button>
+        </div>`;
+
+    // Botões de ação (alguns só para admin)
+    document.getElementById('acoes-peca-botoes').innerHTML = `
+        <button class="btn-conferir" onclick="window.fecharAcoesPeca(); window.abrirModalConferencia(${peca.id})">
+            <i class="fa-solid fa-clipboard-check"></i> Definir Contagem Exata
+        </button>
+        <button class="btn-requisitado ${peca.requested ? 'ativo' : ''}" onclick="window.alternarStatusRequisitado(${peca.id}); window.fecharAcoesPeca()">
+            <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
+        </button>
+        ${ehAdmin ? `
+        <button class="btn-mover" onclick="window.fecharAcoesPeca(); window.abrirModalMoverPeca(${peca.id})">
+            <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
+        </button>
+        <button class="btn-conferir" style="background:#0284c7" onclick="window.fecharAcoesPeca(); window.abrirModalEditarPeca(${peca.id})">
+            <i class="fa-solid fa-pen"></i> Editar Peça
+        </button>
+        <button class="btn-requisitado" style="background:#fee2e2;color:#b91c1c;border-color:#ef4444" onclick="window.fecharAcoesPeca(); window.excluirPeca(${peca.id})">
+            <i class="fa-solid fa-trash"></i> Excluir Peça
+        </button>` : ''}`;
+
+    document.getElementById('modal-acoes-peca').classList.remove('view-hidden');
+}
+
+// Atualiza só o número da quantidade no painel (após +/-) sem fechar
+function atualizarPainelAcoes() {
+    if (pecaAcoesId === null) return;
+    const peca = database.items[gavetaAtualAberta].find(p => p.id === pecaAcoesId);
+    const el = document.getElementById('acoes-qtd-valor');
+    if (peca && el) el.innerText = peca.current;
+}
+
+function fecharAcoesPeca() {
+    document.getElementById('modal-acoes-peca').classList.add('view-hidden');
+    pecaAcoesId = null;
 }
 
 function ajusteRapidoEstoque(idPeca, delta) {
@@ -1488,16 +1526,13 @@ function abrirModalCadastro() {
     document.getElementById('novo-esperado').value  = '1';
     document.getElementById('novo-atual').value     = '0';
     document.getElementById('novo-divisoria').value = 'Geral';
-    
-    // GRID 10x5: Defaults sensíveis para novo cadastro
-    document.getElementById('novo-coluna').value          = '1';
-    document.getElementById('novo-linha').value           = '1';
-    document.getElementById('novo-largura-colunas').value = '1';
-    document.getElementById('novo-altura-linhas').value   = '6';  // 6 linhas = card completo visível
-    
+
+    // TAMANHO FÍSICO: padrão 2 espaços (peça pequena/média)
+    document.getElementById('novo-tamanho').value   = '2';
+
     document.getElementById('novo-imagem').value    = '';
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
-    atualizarPreviewGrid('novo');
+    atualizarPreviewTamanho('novo');
     setTimeout(() => document.getElementById('novo-nome').focus(), 100);
 }
 
@@ -1510,20 +1545,14 @@ async function salvarNovoItem() {
     const atual     = parseInt(document.getElementById('novo-atual').value);
     const posicao   = parseInt(document.getElementById('novo-posicao').value) || 999;
     const divisoria = document.getElementById('novo-divisoria').value.trim() || 'Geral';
-    
-    // GRID 10x5: Posicionamento explícito tipo planilha
-    const coluna         = parseInt(document.getElementById('novo-coluna').value) || 1;
-    const linha          = parseInt(document.getElementById('novo-linha').value) || 1;
-    const larguraColunas = parseInt(document.getElementById('novo-largura-colunas').value) || 1;
-    const alturaLinhas   = parseInt(document.getElementById('novo-altura-linhas').value) || 6;
-    
+
+    // TAMANHO FÍSICO: quantos espaços verticais (1-10) a peça ocupa.
+    // A posição (coluna/linha) é calculada AUTOMATICAMENTE pelo bin-packing.
+    const tamanho   = Math.min(10, Math.max(1, parseInt(document.getElementById('novo-tamanho').value) || 1));
+
     const imgInput  = document.getElementById('novo-imagem');
 
     if (!nome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
-    
-    // Validação básica: não ultrapassar os limites do grid 10x5
-    if (coluna + larguraColunas - 1 > 5) return mostrarAlerta('Erro', 'Posicionamento inválido: ultrapassa as 5 colunas!');
-    if (linha + alturaLinhas - 1 > 10) return mostrarAlerta('Erro', 'Posicionamento inválido: ultrapassa as 10 linhas!');
 
     const btnSalvar = document.querySelector('#modal-cadastro .btn-save');
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
@@ -1536,13 +1565,8 @@ async function salvarNovoItem() {
         current:     atual, 
         position:    posicao,
         divisoria:   divisoria, 
-        // Grid 10x5 positioning:
-        coluna:          coluna,
-        linha:           linha,
-        larguraColunas:  larguraColunas,
-        alturaLinhas:    alturaLinhas,
-        // Legacy:
-        size:        alturaLinhas,  // Mantém compatibilidade com código antigo
+        tamanho:     tamanho,   // Tamanho físico vertical (1-10) — base do encaixe automático
+        size:        tamanho,   // Compatibilidade com código/dados antigos
         requested:   false, 
         lastTakenBy: null, 
         image:       null
@@ -1554,7 +1578,7 @@ async function salvarNovoItem() {
     }
 
     database.items[gavetaAtualAberta].push(novaPeca);
-    registrarLog(`cadastrou "${novaPeca.name}" na Divisória ${divisoria} (Grid: Col ${coluna}, Linha ${linha}).`);
+    registrarLog(`cadastrou "${novaPeca.name}" na Divisória ${divisoria} (tamanho ${tamanho}).`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     fecharModalCadastro();
 
@@ -1571,16 +1595,13 @@ function abrirModalEditarPeca(idPeca) {
     document.getElementById('edit-peca-atual').value     = peca.current;
     document.getElementById('edit-peca-posicao').value   = (peca.position && peca.position !== 999) ? peca.position : '';
     document.getElementById('edit-peca-divisoria').value = peca.divisoria || 'Geral';
-    
-    // GRID 10x5: Popular campos de posicionamento (com defaults pra dados antigos)
-    document.getElementById('edit-peca-coluna').value         = peca.coluna || 1;
-    document.getElementById('edit-peca-linha').value          = peca.linha || 1;
-    document.getElementById('edit-peca-largura-colunas').value = peca.larguraColunas || 1;
-    document.getElementById('edit-peca-altura-linhas').value  = peca.alturaLinhas || 6;
-    
+
+    // TAMANHO FÍSICO (1-10), com default pra dados antigos
+    document.getElementById('edit-peca-tamanho').value = getTamanhoPeca(peca);
+
     document.getElementById('edit-peca-imagem').value    = '';
     document.getElementById('modal-editar-peca').classList.remove('view-hidden');
-    atualizarPreviewGrid('edit');
+    atualizarPreviewTamanho('edit');
     setTimeout(() => document.getElementById('edit-peca-nome').focus(), 100);
 }
 
@@ -1593,20 +1614,13 @@ async function salvarEdicaoPeca() {
     const novoAtual     = parseInt(document.getElementById('edit-peca-atual').value);
     const novaPosicao   = parseInt(document.getElementById('edit-peca-posicao').value) || 999;
     const novaDivisoria = document.getElementById('edit-peca-divisoria').value.trim() || 'Geral';
-    
-    // GRID 10x5: Ler posicionamento
-    const novaColuna         = parseInt(document.getElementById('edit-peca-coluna').value) || 1;
-    const novaLinha          = parseInt(document.getElementById('edit-peca-linha').value) || 1;
-    const novaLarguraColunas = parseInt(document.getElementById('edit-peca-largura-colunas').value) || 1;
-    const novaAlturaLinhas   = parseInt(document.getElementById('edit-peca-altura-linhas').value) || 6;
-    
+
+    // TAMANHO FÍSICO (1-10) — posição é recalculada automaticamente
+    const novoTamanho   = Math.min(10, Math.max(1, parseInt(document.getElementById('edit-peca-tamanho').value) || 1));
+
     const imgInput      = document.getElementById('edit-peca-imagem');
 
     if (!novoNome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
-    
-    // Validação básica: não ultrapassar os limites do grid 10x5
-    if (novaColuna + novaLarguraColunas - 1 > 5) return mostrarAlerta('Erro', 'Posicionamento inválido: ultrapassa as 5 colunas!');
-    if (novaLinha + novaAlturaLinhas - 1 > 10) return mostrarAlerta('Erro', 'Posicionamento inválido: ultrapassa as 10 linhas!');
 
     const btnSalvar = document.querySelector('#modal-editar-peca .btn-save');
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
@@ -1618,13 +1632,8 @@ async function salvarEdicaoPeca() {
     peca.current    = novoAtual;
     peca.position   = novaPosicao;
     peca.divisoria  = novaDivisoria;
-    
-    // GRID 10x5:
-    peca.coluna          = novaColuna;
-    peca.linha           = novaLinha;
-    peca.larguraColunas  = novaLarguraColunas;
-    peca.alturaLinhas    = novaAlturaLinhas;
-    peca.size            = novaAlturaLinhas;  // Legacy compatibility
+    peca.tamanho    = novoTamanho;
+    peca.size       = novoTamanho;  // Compatibilidade
 
     if (peca.current >= peca.expected) peca.requested = false;
 
@@ -1633,7 +1642,7 @@ async function salvarEdicaoPeca() {
         catch (err) { mostrarAlerta('Aviso', 'Não foi possível enviar a nova foto. A imagem anterior foi mantida.'); }
     }
 
-    registrarLog(`editou as informações da peça "${peca.name}" (Grid: Col ${novaColuna}, Linha ${novaLinha})`);
+    registrarLog(`editou as informações da peça "${peca.name}" (tamanho ${novoTamanho})`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     fecharModalEditarPeca();
 
@@ -1862,5 +1871,8 @@ window.excluirContainer          = excluirContainer;
 window.abrirModalNovaGaveta      = abrirModalNovaGaveta;
 window.fecharModalNovaGaveta     = fecharModalNovaGaveta;
 window.salvarNovaGaveta          = salvarNovaGaveta;
-window.atualizarPreviewGrid      = atualizarPreviewGrid;
+window.atualizarPreviewTamanho   = atualizarPreviewTamanho;
+window.abrirAcoesPeca            = abrirAcoesPeca;
+window.fecharAcoesPeca           = fecharAcoesPeca;
+window.atualizarPainelAcoes      = atualizarPainelAcoes;
 window.toggleVerSenha            = toggleVerSenha;
