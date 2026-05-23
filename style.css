@@ -1358,8 +1358,8 @@ body:not(.is-admin) .admin-only { display: none !important; }
    Variáveis controlam a "altura de 1 espaço vertical" e o respiro entre peças.
 ========================================================================= */
 :root {
-    --slot-altura: 46px;   /* altura de 1 dos 10 espaços verticais */
-    --slot-gap:    6px;     /* respiro entre peças empilhadas */
+    --slot-altura: 64px;   /* altura de 1 dos 10 espaços verticais (maior = peças mais visíveis) */
+    --slot-gap:    7px;     /* respiro entre peças empilhadas */
 }
 
 /* Caixa metálica da gaveta: as 5 colunas lado a lado */
@@ -1408,6 +1408,10 @@ body:not(.is-admin) .admin-only { display: none !important; }
     z-index: 3;
     position: relative;
 }
+/* Feedback do arraste */
+.peca-fisica.arrastando { opacity: 0.4; transform: scale(0.97); }
+.peca-fisica.drop-alvo  { outline: 3px dashed #38bdf8; outline-offset: -3px; }
+.gaveta-coluna.coluna-drop { background: rgba(56,189,248,0.18); box-shadow: inset 0 0 0 2px #38bdf8; }
 /* Cor da faixa lateral conforme o status 5S */
 .status-borda-verde    { border-left-color: var(--status-verde); }
 .status-borda-amarelo  { border-left-color: var(--status-amarelo); }
@@ -1448,6 +1452,24 @@ body:not(.is-admin) .admin-only { display: none !important; }
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .peca-qtd-mini { font-weight: 800; font-size: 0.95rem; flex-shrink: 0; }
+
+/* PEÇA PEQUENA (1-2): layout horizontal com mini-foto à esquerda */
+.peca-mini-conteudo {
+    display: flex; gap: 8px; height: 100%; align-items: stretch;
+}
+.peca-mini-img {
+    flex: 0 0 38%; max-width: 90px;
+    display: flex; align-items: center; justify-content: center;
+    background: #f8fafc; border: 1px solid #eef2f7; border-radius: 6px;
+    overflow: hidden; padding: 3px;
+}
+.peca-mini-img img { max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.peca-mini-img .peca-img-placeholder { font-size: 1.3rem; }
+.peca-mini-texto {
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    justify-content: space-between; gap: 4px;
+}
+.peca-mini-topo { display: flex; align-items: center; gap: 6px; min-width: 0; }
 
 .peca-nome {
     font-weight: 700; font-size: 0.85rem; margin: 4px 0; line-height: 1.2;
