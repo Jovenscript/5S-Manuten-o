@@ -1380,27 +1380,30 @@ body:not(.is-admin) .admin-only { display: none !important; }
     min-width: 92px;       /* largura mínima legível; abaixo disso a gaveta rola */
     display: flex;
     flex-direction: column;
-    gap: var(--slot-gap);
+    gap: 0;                /* SEM espaço entre peças: a conta da altura fica exata */
     padding: 6px;
     border-radius: 8px;
     background: rgba(0,0,0,0.18);
     border-left: 2px solid rgba(255,255,255,0.06);
     border-right: 2px solid rgba(0,0,0,0.28);
-    /* ALTURA FIXA = exatamente 10 espaços verticais. Assim uma peça de tamanho 10
-       ocupa a coluna INTEIRA, e a coluna nunca estica por causa de outra. */
-    height: calc(var(--slot-altura) * 10 + var(--slot-gap) * 9 + 12px);
+    overflow: hidden;      /* segurança: nada vaza além dos 10 espaços */
+    box-sizing: border-box;
+    /* ALTURA FIXA = 10 espaços + padding. Tamanho 10 ocupa a coluna INTEIRA. */
+    height: calc(var(--slot-altura) * 10 + 12px);
 }
 
 /* Uma peça encaixada. A altura é setada inline (proporcional ao tamanho 1-10). */
 .peca-fisica {
     background: var(--main-bg);
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 8px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;       /* borda entra na altura → conta continua exata */
     box-shadow: 0 2px 5px rgba(0,0,0,0.28);
     border-left: 5px solid var(--drawer-blue);   /* faixa de status na lateral */
+    border-bottom: 2px solid rgba(15,23,42,0.15); /* divisória física entre encaixes */
     transition: transform 0.12s, box-shadow 0.12s;
 }
 .peca-fisica:hover {
