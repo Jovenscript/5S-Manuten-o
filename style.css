@@ -1358,7 +1358,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
    Variáveis controlam a "altura de 1 espaço vertical" e o respiro entre peças.
 ========================================================================= */
 :root {
-    --slot-altura: 64px;   /* altura de 1 dos 10 espaços verticais (maior = peças mais visíveis) */
+    --slot-altura: 33px;  /* altura de 1 dos 20 espaços (escala dobrada) */
     --slot-gap:    7px;     /* respiro entre peças empilhadas */
 }
 
@@ -1516,11 +1516,11 @@ body:not(.is-admin) .admin-only { display: none !important; }
     background: var(--cabinet-blue); box-shadow: inset 0 0 6px rgba(0,0,0,0.4);
 }
 .tam-preview-slot {
-    height: 13px; border-radius: 2px; background: rgba(255,255,255,0.12);
+    height: 7px; border-radius: 2px; background: rgba(255,255,255,0.12);
     display: flex; align-items: center; justify-content: center;
 }
-.tam-preview-slot.preenchido { background: #38bdf8; box-shadow: 0 0 4px rgba(56,189,248,0.6); }
-.tam-preview-slot span { font-size: 0.6rem; font-weight: 800; color: #0f172a; }
+.tam-preview-slot.preenchido { background: #38bdf8; box-shadow: 0 0 3px rgba(56,189,248,0.6); }
+.tam-preview-slot span { font-size: 0.5rem; font-weight: 800; color: #0f172a; }
 
 /* =========================================================================
    MEDIA QUERIES PARA MOBILE (CELULARES) - RESPONSIVIDADE COMPLETA
@@ -1529,7 +1529,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
     .menu-toggle-mobile { display: block; } 
 
     /* Gaveta física no celular: espaços menores, mas mantém as 5 colunas */
-    :root { --slot-altura: 40px; --slot-gap: 5px; }
+    :root { --slot-altura: 26px; --slot-gap: 5px; }
     .gaveta-coluna { min-width: 78px; padding: 4px; }
     .gaveta-fisica { padding: 8px; gap: 6px; }
     .peca-fisica { padding: 6px; }
