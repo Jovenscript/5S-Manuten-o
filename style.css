@@ -1358,7 +1358,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
    Variáveis controlam a "altura de 1 espaço vertical" e o respiro entre peças.
 ========================================================================= */
 :root {
-    --slot-altura: 33px;  /* altura de 1 dos 20 espaços (escala dobrada) */
+    --slot-altura: 54px;  /* espaços grandes e bem visíveis (escala 20) */
     --slot-gap:    7px;     /* respiro entre peças empilhadas */
 }
 
@@ -1386,10 +1386,10 @@ body:not(.is-admin) .admin-only { display: none !important; }
     background: rgba(0,0,0,0.18);
     border-left: 2px solid rgba(255,255,255,0.06);
     border-right: 2px solid rgba(0,0,0,0.28);
-    overflow: hidden;      /* segurança: nada vaza além dos 10 espaços */
     box-sizing: border-box;
-    /* ALTURA FIXA = 10 espaços + padding. Tamanho 10 ocupa a coluna INTEIRA. */
-    height: calc(var(--slot-altura) * 10 + 12px);
+    /* ALTURA MÍNIMA = 20 espaços. A coluna CRESCE se precisar (nunca corta itens).
+       A página rola pra baixo numa boa. */
+    min-height: calc(var(--slot-altura) * 20 + 12px);
 }
 
 /* Uma peça encaixada. A altura é setada inline (proporcional ao tamanho 1-10). */
@@ -1529,7 +1529,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
     .menu-toggle-mobile { display: block; } 
 
     /* Gaveta física no celular: espaços menores, mas mantém as 5 colunas */
-    :root { --slot-altura: 26px; --slot-gap: 5px; }
+    :root { --slot-altura: 40px; --slot-gap: 5px; }
     .gaveta-coluna { min-width: 78px; padding: 4px; }
     .gaveta-fisica { padding: 8px; gap: 6px; }
     .peca-fisica { padding: 6px; }
