@@ -1158,14 +1158,14 @@ function atualizarPreviewTamanho(prefixo) {
     const preview = document.getElementById(idPreview);
     if (!preview) return;
 
-    const tam = Math.min(10, Math.max(1, parseInt(document.getElementById(idCampo).value) || 1));
+    const tam = Math.min(20, Math.max(1, parseInt(document.getElementById(idCampo).value) || 1));
 
-    // Desenha 10 espaços; os 'tam' de baixo ficam preenchidos
+    // Desenha 20 espaços; os 'tam' de baixo ficam preenchidos
     preview.innerHTML = '';
-    for (let i = 10; i >= 1; i--) {
+    for (let i = 20; i >= 1; i--) {
         const slot = document.createElement('div');
         slot.className = 'tam-preview-slot' + (i <= tam ? ' preenchido' : '');
-        if (i === tam) slot.innerHTML = `<span>${tam}/10</span>`;
+        if (i === tam) slot.innerHTML = `<span>${tam}/20</span>`;
         preview.appendChild(slot);
     }
 }
@@ -1188,12 +1188,17 @@ function atualizarPreviewTamanho(prefixo) {
 // gaveta industrial real.
 // =========================================================================
 const COLUNAS_GAVETA   = 5;   // 5 divisórias verticais físicas
-const ESPACOS_POR_COL  = 10;  // 10 encaixes verticais por coluna
+const ESPACOS_POR_COL  = 20;  // ESCALA DOBRADA: 20 encaixes verticais (permite subdividir)
 
 function getTamanhoPeca(peca) {
-    // Lê o tamanho físico vertical (1-10). Aceita campos antigos por compatibilidade.
-    const t = parseInt(peca.tamanho ?? peca.alturaLinhas ?? peca.size ?? 1);
-    return Math.min(ESPACOS_POR_COL, Math.max(1, isNaN(t) ? 1 : t));
+    // Lê o tamanho físico vertical na ESCALA NOVA (1-20).
+    // MIGRAÇÃO AUTOMÁTICA: peças antigas (sem a flag 'escalaV2') foram salvas na
+    // escala antiga (1-10). Para manter a aparência, multiplicamos o tamanho por 2.
+    // Peças novas já nascem com escalaV2=true e usam o valor direto.
+    let t = parseInt(peca.tamanho ?? peca.alturaLinhas ?? peca.size ?? 1);
+    if (isNaN(t)) t = 1;
+    if (!peca.escalaV2) t = t * 2;   // converte escala antiga → nova
+    return Math.min(ESPACOS_POR_COL, Math.max(1, t));
 }
 
 function distribuirEmColunas(pecas) {
@@ -1257,7 +1262,7 @@ function montarConteudoPeca(peca, tam, statusPeca) {
             <button class="btn-quick" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)"><i class="fa-solid fa-plus"></i></button>
         </div>`;
 
-    if (tam <= 2) {
+    if (tam <= 4) {
         // PEQUENA: horizontal — mini-foto + nome + quantidade. Mostra imagem também!
         return `
             <div class="peca-mini-conteudo">
@@ -1317,7 +1322,7 @@ function renderizarPecasDaGaveta(idGaveta) {
             const isVazio = (peca.name || '').trim().toLowerCase() === 'vazio';
 
             const pecaDiv = document.createElement('div');
-            const faixa = tam <= 2 ? 'peca-mini' : (tam <= 4 ? 'peca-media' : 'peca-grande');
+            const faixa = tam <= 4 ? 'peca-mini' : (tam <= 8 ? 'peca-media' : 'peca-grande');
             pecaDiv.className = `peca-fisica ${faixa} status-borda-${statusPeca}` + (isVazio ? ' peca-vazia' : '');
 
             // ALTURA PROPORCIONAL EXATA: tamanho N = N espaços × altura do slot.
@@ -1617,7 +1622,7 @@ function abrirModalCadastro() {
     document.getElementById('novo-divisoria').value = 'Geral';
 
     // TAMANHO FÍSICO: padrão 2 espaços (peça pequena/média)
-    document.getElementById('novo-tamanho').value   = '2';
+    document.getElementById('novo-tamanho').value   = '4';
 
     document.getElementById('novo-imagem').value    = '';
     document.getElementById('modal-cadastro').classList.remove('view-hidden');
@@ -1637,7 +1642,7 @@ async function salvarNovoItem() {
 
     // TAMANHO FÍSICO: quantos espaços verticais (1-10) a peça ocupa.
     // A posição (coluna/linha) é calculada AUTOMATICAMENTE pelo bin-packing.
-    const tamanho   = Math.min(10, Math.max(1, parseInt(document.getElementById('novo-tamanho').value) || 1));
+    const tamanho   = Math.min(20, Math.max(1, parseInt(document.getElementById('novo-tamanho').value) || 1));
 
     const imgInput  = document.getElementById('novo-imagem');
 
@@ -1654,8 +1659,9 @@ async function salvarNovoItem() {
         current:     atual, 
         position:    posicao,
         divisoria:   divisoria, 
-        tamanho:     tamanho,   // Tamanho físico vertical (1-10) — base do encaixe automático
+        tamanho:     tamanho,   // Tamanho físico vertical na ESCALA NOVA (1-20)
         size:        tamanho,   // Compatibilidade com código/dados antigos
+        escalaV2:    true,      // Marca que já está na escala dobrada (não migrar de novo)
         requested:   false, 
         lastTakenBy: null, 
         image:       null
@@ -1705,7 +1711,7 @@ async function salvarEdicaoPeca() {
     const novaDivisoria = document.getElementById('edit-peca-divisoria').value.trim() || 'Geral';
 
     // TAMANHO FÍSICO (1-10) — posição é recalculada automaticamente
-    const novoTamanho   = Math.min(10, Math.max(1, parseInt(document.getElementById('edit-peca-tamanho').value) || 1));
+    const novoTamanho   = Math.min(20, Math.max(1, parseInt(document.getElementById('edit-peca-tamanho').value) || 1));
 
     const imgInput      = document.getElementById('edit-peca-imagem');
 
@@ -1723,6 +1729,7 @@ async function salvarEdicaoPeca() {
     peca.divisoria  = novaDivisoria;
     peca.tamanho    = novoTamanho;
     peca.size       = novoTamanho;  // Compatibilidade
+    peca.escalaV2   = true;         // Já na escala nova (1-20)
 
     if (peca.current >= peca.expected) peca.requested = false;
 
