@@ -611,6 +611,28 @@
         </div>
     </div>
 
+    <!-- MODAL: MESCLAR OU TROCAR (ao arrastar uma peça sobre outra) -->
+    <div id="modal-mesclar" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno text-center">
+            <div class="mesclar-icone"><i class="fa-solid fa-object-group"></i></div>
+            <h3 class="titulo-alerta">Compartilhar compartimento?</h3>
+            <p class="mensagem-alerta" id="mesclar-texto"></p>
+            <div class="mesclar-opcoes">
+                <button class="btn-mesclar-op btn-mesclar" onclick="window.confirmarMesclar()">
+                    <i class="fa-solid fa-object-group"></i>
+                    <span>Mesclar</span>
+                    <small>Os dois dividem o mesmo espaço, lado a lado</small>
+                </button>
+                <button class="btn-mesclar-op btn-trocar" onclick="window.confirmarTrocar()">
+                    <i class="fa-solid fa-right-left"></i>
+                    <span>Trocar de posição</span>
+                    <small>Um vai pro lugar do outro</small>
+                </button>
+            </div>
+            <button class="btn-cancel btn-full" style="margin-top:14px" onclick="window.fecharModalMesclar()">Cancelar</button>
+        </div>
+    </div>
+
     <script type="module" src="script.js"></script>
 </body>
 </html>
