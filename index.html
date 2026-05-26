@@ -298,12 +298,12 @@
                 </h4>
                 <div class="form-group row">
                     <div class="col">
-                        <label>Tamanho (1 a 10 espaços verticais):</label>
-                        <input type="number" id="novo-tamanho" min="1" max="10" value="2" placeholder="1 a 10" oninput="window.atualizarPreviewTamanho('novo')">
+                        <label>Tamanho (1 a 20 espaços verticais):</label>
+                        <input type="number" id="novo-tamanho" min="1" max="20" value="4" placeholder="1 a 20" oninput="window.atualizarPreviewTamanho('novo')">
                     </div>
                 </div>
                 <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin: 4px 0 8px;">
-                    💡 1 = encaixe pequeno · 5 = metade da coluna · 10 = coluna inteira. O sistema encaixa a peça automaticamente no melhor espaço livre — sem você precisar escolher coluna/linha.
+                    💡 1 = encaixe mínimo · 2 = pequeno · 10 = metade da coluna · 20 = coluna inteira. Dá pra dividir: 2 itens de tamanho 1 ocupam o espaço de um tamanho 2. O sistema encaixa automaticamente.
                 </small>
                 <div class="tam-preview-wrapper">
                     <span class="grid-preview-label">Quanto ocupa numa coluna:</span>
@@ -370,12 +370,12 @@
                 </h4>
                 <div class="form-group row">
                     <div class="col">
-                        <label>Tamanho (1 a 10 espaços verticais):</label>
-                        <input type="number" id="edit-peca-tamanho" min="1" max="10" placeholder="1 a 10" oninput="window.atualizarPreviewTamanho('edit')">
+                        <label>Tamanho (1 a 20 espaços verticais):</label>
+                        <input type="number" id="edit-peca-tamanho" min="1" max="20" placeholder="1 a 20" oninput="window.atualizarPreviewTamanho('edit')">
                     </div>
                 </div>
                 <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin: 4px 0 8px;">
-                    💡 1 = encaixe pequeno · 5 = metade da coluna · 10 = coluna inteira. O sistema reencaixa automaticamente.
+                    💡 1 = encaixe mínimo · 2 = pequeno · 10 = metade da coluna · 20 = coluna inteira. O sistema reencaixa automaticamente.
                 </small>
                 <div class="tam-preview-wrapper">
                     <span class="grid-preview-label">Quanto ocupa numa coluna:</span>
