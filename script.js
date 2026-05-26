@@ -1201,32 +1201,64 @@ function getTamanhoPeca(peca) {
     return Math.min(ESPACOS_POR_COL, Math.max(1, t));
 }
 
-function distribuirEmColunas(pecas) {
-    // Inicializa as 5 colunas vazias
-    const colunas = Array.from({ length: COLUNAS_GAVETA }, () => ({ itens: [], ocupacao: 0 }));
-
-    // Ordena pela posição definida pelo usuário (mantém intenção de ordem)
+// Agrupa as peças em BLOCOS. Um bloco é:
+//  - uma peça sozinha (ocupa a largura toda da coluna), OU
+//  - um grupo de peças MESCLADAS (mesmo 'grupoMescla') que ficam lado a lado,
+//    dividindo a largura. A altura do bloco = maior tamanho entre as peças do grupo.
+function montarBlocos(pecas) {
     const ordenadas = [...pecas].sort((a, b) => (a.position || 999) - (b.position || 999));
+    const blocosMap = new Map();   // grupoMescla -> bloco
+    const blocos = [];
 
-    // FASE 1: peças com COLUNA ATRIBUÍDA manualmente (via arraste) vão direto pra ela
     ordenadas.forEach(peca => {
-        const col = parseInt(peca.coluna);
-        if (col >= 1 && col <= COLUNAS_GAVETA) {
-            const tam = getTamanhoPeca(peca);
-            colunas[col - 1].itens.push({ peca, tam });
-            colunas[col - 1].ocupacao += tam;
+        const tam = getTamanhoPeca(peca);
+        const gid = peca.grupoMescla;
+
+        if (gid && blocosMap.has(gid)) {
+            // Junta no bloco mesclado já existente
+            const b = blocosMap.get(gid);
+            b.pecas.push(peca);
+            b.tam = Math.max(b.tam, tam);
+        } else {
+            const bloco = {
+                pecas:   [peca],
+                tam:     tam,
+                grupo:   gid || null,
+                coluna:  peca.coluna,
+                position: peca.position || 999
+            };
+            if (gid) blocosMap.set(gid, bloco);
+            blocos.push(bloco);
         }
     });
 
-    // FASE 2: peças SEM coluna definida → encaixe automático (best-fit balanceado)
-    ordenadas.forEach(peca => {
-        const col = parseInt(peca.coluna);
-        if (col >= 1 && col <= COLUNAS_GAVETA) return;  // já posicionada na fase 1
+    return blocos;
+}
 
-        const tam = getTamanhoPeca(peca);
+function distribuirEmColunas(pecas) {
+    // Inicializa as 5 colunas vazias
+    const colunas = Array.from({ length: COLUNAS_GAVETA }, () => ({ blocos: [], ocupacao: 0 }));
+
+    // Trabalha com BLOCOS (peça sozinha ou grupo mesclado)
+    const blocos = montarBlocos(pecas);
+
+    // FASE 1: blocos com COLUNA ATRIBUÍDA (via arraste) vão direto pra ela
+    blocos.forEach(bloco => {
+        const col = parseInt(bloco.coluna);
+        if (col >= 1 && col <= COLUNAS_GAVETA) {
+            colunas[col - 1].blocos.push(bloco);
+            colunas[col - 1].ocupacao += bloco.tam;
+        }
+    });
+
+    // FASE 2: blocos SEM coluna → encaixe automático (best-fit balanceado)
+    blocos.forEach(bloco => {
+        const col = parseInt(bloco.coluna);
+        if (col >= 1 && col <= COLUNAS_GAVETA) return;
+
         let alvo = null, menorOcupacao = Infinity;
         for (const c of colunas) {
-            if (c.ocupacao + tam <= ESPACOS_POR_COL && c.ocupacao < menorOcupacao) {
+            if (c.ocupacao + bloco.tam <= ESPACOS_POR_COL && c.ocupacao < menorOcupacao) {
                 menorOcupacao = c.ocupacao;
                 alvo = c;
             }
@@ -1234,8 +1266,8 @@ function distribuirEmColunas(pecas) {
         if (!alvo) {
             alvo = colunas.reduce((min, c) => (c.ocupacao < min.ocupacao ? c : min), colunas[0]);
         }
-        alvo.itens.push({ peca, tam });
-        alvo.ocupacao += tam;
+        alvo.blocos.push(bloco);
+        alvo.ocupacao += bloco.tam;
     });
 
     return colunas;
@@ -1317,17 +1349,14 @@ function renderizarPecasDaGaveta(idGaveta) {
         colDiv.className = 'gaveta-coluna';
         colDiv.dataset.coluna = indexColuna + 1;   // 1 a 5 (usado no arraste)
 
-        coluna.itens.forEach(({ peca, tam }) => {
+        // Função que cria o elemento visual de UMA peça (usada em blocos sozinhos e mesclados)
+        const fazerCardPeca = (peca, tam) => {
             const statusPeca = getPecaStatus(peca);
             const isVazio = (peca.name || '').trim().toLowerCase() === 'vazio';
 
             const pecaDiv = document.createElement('div');
             const faixa = tam <= 4 ? 'peca-mini' : (tam <= 8 ? 'peca-media' : 'peca-grande');
             pecaDiv.className = `peca-fisica ${faixa} status-borda-${statusPeca}` + (isVazio ? ' peca-vazia' : '');
-
-            // ALTURA PROPORCIONAL EXATA: tamanho N = N espaços × altura do slot.
-            // Sem somar gaps (que quebravam a conta). Coluna = 10 espaços exatos.
-            pecaDiv.style.flex = `0 0 calc(var(--slot-altura) * ${tam})`;
 
             if (isVazio) {
                 pecaDiv.innerHTML = `<div class="peca-vazia-label"><i class="fa-solid fa-box-open"></i> livre</div>`;
@@ -1337,32 +1366,48 @@ function renderizarPecasDaGaveta(idGaveta) {
                 pecaDiv.style.cursor = 'pointer';
             }
 
-            // ---- ARRASTAR (somente ADMIN): mover peça entre colunas/posições ----
+            // ---- ARRASTAR (somente ADMIN) ----
             if (ehAdmin) {
                 pecaDiv.draggable = true;
-
                 pecaDiv.ondragstart = (e) => {
-                    // Não inicia arraste ao mexer nos botões +/-
                     if (e.target.closest('button')) { e.preventDefault(); return; }
                     draggedPecaId = peca.id;
                     e.dataTransfer.effectAllowed = 'move';
                     setTimeout(() => pecaDiv.classList.add('arrastando'), 0);
                 };
-                pecaDiv.ondragend = () => {
-                    pecaDiv.classList.remove('arrastando');
-                    draggedPecaId = null;
-                };
+                pecaDiv.ondragend = () => { pecaDiv.classList.remove('arrastando'); draggedPecaId = null; };
                 pecaDiv.ondragover = (e) => { e.preventDefault(); pecaDiv.classList.add('drop-alvo'); };
                 pecaDiv.ondragleave = () => pecaDiv.classList.remove('drop-alvo');
                 pecaDiv.ondrop = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     pecaDiv.classList.remove('drop-alvo');
-                    soltarPecaSobre(peca.id, indexColuna + 1);
+                    // Soltou em cima de OUTRA peça → pergunta Mesclar ou Trocar
+                    abrirModalMesclar(peca.id, indexColuna + 1);
                 };
             }
+            return pecaDiv;
+        };
 
-            colDiv.appendChild(pecaDiv);
+        coluna.blocos.forEach(bloco => {
+            if (bloco.pecas.length === 1) {
+                // Bloco SOZINHO: ocupa a largura toda da coluna
+                const pecaDiv = fazerCardPeca(bloco.pecas[0], bloco.tam);
+                pecaDiv.style.flex = `0 0 calc(var(--slot-altura) * ${bloco.tam})`;
+                colDiv.appendChild(pecaDiv);
+            } else {
+                // Bloco MESCLADO: várias peças lado a lado dividindo a largura
+                const linha = document.createElement('div');
+                linha.className = 'bloco-mesclado';
+                linha.style.flex = `0 0 calc(var(--slot-altura) * ${bloco.tam})`;
+                bloco.pecas.forEach(p => {
+                    const card = fazerCardPeca(p, bloco.tam);
+                    card.style.flex = '1 1 0';   // largura igual dividida
+                    card.style.minWidth = '0';
+                    linha.appendChild(card);
+                });
+                colDiv.appendChild(linha);
+            }
         });
 
         // ESPAÇO LIVRE: sobra da coluna (também é área onde se pode SOLTAR uma peça)
@@ -1392,28 +1437,94 @@ function renderizarPecasDaGaveta(idGaveta) {
 }
 
 // =========================================================================
-// MOVIMENTAÇÃO MANUAL POR ARRASTE
+// MOVIMENTAÇÃO MANUAL POR ARRASTE + MESCLAR/TROCAR
 // -------------------------------------------------------------------------
-// Duas formas de soltar:
-//  - soltarPecaSobre: largou em cima de OUTRA peça → assume a coluna dela e
-//    fica logo antes dela na ordem (position).
-//  - soltarPecaNaColuna: largou num espaço livre/coluna → vai pro fim daquela coluna.
-// A peça arrastada recebe um campo "coluna" (1-5). Como a posição é manual,
-// o sistema respeita e nunca sobrepõe (as peças empilham em sequência).
+// - Soltar em cima de OUTRA peça → abre modal "Mesclar ou Trocar de posição".
+//     • Mesclar: as duas peças passam a dividir o mesmo compartimento (lado a lado).
+//     • Trocar: troca a posição/coluna das duas.
+// - Soltar num espaço livre/coluna → a peça vai pro fim daquela coluna.
 // =========================================================================
-async function soltarPecaSobre(idAlvo, colunaDestino) {
+let mesclaArrastadaId = null;
+let mesclaAlvoId      = null;
+
+function abrirModalMesclar(idAlvo, colunaDestino) {
     if (!draggedPecaId || draggedPecaId === idAlvo) return;
     const itens = database.items[gavetaAtualAberta];
     const arrastada = itens.find(p => p.id === draggedPecaId);
     const alvo      = itens.find(p => p.id === idAlvo);
     if (!arrastada || !alvo) return;
 
-    arrastada.coluna = colunaDestino;
-    // Reordena: coloca a arrastada imediatamente antes da peça alvo
-    arrastada.position = (alvo.position || 1) - 0.5;
+    mesclaArrastadaId = draggedPecaId;
+    mesclaAlvoId      = idAlvo;
+
+    document.getElementById('mesclar-texto').innerHTML =
+        `Arrastou <strong>${arrastada.name}</strong> sobre <strong>${alvo.name}</strong>.<br>O que você quer fazer?`;
+    document.getElementById('modal-mesclar').classList.remove('view-hidden');
+}
+
+function fecharModalMesclar() {
+    document.getElementById('modal-mesclar').classList.add('view-hidden');
+    mesclaArrastadaId = null;
+    mesclaAlvoId = null;
+}
+
+// MESCLAR: as duas peças passam a dividir o mesmo compartimento (lado a lado)
+async function confirmarMesclar() {
+    const itens = database.items[gavetaAtualAberta];
+    const arrastada = itens.find(p => p.id === mesclaArrastadaId);
+    const alvo      = itens.find(p => p.id === mesclaAlvoId);
+    if (!arrastada || !alvo) return fecharModalMesclar();
+
+    // Usa o grupo do alvo (ou cria um novo) e coloca a arrastada no mesmo grupo
+    const gid = alvo.grupoMescla || ('g' + Date.now());
+    alvo.grupoMescla      = gid;
+    arrastada.grupoMescla = gid;
+    // A arrastada herda a coluna e a posição do alvo (ficam no mesmo bloco)
+    arrastada.coluna   = alvo.coluna;
+    arrastada.position = alvo.position;
     renumerarPosicoes(itens);
 
-    registrarLog(`moveu a peça "${arrastada.name}" para a coluna ${colunaDestino}.`);
+    registrarLog(`mesclou "${arrastada.name}" com "${alvo.name}" no mesmo compartimento.`);
+    await salvarItensDaGaveta(gavetaAtualAberta);
+    fecharModalMesclar();
+    renderizarPecasDaGaveta(gavetaAtualAberta);
+}
+
+// TROCAR: troca posição e coluna das duas peças
+async function confirmarTrocar() {
+    const itens = database.items[gavetaAtualAberta];
+    const arrastada = itens.find(p => p.id === mesclaArrastadaId);
+    const alvo      = itens.find(p => p.id === mesclaAlvoId);
+    if (!arrastada || !alvo) return fecharModalMesclar();
+
+    const tmpPos = arrastada.position; arrastada.position = alvo.position; alvo.position = tmpPos;
+    const tmpCol = arrastada.coluna;   arrastada.coluna   = alvo.coluna;   alvo.coluna   = tmpCol;
+    const tmpGrp = arrastada.grupoMescla; arrastada.grupoMescla = alvo.grupoMescla; alvo.grupoMescla = tmpGrp;
+
+    registrarLog(`trocou a posição de "${arrastada.name}" com "${alvo.name}".`);
+    await salvarItensDaGaveta(gavetaAtualAberta);
+    fecharModalMesclar();
+    renderizarPecasDaGaveta(gavetaAtualAberta);
+}
+
+// SEPARAR: tira uma peça do grupo mesclado (volta a ocupar sozinha)
+async function separarPeca(idPeca) {
+    const itens = database.items[gavetaAtualAberta];
+    const peca = itens.find(p => p.id === idPeca);
+    if (!peca || !peca.grupoMescla) return;
+
+    const gid = peca.grupoMescla;
+    peca.grupoMescla = null;
+    // Se sobrou só 1 peça no grupo, ela também deixa de ser grupo
+    const restantes = itens.filter(p => p.grupoMescla === gid);
+    if (restantes.length === 1) restantes[0].grupoMescla = null;
+
+    // Manda a peça separada pro fim da coluna
+    const maxPos = itens.reduce((m, p) => Math.max(m, p.position || 0), 0);
+    peca.position = maxPos + 1;
+    renumerarPosicoes(itens);
+
+    registrarLog(`separou a peça "${peca.name}" do compartimento mesclado.`);
     await salvarItensDaGaveta(gavetaAtualAberta);
     renderizarPecasDaGaveta(gavetaAtualAberta);
 }
@@ -1488,6 +1599,10 @@ function abrirAcoesPeca(idPeca) {
             <i class="fa-solid fa-cart-arrow-down"></i> ${peca.requested ? 'Já Requisitado' : 'Marcar como Requisitado'}
         </button>
         ${ehAdmin ? `
+        ${peca.grupoMescla ? `
+        <button class="btn-mover" style="background:#fef3c7;color:#92400e;border-color:#f59e0b" onclick="window.fecharAcoesPeca(); window.separarPeca(${peca.id})">
+            <i class="fa-solid fa-object-ungroup"></i> Separar do compartimento
+        </button>` : ''}
         <button class="btn-mover" onclick="window.fecharAcoesPeca(); window.abrirModalMoverPeca(${peca.id})">
             <i class="fa-solid fa-right-left"></i> Mover para outra Gaveta
         </button>
@@ -1971,4 +2086,9 @@ window.atualizarPreviewTamanho   = atualizarPreviewTamanho;
 window.abrirAcoesPeca            = abrirAcoesPeca;
 window.fecharAcoesPeca           = fecharAcoesPeca;
 window.atualizarPainelAcoes      = atualizarPainelAcoes;
+window.abrirModalMesclar         = abrirModalMesclar;
+window.fecharModalMesclar        = fecharModalMesclar;
+window.confirmarMesclar          = confirmarMesclar;
+window.confirmarTrocar           = confirmarTrocar;
+window.separarPeca               = separarPeca;
 window.toggleVerSenha            = toggleVerSenha;
