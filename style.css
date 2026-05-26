@@ -1416,6 +1416,32 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .peca-fisica.arrastando { opacity: 0.4; transform: scale(0.97); }
 .peca-fisica.drop-alvo  { outline: 3px dashed #38bdf8; outline-offset: -3px; }
 .gaveta-coluna.coluna-drop { background: rgba(56,189,248,0.18); box-shadow: inset 0 0 0 2px #38bdf8; }
+
+/* BLOCO MESCLADO: duas+ peças dividindo o mesmo compartimento, lado a lado */
+.bloco-mesclado {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.bloco-mesclado .peca-fisica { height: 100%; }
+
+/* MODAL MESCLAR OU TROCAR */
+.mesclar-icone { font-size: 2.6rem; color: var(--drawer-blue); margin-bottom: 8px; }
+.mesclar-opcoes { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 4px; }
+.btn-mesclar-op {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 14px; border-radius: 10px; border: 2px solid; cursor: pointer;
+    background: white; transition: all 0.15s;
+}
+.btn-mesclar-op span  { font-weight: 800; font-size: 1.05rem; }
+.btn-mesclar-op small { font-size: 0.72rem; opacity: 0.75; }
+.btn-mesclar-op i     { font-size: 1.4rem; }
+.btn-mesclar { border-color: #10b981; color: #047857; }
+.btn-mesclar:hover { background: #10b981; color: white; transform: translateY(-2px); }
+.btn-trocar  { border-color: #3b82f6; color: #1d4ed8; }
+.btn-trocar:hover  { background: #3b82f6; color: white; transform: translateY(-2px); }
 /* Cor da faixa lateral conforme o status 5S */
 .status-borda-verde    { border-left-color: var(--status-verde); }
 .status-borda-amarelo  { border-left-color: var(--status-amarelo); }
