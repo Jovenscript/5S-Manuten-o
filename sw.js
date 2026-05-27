@@ -9,7 +9,7 @@
    - Cross-origin (Firebase, Cloudinary, gstatic): NÃO intercepta. Deixa o
      navegador cuidar. O SW só gerencia os arquivos do próprio app.
 ========================================================================= */
-const CACHE_NAME = '5s-manutencao-v11'; // Atualizei a versão para forçar a troca
+const CACHE_NAME = '5s-manutencao-v12'; // Atualizei a versão para forçar a troca
 
 const ASSETS_TO_CACHE = [
   './',
