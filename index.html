@@ -93,6 +93,7 @@
         <nav class="sidebar" id="sidebar-menu">
             <div class="logo">5S</div>
             <div class="nav-items">
+                <div class="nav-secao">NAVEGAR</div>
                 <div class="nav-item active" onclick="window.mostrarTela('view-dashboard')">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <span>Início</span>
@@ -101,6 +102,14 @@
                     <i class="fa-solid fa-warehouse"></i>
                     <span>Locais</span>
                 </div>
+
+                <div class="nav-secao">AÇÕES</div>
+                <div class="nav-item" onclick="window.gerarEmailPedido()">
+                    <i class="fa-solid fa-envelope-open-text"></i>
+                    <span>Pedir Peças</span>
+                </div>
+
+                <div class="nav-secao admin-only">SISTEMA</div>
                 <div class="nav-item admin-only" onclick="window.mostrarTela('view-historico')">
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>Histórico</span>
@@ -108,10 +117,6 @@
                 <div class="nav-item admin-only" onclick="window.mostrarTela('view-config')">
                     <i class="fa-solid fa-gear"></i>
                     <span>Ajustes</span>
-                </div>
-                <div class="nav-item" onclick="window.gerarEmailPedido()">
-                    <i class="fa-solid fa-envelope-open-text"></i>
-                    <span>Pedir Peças</span>
                 </div>
             </div>
             <div class="nav-footer" onclick="window.sairDoSistema()">
@@ -137,6 +142,9 @@
                     <div class="user-avatar"><i class="fa-solid fa-user-gear"></i></div>
                 </div>
             </header>
+
+            <!-- BREADCRUMB: mostra onde o usuário está agora (Locais > Elétrica > G4...) -->
+            <nav id="breadcrumb" class="breadcrumb"></nav>
 
             <div class="main-padding" id="area-conteudo-scroll">
                 
@@ -235,17 +243,31 @@
                                 <button class="btn-save" style="background-color: #3b82f6;" onclick="window.exportarHistoricoCSV()"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
                             </div>
                         </div>
+                        <div class="config-card config-card-perigo">
+                            <h3 style="color: #b91c1c;"><i class="fa-solid fa-triangle-exclamation"></i> Zona de Perigo</h3>
+                            <p>Restaurar o padrão de fábrica <strong>apaga todas as peças, gavetas criadas e o histórico</strong>. Não pode ser desfeito. Use só se realmente precisa começar do zero.</p>
+                            <div class="config-buttons">
+                                <button class="btn-save" style="background-color: #dc2626;" onclick="window.restaurarPadraoFabrica()">
+                                    <i class="fa-solid fa-rotate-left"></i> Restaurar Padrão de Fábrica
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
                 <!-- VIEW: INTERIOR DA GAVETA (COLMEIA INDUSTRIAL 5 COLUNAS) -->
                 <section id="view-compartimentos" class="view-hidden">
-                    <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%;">
+                    <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 8px;">
                         <button class="btn-voltar" onclick="window.voltarParaGavetas()">⬅ Voltar</button>
-                        <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1;">Gaveta X</h2>
-                        <button class="btn-add-item admin-only" onclick="window.abrirModalCadastro()">
-                            <i class="fa-solid fa-plus"></i> Nova Peça
-                        </button>
+                        <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1; min-width: 200px;">Gaveta X</h2>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn-voltar admin-only" onclick="window.padronizarTamanhos()" title="Aplicar o mesmo tamanho a todas as peças desta gaveta" style="background: var(--drawer-blue);">
+                                <i class="fa-solid fa-arrows-up-down"></i> Padronizar
+                            </button>
+                            <button class="btn-add-item admin-only" onclick="window.abrirModalCadastro()">
+                                <i class="fa-solid fa-plus"></i> Nova Peça
+                            </button>
+                        </div>
                     </div>
                     <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem; text-align: center;">
                         <i class="fa-solid fa-table-cells"></i> Vista interna do gaveteiro: 5 colunas físicas. A altura de cada encaixe segue o campo <strong>"Altura Física (Slots)"</strong> da peça.
