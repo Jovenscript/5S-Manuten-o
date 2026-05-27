@@ -1735,6 +1735,7 @@ function abrirModalCadastro() {
     document.getElementById('novo-esperado').value  = '1';
     document.getElementById('novo-atual').value     = '0';
     document.getElementById('novo-divisoria').value = 'Geral';
+    document.getElementById('novo-almoxarifado').value = 'Automação';
 
     // TAMANHO FÍSICO: padrão 2 espaços (peça pequena/média)
     document.getElementById('novo-tamanho').value   = '4';
@@ -1754,6 +1755,7 @@ async function salvarNovoItem() {
     const atual     = parseInt(document.getElementById('novo-atual').value);
     const posicao   = parseInt(document.getElementById('novo-posicao').value) || 999;
     const divisoria = document.getElementById('novo-divisoria').value.trim() || 'Geral';
+    const almoxarifado = document.getElementById('novo-almoxarifado').value || 'Automação';
 
     // TAMANHO FÍSICO: quantos espaços verticais (1-10) a peça ocupa.
     // A posição (coluna/linha) é calculada AUTOMATICAMENTE pelo bin-packing.
@@ -1774,6 +1776,7 @@ async function salvarNovoItem() {
         current:     atual, 
         position:    posicao,
         divisoria:   divisoria, 
+        almoxarifado: almoxarifado,   // Automação ou Estoque (usado no pedido de compra)
         tamanho:     tamanho,   // Tamanho físico vertical na ESCALA NOVA (1-20)
         size:        tamanho,   // Compatibilidade com código/dados antigos
         escalaV2:    true,      // Marca que já está na escala dobrada (não migrar de novo)
@@ -1805,6 +1808,7 @@ function abrirModalEditarPeca(idPeca) {
     document.getElementById('edit-peca-atual').value     = peca.current;
     document.getElementById('edit-peca-posicao').value   = (peca.position && peca.position !== 999) ? peca.position : '';
     document.getElementById('edit-peca-divisoria').value = peca.divisoria || 'Geral';
+    document.getElementById('edit-peca-almoxarifado').value = peca.almoxarifado || 'Automação';
 
     // TAMANHO FÍSICO (1-10), com default pra dados antigos
     document.getElementById('edit-peca-tamanho').value = getTamanhoPeca(peca);
@@ -1842,6 +1846,7 @@ async function salvarEdicaoPeca() {
     peca.current    = novoAtual;
     peca.position   = novaPosicao;
     peca.divisoria  = novaDivisoria;
+    peca.almoxarifado = document.getElementById('edit-peca-almoxarifado').value || 'Automação';
     peca.tamanho    = novoTamanho;
     peca.size       = novoTamanho;  // Compatibilidade
     peca.escalaV2   = true;         // Já na escala nova (1-20)
@@ -1896,6 +1901,8 @@ function fecharAlerta() { document.getElementById('modal-alerta').classList.add(
 // =========================================================================
 // GERADOR DE PEDIDO DE COMPRA
 // =========================================================================
+const CHAVE_RASCUNHO_PEDIDO = '5s_pedido_rascunho';
+
 function gerarEmailPedido() {
     const containerItens = document.getElementById('formulario-pedido-itens');
     containerItens.innerHTML = '';
@@ -1904,7 +1911,14 @@ function gerarEmailPedido() {
     getTodasGavetas().forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
             if (peca.current < peca.expected) {
-                itensFaltando.push({ nome: peca.name, codigo: peca.code, falta: peca.expected - peca.current });
+                itensFaltando.push({
+                    nome: peca.name,
+                    codigo: peca.code,
+                    falta: peca.expected - peca.current,
+                    almoxarifado: peca.almoxarifado || 'Automação',
+                    pecaId: peca.id,
+                    gavetaId: gaveta.id
+                });
             }
         });
     });
@@ -1931,13 +1945,13 @@ function gerarEmailPedido() {
                 </div>
                 <div class="col">
                     <label>Almoxarifado:</label>
-                    <select id="almo-${index}" onchange="window.toggleCompradoFora(${index})">
-                        <option value="Automação">Automação</option>
-                        <option value="Estoque">Estoque</option>
-                        <option value="Comprado Fora">Comprado Fora</option>
-                    </select>
+                    <div class="pedido-almox-fixo"><i class="fa-solid fa-warehouse"></i> ${item.almoxarifado}</div>
                 </div>
             </div>
+            <label class="pedido-check-fora">
+                <input type="checkbox" id="fora-${index}" onchange="window.toggleCompradoFora(${index})">
+                <span>Esse item foi <strong>comprado fora</strong> (fornecedor externo)</span>
+            </label>
             <div id="extra-${index}" class="view-hidden" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;">
                 <div class="form-group row">
                     <div class="col">
@@ -1962,17 +1976,48 @@ function gerarEmailPedido() {
     document.getElementById('texto-pedido-gerado').classList.add('view-hidden');
     document.getElementById('btn-gerar-texto-pedido').classList.remove('view-hidden');
     document.getElementById('btn-copiar-pedido').classList.add('view-hidden');
-    document.getElementById('pedido-subtitle').innerText = "Preencha os detalhes de cada item para gerar a solicitação.";
+    document.getElementById('btn-marcar-requisitados').classList.add('view-hidden');
+    document.getElementById('pedido-subtitle').innerText = "Confira os itens e gere a solicitação. O almoxarifado vem do cadastro da peça.";
 
     window.itensFaltandoTemp = itensFaltando;
+
+    // RASCUNHO SALVO: se houver um pedido salvo anteriormente, oferece recuperar
+    const rascunho = localStorage.getItem(CHAVE_RASCUNHO_PEDIDO);
+    const bannerRascunho = document.getElementById('pedido-rascunho-banner');
+    if (rascunho && bannerRascunho) {
+        bannerRascunho.classList.remove('view-hidden');
+    } else if (bannerRascunho) {
+        bannerRascunho.classList.add('view-hidden');
+    }
+
     document.getElementById('modal-pedido').classList.remove('view-hidden');
 }
 
+// Checkbox "comprado fora" → mostra/esconde os campos extras de compra externa
 function toggleCompradoFora(index) {
-    const select   = document.getElementById(`almo-${index}`).value;
+    const marcado  = document.getElementById(`fora-${index}`).checked;
     const extraDiv = document.getElementById(`extra-${index}`);
-    if (select === 'Comprado Fora') extraDiv.classList.remove('view-hidden');
+    if (marcado) extraDiv.classList.remove('view-hidden');
     else extraDiv.classList.add('view-hidden');
+}
+
+// Recupera o texto salvo do último pedido (caso o PC tenha desligado, etc.)
+function recuperarRascunhoPedido() {
+    const rascunho = localStorage.getItem(CHAVE_RASCUNHO_PEDIDO);
+    if (!rascunho) return;
+    document.getElementById('texto-pedido-gerado').value = rascunho;
+    document.getElementById('formulario-pedido-itens').classList.add('view-hidden');
+    document.getElementById('texto-pedido-gerado').classList.remove('view-hidden');
+    document.getElementById('btn-gerar-texto-pedido').classList.add('view-hidden');
+    document.getElementById('btn-copiar-pedido').classList.remove('view-hidden');
+    document.getElementById('btn-marcar-requisitados').classList.remove('view-hidden');
+    document.getElementById('pedido-rascunho-banner').classList.add('view-hidden');
+    document.getElementById('pedido-subtitle').innerText = "Rascunho recuperado. Você pode copiar ou editar.";
+}
+
+function descartarRascunhoPedido() {
+    localStorage.removeItem(CHAVE_RASCUNHO_PEDIDO);
+    document.getElementById('pedido-rascunho-banner').classList.add('view-hidden');
 }
 
 function processarFormularioPedido() {
@@ -1981,11 +2026,12 @@ function processarFormularioPedido() {
 
     window.itensFaltandoTemp.forEach((item, index) => {
         const os   = document.getElementById(`os-${index}`).value    || 'Não informada';
-        const almo = document.getElementById(`almo-${index}`).value;
+        const fora = document.getElementById(`fora-${index}`).checked;
+        const almo = fora ? 'Comprado Fora' : item.almoxarifado;
 
         textoFinal += `- ${item.falta} un. | ${item.nome} (Item: ${item.codigo || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
 
-        if (almo === 'Comprado Fora') {
+        if (fora) {
             const forn = document.getElementById(`forn-${index}`).value || 'Não informado';
             const unid = document.getElementById(`unid-${index}`).value || 'Não informada';
             const just = document.getElementById(`just-${index}`).value || 'Não informada';
@@ -2000,7 +2046,38 @@ function processarFormularioPedido() {
     document.getElementById('texto-pedido-gerado').classList.remove('view-hidden');
     document.getElementById('btn-gerar-texto-pedido').classList.add('view-hidden');
     document.getElementById('btn-copiar-pedido').classList.remove('view-hidden');
-    document.getElementById('pedido-subtitle').innerText = "Copie o texto pronto abaixo para enviar diretamente no seu Outlook ou Teams.";
+    document.getElementById('btn-marcar-requisitados').classList.remove('view-hidden');
+    document.getElementById('pedido-subtitle').innerText = "Copie o texto pronto abaixo. Ele fica SALVO mesmo se você fechar ou o PC desligar.";
+
+    // SALVA O RASCUNHO (sobrevive a reload / PC desligar)
+    localStorage.setItem(CHAVE_RASCUNHO_PEDIDO, textoFinal);
+    registrarLog('gerou um texto de pedido de compra.');
+}
+
+// Marca TODAS as peças do pedido atual como "requisitado" de uma vez
+async function marcarTodosRequisitados() {
+    if (!window.itensFaltandoTemp || window.itensFaltandoTemp.length === 0) return;
+    if (!confirm(`Confirmar que os ${window.itensFaltandoTemp.length} item(ns) do pedido foram REQUISITADOS?`)) return;
+
+    const gavetasAfetadas = new Set();
+    window.itensFaltandoTemp.forEach(item => {
+        const peca = (database.items[item.gavetaId] || []).find(p => p.id === item.pecaId);
+        if (peca) { peca.requested = true; gavetasAfetadas.add(item.gavetaId); }
+    });
+
+    // Salva todas as gavetas afetadas
+    for (const gid of gavetasAfetadas) {
+        await salvarItensDaGaveta(gid);
+    }
+    registrarLog(`marcou ${window.itensFaltandoTemp.length} item(ns) do pedido como requisitados.`);
+
+    const btn = document.getElementById('btn-marcar-requisitados');
+    if (btn) {
+        const orig = btn.innerHTML;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Marcados!`;
+        btn.style.backgroundColor = 'var(--status-verde)';
+        setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = ''; }, 2000);
+    }
 }
 
 function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
@@ -2066,6 +2143,9 @@ window.fecharModalMoverPeca      = fecharModalMoverPeca;
 window.confirmarMoverPeca        = confirmarMoverPeca;
 window.toggleCompradoFora        = toggleCompradoFora;
 window.processarFormularioPedido = processarFormularioPedido;
+window.recuperarRascunhoPedido   = recuperarRascunhoPedido;
+window.descartarRascunhoPedido   = descartarRascunhoPedido;
+window.marcarTodosRequisitados   = marcarTodosRequisitados;
 window.salvarSenhaObrigatoria    = salvarSenhaObrigatoria;
 window.cancelarRedefinicaoSenha  = cancelarRedefinicaoSenha;
 window.buscarPecasGlobal         = buscarPecasGlobal;
