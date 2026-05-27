@@ -1170,10 +1170,6 @@ function atualizarPreviewTamanho(prefixo) {
     }
 }
 
-
-
-
-
 // =========================================================================
 // DISTRIBUIÇÃO AUTOMÁTICA EM COLUNAS (BIN-PACKING / ENCAIXE INTELIGENTE)
 // -------------------------------------------------------------------------
@@ -1415,7 +1411,10 @@ function renderizarPecasDaGaveta(idGaveta) {
             const livre = ESPACOS_POR_COL - coluna.ocupacao;
             const vazio = document.createElement('div');
             vazio.className = 'coluna-espaco-livre';
-            vazio.innerHTML = `<span><i class="fa-solid fa-grip-lines"></i><br>${livre} livre(s)</span>`;
+            
+            // Texto de "espaço livre" ocultado conforme solicitado, mantendo a área livre funcional.
+            // vazio.innerHTML = `<span><i class="fa-solid fa-grip-lines"></i><br>${livre} livre(s)</span>`;
+            
             colDiv.appendChild(vazio);
         }
 
