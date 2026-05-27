@@ -1440,8 +1440,88 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .btn-mesclar-op i     { font-size: 1.4rem; }
 .btn-mesclar { border-color: #10b981; color: #047857; }
 .btn-mesclar:hover { background: #10b981; color: white; transform: translateY(-2px); }
-.btn-trocar  { border-color: #3b82f6; color: #1d4ed8; }
-.btn-trocar:hover  { background: #3b82f6; color: white; transform: translateY(-2px); }
+/* =========================================================================
+   UX EXTRAS: SIDEBAR EM SEÇÕES, BREADCRUMB, TOAST, ZONA DE PERIGO
+========================================================================= */
+
+/* SIDEBAR: cabeçalhos das seções (NAVEGAR / AÇÕES / SISTEMA) */
+.nav-secao {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.4);
+    padding: 12px 18px 4px;
+    margin-top: 8px;
+    text-transform: uppercase;
+}
+.nav-secao:first-child { margin-top: 0; }
+
+/* BREADCRUMB: caminho de navegação no topo (Início > Locais > Elétrica > G4) */
+.breadcrumb {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: #f8fafc; padding: 10px 20px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+.breadcrumb:empty { display: none; }   /* não mostra barra vazia */
+.breadcrumb-link  {
+    color: var(--drawer-blue); cursor: pointer; font-weight: 600;
+    display: flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 5px; transition: background 0.15s;
+}
+.breadcrumb-link:hover  { background: rgba(31,71,123,0.1); }
+.breadcrumb-atual {
+    color: var(--text-primary); font-weight: 700;
+    display: flex; align-items: center; gap: 5px;
+}
+.breadcrumb-sep   { color: #94a3b8; font-size: 0.7rem; }
+
+/* TOAST: notificação rápida no canto da tela */
+#toast-container {
+    position: fixed; bottom: 20px; right: 20px;
+    display: flex; flex-direction: column; gap: 10px;
+    z-index: 9999; pointer-events: none;
+}
+.toast {
+    background: #1e293b; color: white;
+    padding: 12px 18px; border-radius: 8px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    min-width: 250px; max-width: 380px;
+    font-size: 0.9rem; font-weight: 600;
+    animation: toastEntra 0.25s ease-out;
+    pointer-events: auto;
+}
+.toast i { font-size: 1.2rem; }
+.toast-sucesso { background: #047857; }
+.toast-erro    { background: #b91c1c; }
+.toast-info    { background: #1e293b; }
+.toast-saindo  { animation: toastSai 0.4s ease-in forwards; }
+@keyframes toastEntra { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes toastSai   { to { transform: translateX(120%); opacity: 0; } }
+
+/* PREVIEW DE TAMANHO: label embaixo da barra (não mais espremido dentro de um slot) */
+.tam-preview-label {
+    text-align: center;
+    color: white;
+    font-size: 0.85rem;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+}
+.tam-preview-label strong { font-size: 1.05rem; color: #38bdf8; }
+
+/* CARD DE PERIGO nos Ajustes (Restaurar Padrão de Fábrica) */
+.config-card-perigo {
+    border: 2px solid #fecaca !important;
+    background: #fef2f2 !important;
+}
+
+/* SPACER invisível pra ocupar a sobra de uma coluna (sem mostrar "X livre") */
+.coluna-spacer {
+    flex: 1 1 auto;
+    min-height: 0;
+}
 
 /* =========================================================================
    GERADOR DE PEDIDO DE COMPRA: rascunho salvo + almoxarifado fixo + checkbox
