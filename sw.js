@@ -9,18 +9,23 @@
    - Cross-origin (Firebase, Cloudinary, gstatic): NÃO intercepta. Deixa o
      navegador cuidar. O SW só gerencia os arquivos do próprio app.
 ========================================================================= */
-const CACHE_NAME = '5s-manutencao-v10';
+const CACHE_NAME = '5s-manutencao-v11'; // Atualizei a versão para forçar a troca
+
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './script.js',
-  './manifest.json',
-  './icon-192x192.png',
-  './icon-512x512.png',
-  './icon-maskable-192x192.png',
-  './icon-maskable-512x512.png',
-  './apple-touch-icon.png'
+  './manifest.json'
+  
+  // ATENÇÃO: Só descomente as linhas abaixo se tiver ABSOLUTA CERTEZA 
+  // de que esses arquivos existem no seu repositório do GitHub.
+  // Caso contrário, o erro 'addAll' voltará a acontecer.
+  // './icon-192x192.png',
+  // './icon-512x512.png',
+  // './icon-maskable-192x192.png',
+  // './icon-maskable-512x512.png',
+  // './apple-touch-icon.png'
 ];
 
 // INSTALL — pré-cacheia o app shell
