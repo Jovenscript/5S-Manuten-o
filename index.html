@@ -290,6 +290,13 @@
                     <label>Divisória (Letra/Nome):</label>
                     <input type="text" id="novo-divisoria" placeholder="Ex: A, B, Geral..." value="Geral">
                 </div>
+                <div class="col">
+                    <label>Almoxarifado:</label>
+                    <select id="novo-almoxarifado">
+                        <option value="Automação">Automação</option>
+                        <option value="Estoque">Estoque</option>
+                    </select>
+                </div>
             </div>
 
             <div class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 2px solid #cbd5e1;">
@@ -361,6 +368,13 @@
                 <div class="col">
                     <label>Divisória (Letra/Nome):</label>
                     <input type="text" id="edit-peca-divisoria" placeholder="Ex: A, B, Geral...">
+                </div>
+                <div class="col">
+                    <label>Almoxarifado:</label>
+                    <select id="edit-peca-almoxarifado">
+                        <option value="Automação">Automação</option>
+                        <option value="Estoque">Estoque</option>
+                    </select>
                 </div>
             </div>
 
@@ -439,19 +453,35 @@
         <div class="modal-content modal-largo">
             <h3>Solicitação de Compra</h3>
             <p class="modal-subtitle" id="pedido-subtitle">Preencha os detalhes de cada item para gerar a solicitação.</p>
-            
+
+            <!-- Banner de rascunho salvo (aparece se há um pedido anterior não finalizado) -->
+            <div id="pedido-rascunho-banner" class="pedido-rascunho-banner view-hidden">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Você tem um pedido salvo do uso anterior.</span>
+                <button class="btn-mini-acao btn-mini-recuperar" onclick="window.recuperarRascunhoPedido()">
+                    <i class="fa-solid fa-rotate-left"></i> Recuperar
+                </button>
+                <button class="btn-mini-acao btn-mini-descartar" onclick="window.descartarRascunhoPedido()" title="Descartar rascunho">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
             <div id="formulario-pedido-itens" style="max-height: 55vh; overflow-y: auto; margin-bottom: 15px; padding-right: 10px;">
             </div>
 
             <textarea id="texto-pedido-gerado" readonly rows="14" class="textarea-pedido view-hidden"></textarea>
-            
-            <div class="modal-actions espacado">
+
+            <div class="modal-actions espacado" style="flex-wrap: wrap; gap: 8px;">
                 <button class="btn-cancel" onclick="window.fecharModalPedido()">Fechar</button>
-                
+
                 <button id="btn-gerar-texto-pedido" class="btn-save" onclick="window.processarFormularioPedido()">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Texto
                 </button>
-                
+
+                <button id="btn-marcar-requisitados" class="btn-save view-hidden" style="background-color: var(--status-amarelo); color: #1f2937;" onclick="window.marcarTodosRequisitados()">
+                    <i class="fa-solid fa-cart-arrow-down"></i> Marcar todos como requisitados
+                </button>
+
                 <button id="btn-copiar-pedido" class="btn-save btn-copiar view-hidden" onclick="window.copiarTextoPedido(event)">
                     <i class="fa-solid fa-copy"></i> Copiar Mensagem
                 </button>
