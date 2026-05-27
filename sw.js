@@ -9,29 +9,36 @@
    - Cross-origin (Firebase, Cloudinary, gstatic): NÃO intercepta. Deixa o
      navegador cuidar. O SW só gerencia os arquivos do próprio app.
 ========================================================================= */
-const CACHE_NAME = '5s-manutencao-v12'; // Atualizei a versão para forçar a troca
-
+const CACHE_NAME = '5s-manutencao-v13';
+// Lista de assets a pré-cachear. Se algum não existir no servidor, o SW
+// NÃO quebra a instalação — apenas pula esse arquivo e continua os outros.
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './script.js',
-  './manifest.json'
-  
-  // ATENÇÃO: Só descomente as linhas abaixo se tiver ABSOLUTA CERTEZA 
-  // de que esses arquivos existem no seu repositório do GitHub.
-  // Caso contrário, o erro 'addAll' voltará a acontecer.
-  // './icon-192x192.png',
-  // './icon-512x512.png',
-  // './icon-maskable-192x192.png',
-  // './icon-maskable-512x512.png',
-  // './apple-touch-icon.png'
+  './manifest.json',
+  './icon-192x192.png',
+  './icon-512x512.png',
+  './icon-maskable-192x192.png',
+  './icon-maskable-512x512.png',
+  './apple-touch-icon.png'
 ];
 
-// INSTALL — pré-cacheia o app shell
+// INSTALL — pré-cacheia o app shell de forma RESILIENTE.
+// Antes usávamos cache.addAll() que aborta TUDO se um único arquivo falhar (404).
+// Agora cacheamos um por um com try/catch: arquivo faltando = warning, não erro fatal.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await Promise.all(ASSETS_TO_CACHE.map(async (asset) => {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn(`[SW] não cacheou "${asset}":`, err.message);
+        }
+      }));
+    })
   );
   self.skipWaiting();
 });
