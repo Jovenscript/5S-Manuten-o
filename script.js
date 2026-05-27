@@ -661,6 +661,8 @@ function mostrarTela(id) {
     if (id === 'view-containers') renderContainers();   // Tela de seleção de locais
     if (id === 'view-historico')  renderizarHistorico();
 
+    atualizarBreadcrumb(id);
+
     const scroll = document.getElementById('area-conteudo-scroll');
     if (scroll) scroll.scrollTo(0, 0);
 
@@ -1165,10 +1167,18 @@ function atualizarPreviewTamanho(prefixo) {
     for (let i = 20; i >= 1; i--) {
         const slot = document.createElement('div');
         slot.className = 'tam-preview-slot' + (i <= tam ? ' preenchido' : '');
-        if (i === tam) slot.innerHTML = `<span>${tam}/20</span>`;
         preview.appendChild(slot);
     }
+    // Label do tamanho fica EMBAIXO da barra (não dentro de um slot apertado)
+    const label = document.createElement('div');
+    label.className = 'tam-preview-label';
+    label.innerHTML = `<strong>${tam}</strong> / 20 espaços`;
+    preview.appendChild(label);
 }
+
+
+
+
 
 // =========================================================================
 // DISTRIBUIÇÃO AUTOMÁTICA EM COLUNAS (BIN-PACKING / ENCAIXE INTELIGENTE)
@@ -1406,16 +1416,14 @@ function renderizarPecasDaGaveta(idGaveta) {
             }
         });
 
-        // ESPAÇO LIVRE: sobra da coluna (também é área onde se pode SOLTAR uma peça)
+        // ESPAÇO LIVRE: spacer invisível que ocupa a sobra da coluna.
+        // Sem texto/ícone (antes parecia um "item fantasma" confuso). A área
+        // continua sendo zona de drop pra arraste — só a coluna inteira detecta.
         if (coluna.ocupacao < ESPACOS_POR_COL) {
-            const livre = ESPACOS_POR_COL - coluna.ocupacao;
-            const vazio = document.createElement('div');
-            vazio.className = 'coluna-espaco-livre';
-            
-            // Texto de "espaço livre" ocultado conforme solicitado, mantendo a área livre funcional.
-            // vazio.innerHTML = `<span><i class="fa-solid fa-grip-lines"></i><br>${livre} livre(s)</span>`;
-            
-            colDiv.appendChild(vazio);
+            const spacer = document.createElement('div');
+            spacer.className = 'coluna-spacer';
+            spacer.style.flex = '1 1 auto';
+            colDiv.appendChild(spacer);
         }
 
         // A COLUNA INTEIRA é uma área de drop: soltar aqui joga a peça pro fim desta coluna
@@ -1909,7 +1917,8 @@ function gerarEmailPedido() {
 
     getTodasGavetas().forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
-            if (peca.current < peca.expected) {
+            // Só entram no pedido peças faltando E que AINDA não foram requisitadas
+            if (peca.current < peca.expected && !peca.requested) {
                 itensFaltando.push({
                     nome: peca.name,
                     codigo: peca.code,
@@ -1922,7 +1931,7 @@ function gerarEmailPedido() {
         });
     });
 
-    if (itensFaltando.length === 0) return mostrarAlerta("Tudo em Ordem", "Não há peças faltando no gaveteiro neste momento.");
+    if (itensFaltando.length === 0) return mostrarAlerta("Tudo em Ordem", "Nenhuma peça pendente — todas as faltantes já estão marcadas como requisitadas.");
 
     itensFaltando.forEach((item, index) => {
         const div = document.createElement('div');
@@ -2081,6 +2090,143 @@ async function marcarTodosRequisitados() {
 
 function fecharModalPedido() { document.getElementById('modal-pedido').classList.add('view-hidden'); }
 
+// =========================================================================
+// PADRONIZAR TAMANHOS (aplica um tamanho a TODAS as peças da gaveta aberta)
+// -------------------------------------------------------------------------
+// Útil quando o usuário tem muitas peças do mesmo tipo e quer alinhar tudo
+// numa só altura (ex: padronizar todos os bornes em tamanho 2).
+// =========================================================================
+async function padronizarTamanhos() {
+    if (!gavetaAtualAberta) return;
+    const gaveta = acharGaveta(gavetaAtualAberta);
+    const itens = database.items[gavetaAtualAberta] || [];
+    if (itens.length === 0) return mostrarAlerta('Atenção', 'Não há peças nesta gaveta para padronizar.');
+
+    const valor = prompt(`Padronizar TODAS as ${itens.length} peças da gaveta "${gaveta.title}" para qual tamanho? (1 a 20)`, '2');
+    if (valor === null) return;
+    const tam = Math.min(20, Math.max(1, parseInt(valor) || 0));
+    if (!tam) return mostrarAlerta('Atenção', 'Digite um número entre 1 e 20.');
+
+    itens.forEach(p => {
+        p.tamanho   = tam;
+        p.size      = tam;
+        p.escalaV2  = true;   // já na escala nova (não migrar de novo)
+    });
+
+    registrarLog(`padronizou as ${itens.length} peças da ${gaveta.label} para tamanho ${tam}.`);
+    await salvarItensDaGaveta(gavetaAtualAberta);
+    mostrarToast(`Todas as peças desta gaveta agora têm tamanho ${tam}.`, 'sucesso');
+}
+
+// =========================================================================
+// RESTAURAR PADRÃO DE FÁBRICA (resetar configurações do sistema)
+// -------------------------------------------------------------------------
+// AÇÃO DESTRUTIVA: apaga containers personalizados, gavetas criadas via
+// wizard, todas as peças cadastradas e o histórico. Volta ao estado inicial
+// (Container Elétrica + Mecânica padrão, vazios). Pede confirmação dupla
+// para evitar acidentes.
+// =========================================================================
+async function restaurarPadraoFabrica() {
+    // Confirmação 1
+    const conf1 = prompt(
+        'RESTAURAR PADRÃO DE FÁBRICA\n\n' +
+        'Esta ação apaga TODAS as peças cadastradas, gavetas criadas, histórico ' +
+        'e volta ao estado inicial (Elétrica + Mecânica padrão, vazios).\n\n' +
+        'Para confirmar, digite: RESTAURAR'
+    );
+    if (conf1 !== 'RESTAURAR') {
+        if (conf1 !== null) mostrarAlerta('Cancelado', 'Você precisava digitar RESTAURAR para continuar.');
+        return;
+    }
+    // Confirmação 2 (extra cuidado, ação irreversível)
+    if (!confirm('TEM ABSOLUTA CERTEZA? Os dados de TODAS as peças serão perdidos. Esta ação NÃO PODE ser desfeita.')) return;
+
+    try {
+        // Limpa todas as peças de todas as gavetas atuais
+        for (const gaveta of getTodasGavetas()) {
+            database.items[gaveta.id] = [];
+            await salvarItensDaGaveta(gaveta.id);
+        }
+
+        // Restaura containers padrão (Elétrica + Mecânica)
+        database.containers = JSON.parse(JSON.stringify(CONTAINERS_PADRAO));
+        database.containers.forEach(c => c.gavetas.forEach(g => { if (!database.items[g.id]) database.items[g.id] = []; }));
+
+        // Zera o histórico
+        historicoLogs = [];
+
+        await salvarConfig();
+        await salvarHistorico();
+        registrarLog('restaurou o sistema para o padrão de fábrica.');
+
+        mostrarToast('Sistema restaurado para o padrão de fábrica.', 'sucesso');
+        containerAtual = null;
+        gavetaAtualAberta = null;
+        mostrarTela('view-dashboard');
+    } catch (e) {
+        console.error(e);
+        mostrarAlerta('Erro', 'Não foi possível restaurar. Tente novamente.');
+    }
+}
+
+// =========================================================================
+// TOAST DE FEEDBACK (notificação rápida no canto da tela)
+// -------------------------------------------------------------------------
+// Aparece depois de ações importantes (salvar, padronizar, etc.) e some
+// sozinho em 2.5 segundos. Não bloqueia a tela como um modal.
+// =========================================================================
+function mostrarToast(mensagem, tipo = 'info') {
+    let cont = document.getElementById('toast-container');
+    if (!cont) {
+        cont = document.createElement('div');
+        cont.id = 'toast-container';
+        document.body.appendChild(cont);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    const icone = tipo === 'sucesso' ? 'fa-circle-check' : tipo === 'erro' ? 'fa-circle-xmark' : 'fa-circle-info';
+    toast.innerHTML = `<i class="fa-solid ${icone}"></i> <span>${mensagem}</span>`;
+    cont.appendChild(toast);
+    setTimeout(() => toast.classList.add('toast-saindo'), 2200);
+    setTimeout(() => toast.remove(), 2700);
+}
+
+// =========================================================================
+// BREADCRUMB (caminho de navegação no topo)
+// -------------------------------------------------------------------------
+// Mostra onde o usuário está: "Início" / "Locais > Elétrica" / "Locais > Elétrica > G4".
+// Chamado automaticamente sempre que mostrarTela() ou abrirGaveta() rodam.
+// =========================================================================
+function atualizarBreadcrumb(viewId) {
+    const el = document.getElementById('breadcrumb');
+    if (!el) return;
+
+    const cont = containerAtual ? getContainerAtual() : null;
+    const gav = gavetaAtualAberta ? acharGaveta(gavetaAtualAberta) : null;
+
+    const partes = [];
+    if (viewId === 'view-dashboard')         partes.push({ label: 'Início', icone: 'fa-magnifying-glass' });
+    else if (viewId === 'view-containers')   partes.push({ label: 'Locais', icone: 'fa-warehouse' });
+    else if (viewId === 'view-historico')    partes.push({ label: 'Histórico', icone: 'fa-clock-rotate-left' });
+    else if (viewId === 'view-config')       partes.push({ label: 'Ajustes', icone: 'fa-gear' });
+    else if (viewId === 'view-gavetas' && cont) {
+        partes.push({ label: 'Locais', icone: 'fa-warehouse', click: 'voltarParaContainers' });
+        partes.push({ label: cont.nome, icone: cont.icone });
+    } else if (viewId === 'view-compartimentos' && cont && gav) {
+        partes.push({ label: 'Locais', icone: 'fa-warehouse', click: 'voltarParaContainers' });
+        partes.push({ label: cont.nome, icone: cont.icone, click: `abrirContainer(${cont.id})` });
+        partes.push({ label: `${gav.label}: ${gav.title}`, icone: 'fa-box-archive' });
+    }
+
+    el.innerHTML = partes.map((p, i) => {
+        const isUltimo = i === partes.length - 1;
+        const clickAttr = !isUltimo && p.click ? `onclick="window.${p.click}()"` : '';
+        const cls = isUltimo ? 'breadcrumb-atual' : 'breadcrumb-link';
+        return `<span class="${cls}" ${clickAttr}><i class="fa-solid ${p.icone}"></i> ${p.label}</span>` +
+               (isUltimo ? '' : '<i class="fa-solid fa-chevron-right breadcrumb-sep"></i>');
+    }).join('');
+}
+
 function copiarTextoPedido(event) {
     const ta  = document.getElementById('texto-pedido-gerado');
     const btn = (event && event.currentTarget) ? event.currentTarget : document.getElementById('btn-copiar-pedido');
@@ -2145,6 +2291,9 @@ window.processarFormularioPedido = processarFormularioPedido;
 window.recuperarRascunhoPedido   = recuperarRascunhoPedido;
 window.descartarRascunhoPedido   = descartarRascunhoPedido;
 window.marcarTodosRequisitados   = marcarTodosRequisitados;
+window.padronizarTamanhos        = padronizarTamanhos;
+window.restaurarPadraoFabrica    = restaurarPadraoFabrica;
+window.mostrarToast              = mostrarToast;
 window.salvarSenhaObrigatoria    = salvarSenhaObrigatoria;
 window.cancelarRedefinicaoSenha  = cancelarRedefinicaoSenha;
 window.buscarPecasGlobal         = buscarPecasGlobal;
