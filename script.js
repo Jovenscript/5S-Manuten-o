@@ -187,9 +187,14 @@ window.onload = () => {
 
 function iniciarPWA() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('PWA Service Worker registrado com sucesso.', reg.scope))
-            .catch(err => console.error('Erro ao registrar Service Worker PWA:', err));
+        // Força buscar nova versão do sw.js a cada abertura do app
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+            .then(reg => {
+                console.log('PWA Service Worker registrado.', reg.scope);
+                // Força check de atualização imediatamente (não espera 24h)
+                reg.update().catch(() => {});
+            })
+            .catch(err => console.error('Erro ao registrar SW:', err));
     }
 }
 
