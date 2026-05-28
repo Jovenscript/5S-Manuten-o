@@ -177,6 +177,7 @@ window.onload = () => {
     iniciarPWA();
     iniciarSincronizacaoFirebase();
     configurarEventosEnter();
+    configurarBotaoExcluir();  // Handlers do botão lixeira
 
     const deviceAuthorized = localStorage.getItem('5s_device_authorized');
     if (deviceAuthorized === 'true') {
@@ -196,6 +197,57 @@ function iniciarPWA() {
             })
             .catch(err => console.error('Erro ao registrar SW:', err));
     }
+}
+
+// EXCLUIR PEÇA ARRASTADA — soltar no botão lixeira
+window.excluirPecaArrastada = function() {
+    if (!draggedPecaId) return;
+    
+    const itens = getTodasGavetas();
+    const gavetaAtual = getGavetaAtual();
+    if (!gavetaAtual) return;
+    
+    // Remover peça do array
+    const index = itens.findIndex(p => p.id === draggedPecaId);
+    if (index !== -1) {
+        const pecaNome = itens[index].name;
+        itens.splice(index, 1);
+        
+        // Salvar
+        database.items[gavetaAtual.id] = itens;
+        salvarDatabase();
+        
+        // Feedback
+        mostrarToast(`<i class="fa-solid fa-trash-can"></i> ${pecaNome} excluída`, 'info');
+        
+        // Re-render
+        renderizarPecasDaGaveta();
+    }
+    
+    draggedPecaId = null;
+    document.getElementById('btn-excluir-flutuante').classList.remove('ativo');
+};
+
+// CONFIGURAR HANDLERS DO BOTÃO LIXEIRA
+function configurarBotaoExcluir() {
+    const btn = document.getElementById('btn-excluir-flutuante');
+    if (!btn) return;
+    
+    btn.ondragover = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        btn.style.background = '#991b1b';  // Mais escuro ao passar
+    };
+    
+    btn.ondragleave = () => {
+        btn.style.background = '#dc2626';  // Volta ao normal
+    };
+    
+    btn.ondrop = (e) => {
+        e.preventDefault();
+        btn.style.background = '#dc2626';
+        window.excluirPecaArrastada();
+    };
 }
 
 // =========================================================================
@@ -1385,8 +1437,15 @@ function renderizarPecasDaGaveta(idGaveta) {
                     draggedPecaId = peca.id;
                     e.dataTransfer.effectAllowed = 'move';
                     setTimeout(() => pecaDiv.classList.add('arrastando'), 0);
+                    // Mostrar botão lixeira
+                    document.getElementById('btn-excluir-flutuante').classList.add('ativo');
                 };
-                pecaDiv.ondragend = () => { pecaDiv.classList.remove('arrastando'); draggedPecaId = null; };
+                pecaDiv.ondragend = () => { 
+                    pecaDiv.classList.remove('arrastando'); 
+                    draggedPecaId = null;
+                    // Esconder botão lixeira
+                    document.getElementById('btn-excluir-flutuante').classList.remove('ativo');
+                };
                 pecaDiv.ondragover = (e) => { e.preventDefault(); pecaDiv.classList.add('drop-alvo'); };
                 pecaDiv.ondragleave = () => pecaDiv.classList.remove('drop-alvo');
                 pecaDiv.ondrop = (e) => {
@@ -2299,6 +2358,8 @@ window.marcarTodosRequisitados   = marcarTodosRequisitados;
 window.padronizarTamanhos        = padronizarTamanhos;
 window.restaurarPadraoFabrica    = restaurarPadraoFabrica;
 window.mostrarToast              = mostrarToast;
+window.excluirPecaArrastada      = excluirPecaArrastada;
+window.configurarBotaoExcluir    = configurarBotaoExcluir;
 window.salvarSenhaObrigatoria    = salvarSenhaObrigatoria;
 window.cancelarRedefinicaoSenha  = cancelarRedefinicaoSenha;
 window.buscarPecasGlobal         = buscarPecasGlobal;
