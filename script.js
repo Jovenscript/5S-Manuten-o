@@ -200,28 +200,17 @@ function iniciarPWA() {
 }
 
 // EXCLUIR PEÇA ARRASTADA — soltar no botão lixeira
-window.excluirPecaArrastada = function() {
-    if (!draggedPecaId) return;
+window.excluirPecaArrastada = async function() {
+    if (!draggedPecaId || !gavetaAtualAberta) return;
     
-    const itens = getTodasGavetas();
-    const gavetaAtual = getGavetaAtual();
-    if (!gavetaAtual) return;
-    
-    // Remover peça do array
+    const itens = database.items[gavetaAtualAberta] || [];
     const index = itens.findIndex(p => p.id === draggedPecaId);
     if (index !== -1) {
-        const pecaNome = itens[index].name;
+        const pecaNome = itens[index].name || 'Peça sem nome';
         itens.splice(index, 1);
-        
-        // Salvar
-        database.items[gavetaAtual.id] = itens;
-        salvarDatabase();
-        
-        // Feedback
-        mostrarToast(`<i class="fa-solid fa-trash-can"></i> ${pecaNome} excluída`, 'info');
-        
-        // Re-render
-        renderizarPecasDaGaveta();
+        await salvarItensDaGaveta(gavetaAtualAberta);
+        mostrarToast(`"${pecaNome}" excluída`, 'info');
+        renderizarPecasDaGaveta(gavetaAtualAberta);
     }
     
     draggedPecaId = null;
@@ -248,6 +237,177 @@ function configurarBotaoExcluir() {
         btn.style.background = '#dc2626';
         window.excluirPecaArrastada();
     };
+}
+
+// =========================================================================
+// GERENCIAR GAVETA — pacote completo de ações em massa
+// -------------------------------------------------------------------------
+// • Duplicar: cria nova gaveta com mesmo título (vazia)
+// • Mover Todas: transfere peças desta gaveta pra outra
+// • Esvaziar: apaga peças, mantém gaveta
+// • Excluir: apaga gaveta + peças
+// =========================================================================
+
+function abrirModalGerenciarGaveta() {
+    if (!gavetaAtualAberta) {
+        mostrarToast('Abra uma gaveta primeiro', 'erro');
+        return;
+    }
+    const gaveta = acharGaveta(gavetaAtualAberta);
+    if (!gaveta) return;
+    const qtdPecas = (database.items[gavetaAtualAberta] || []).length;
+    document.getElementById('gerenciar-info').innerHTML =
+        `<i class="fa-solid fa-circle-info"></i> Gerenciando: <strong>${gaveta.title || gaveta.label}</strong> — ${qtdPecas} peça(s)`;
+    document.getElementById('modal-gerenciar-gaveta').classList.replace('view-hidden', 'view-active');
+}
+
+function fecharModalGerenciarGaveta() {
+    document.getElementById('modal-gerenciar-gaveta').classList.replace('view-active', 'view-hidden');
+}
+
+// --- DUPLICAR -----------------------------------------------------------
+async function duplicarGavetaAtual() {
+    if (!gavetaAtualAberta) return;
+    const gaveta = acharGaveta(gavetaAtualAberta);
+    const container = getContainerDeGaveta(gavetaAtualAberta);
+    if (!gaveta || !container) return;
+
+    const novoTitulo = prompt(`Título da nova gaveta:`, `${gaveta.title} (cópia)`);
+    if (!novoTitulo || !novoTitulo.trim()) return;
+
+    const novoId = proximoIdGaveta();
+    const novoLabel = `G${(container.gavetas || []).length + 1}`;
+    container.gavetas.push({
+        id: novoId,
+        label: novoLabel,
+        title: novoTitulo.trim()
+    });
+    database.items[novoId] = [];
+
+    await salvarConfig();
+    fecharModalGerenciarGaveta();
+    mostrarToast(`"${novoTitulo}" criada (vazia)`, 'sucesso');
+    voltarParaGavetas();
+}
+
+// --- ESVAZIAR (mantém a gaveta) -----------------------------------------
+async function esvaziarGavetaAtual() {
+    if (!gavetaAtualAberta) return;
+    const itens = database.items[gavetaAtualAberta] || [];
+    if (itens.length === 0) {
+        mostrarToast('Esta gaveta já está vazia', 'info');
+        return;
+    }
+    if (!confirm(`Apagar TODAS as ${itens.length} peças desta gaveta?\n\nA gaveta vai continuar existindo, mas vazia.`)) return;
+
+    database.items[gavetaAtualAberta] = [];
+    await salvarItensDaGaveta(gavetaAtualAberta);
+    fecharModalGerenciarGaveta();
+    mostrarToast(`Gaveta esvaziada (${itens.length} peças apagadas)`, 'sucesso');
+    renderizarPecasDaGaveta(gavetaAtualAberta);
+}
+
+// --- EXCLUIR (gaveta + peças) -------------------------------------------
+async function excluirGavetaAtual() {
+    if (!gavetaAtualAberta) return;
+    const gaveta = acharGaveta(gavetaAtualAberta);
+    const container = getContainerDeGaveta(gavetaAtualAberta);
+    if (!gaveta || !container) return;
+    const qtdPecas = (database.items[gavetaAtualAberta] || []).length;
+
+    const msg = `Excluir a gaveta "${gaveta.title || gaveta.label}"?\n\n` +
+                `Isso vai apagar TAMBÉM as ${qtdPecas} peça(s) dentro dela.\n` +
+                `Esta ação NÃO PODE ser desfeita.`;
+    if (!confirm(msg)) return;
+
+    // Remove gaveta do container
+    container.gavetas = container.gavetas.filter(g => g.id !== gavetaAtualAberta);
+    // Apaga peças
+    delete database.items[gavetaAtualAberta];
+
+    await salvarConfig();
+    const idApagado = gavetaAtualAberta;
+    gavetaAtualAberta = null;
+    fecharModalGerenciarGaveta();
+    mostrarToast(`Gaveta excluída`, 'info');
+    voltarParaGavetas();
+}
+
+// --- MOVER TODAS PEÇAS PRA OUTRA GAVETA ---------------------------------
+function iniciarMoverTodasPecas() {
+    if (!gavetaAtualAberta) return;
+    const itens = database.items[gavetaAtualAberta] || [];
+    if (itens.length === 0) {
+        mostrarToast('Esta gaveta está vazia, nada pra mover', 'info');
+        return;
+    }
+    const origemGaveta = acharGaveta(gavetaAtualAberta);
+
+    // Listar TODAS as outras gavetas como destino
+    const todasGavetas = [];
+    database.containers.forEach(c => {
+        (c.gavetas || []).forEach(g => {
+            if (g.id !== gavetaAtualAberta) {
+                todasGavetas.push({ ...g, containerNome: c.nome, containerIcone: c.icone });
+            }
+        });
+    });
+
+    if (todasGavetas.length === 0) {
+        mostrarToast('Não há outra gaveta pra receber as peças. Crie uma primeiro.', 'erro');
+        return;
+    }
+
+    document.getElementById('destino-info').innerHTML =
+        `<i class="fa-solid fa-circle-info"></i> Mover <strong>${itens.length} peça(s)</strong> de "${origemGaveta?.title || ''}" para:`;
+
+    const lista = document.getElementById('lista-gavetas-destino');
+    lista.innerHTML = todasGavetas.map(g => {
+        const qtdAtual = (database.items[g.id] || []).length;
+        return `
+            <button class="acao-card" onclick="window.confirmarMoverTodas(${g.id})">
+                <i class="fa-solid ${g.containerIcone || 'fa-box'}" style="color:#1f477b"></i>
+                <div>
+                    <strong>${g.title || g.label}</strong>
+                    <small>${g.containerNome} • ${qtdAtual} peça(s) atualmente</small>
+                </div>
+            </button>
+        `;
+    }).join('');
+
+    fecharModalGerenciarGaveta();
+    document.getElementById('modal-escolher-destino').classList.replace('view-hidden', 'view-active');
+}
+
+function fecharModalEscolherDestino() {
+    document.getElementById('modal-escolher-destino').classList.replace('view-active', 'view-hidden');
+}
+
+async function confirmarMoverTodas(idDestino) {
+    if (!gavetaAtualAberta || gavetaAtualAberta === idDestino) return;
+    const origem = database.items[gavetaAtualAberta] || [];
+    const destino = database.items[idDestino] || [];
+
+    if (!confirm(`Mover ${origem.length} peça(s) pra "${acharGaveta(idDestino)?.title}"?`)) return;
+
+    // Renumera positions das peças que vão pro destino (continuam após as existentes)
+    let posMax = destino.reduce((m, p) => Math.max(m, p.position || 0), 0);
+    const movidas = origem.map(p => ({
+        ...p,
+        position: ++posMax,
+        coluna: undefined,        // limpa coluna fixa (best-fit recalcula)
+        grupoMescla: null         // desfaz mesclas (peça vai sozinha)
+    }));
+
+    database.items[idDestino] = [...destino, ...movidas];
+    database.items[gavetaAtualAberta] = [];
+
+    await salvarItensDaGaveta(idDestino);
+    await salvarItensDaGaveta(gavetaAtualAberta);
+
+    fecharModalEscolherDestino();
+    mostrarToast(`${origem.length} peça(s) movida(s) ✓`, 'sucesso');
+    renderizarPecasDaGaveta(gavetaAtualAberta);
 }
 
 // =========================================================================
@@ -2360,6 +2520,14 @@ window.restaurarPadraoFabrica    = restaurarPadraoFabrica;
 window.mostrarToast              = mostrarToast;
 window.excluirPecaArrastada      = excluirPecaArrastada;
 window.configurarBotaoExcluir    = configurarBotaoExcluir;
+window.abrirModalGerenciarGaveta = abrirModalGerenciarGaveta;
+window.fecharModalGerenciarGaveta= fecharModalGerenciarGaveta;
+window.duplicarGavetaAtual       = duplicarGavetaAtual;
+window.esvaziarGavetaAtual       = esvaziarGavetaAtual;
+window.excluirGavetaAtual        = excluirGavetaAtual;
+window.iniciarMoverTodasPecas    = iniciarMoverTodasPecas;
+window.fecharModalEscolherDestino= fecharModalEscolherDestino;
+window.confirmarMoverTodas       = confirmarMoverTodas;
 window.salvarSenhaObrigatoria    = salvarSenhaObrigatoria;
 window.cancelarRedefinicaoSenha  = cancelarRedefinicaoSenha;
 window.buscarPecasGlobal         = buscarPecasGlobal;
