@@ -1523,6 +1523,56 @@ body:not(.is-admin) .admin-only { display: none !important; }
     min-height: 0;
 }
 
+/* MODAL GERENCIAR GAVETA — cards de ação clicáveis */
+.modal-gerenciar { max-width: 480px; }
+.gerenciar-acoes {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.acao-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: all 0.15s ease;
+}
+.acao-card:hover {
+    border-color: #1f477b;
+    background: #f8fafc;
+    transform: translateX(4px);
+}
+.acao-card i:first-child {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    width: 40px;
+    text-align: center;
+}
+.acao-card > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.acao-card strong {
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+.acao-card small {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+.acao-card-amarelo { border-color: #fde68a; background: #fffbeb; }
+.acao-card-amarelo:hover { border-color: #ca8a04; }
+.acao-card-vermelho { border-color: #fecaca; background: #fef2f2; }
+.acao-card-vermelho:hover { border-color: #dc2626; }
+
 /* BOTÃO FLUTUANTE LIXEIRA — aparece durante drag pra soltar e excluir uma peça */
 .btn-excluir-flutuante {
     position: fixed;
