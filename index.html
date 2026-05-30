@@ -9,7 +9,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192x192.png">
     
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="style.css?v=11">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -261,6 +261,9 @@
                         <button class="btn-voltar" onclick="window.voltarParaGavetas()">⬅ Voltar</button>
                         <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1; min-width: 200px;">Gaveta X</h2>
                         <div style="display: flex; gap: 6px;">
+                            <button class="btn-voltar admin-only" onclick="window.abrirModalGerenciarGaveta()" title="Excluir, esvaziar, duplicar ou mover peças desta gaveta" style="background: #475569;">
+                                <i class="fa-solid fa-gear"></i> Gerenciar
+                            </button>
                             <button class="btn-voltar admin-only" onclick="window.padronizarTamanhos()" title="Aplicar o mesmo tamanho a todas as peças desta gaveta" style="background: var(--drawer-blue);">
                                 <i class="fa-solid fa-arrows-up-down"></i> Padronizar
                             </button>
@@ -685,11 +688,67 @@
         </div>
     </div>
 
+    <!-- MODAL: GERENCIAR GAVETA (admin) — excluir, esvaziar, duplicar, mover peças -->
+    <div id="modal-gerenciar-gaveta" class="modal-overlay view-hidden">
+        <div class="modal-content modal-gerenciar">
+            <button class="modal-close-btn" onclick="window.fecharModalGerenciarGaveta()" aria-label="Fechar">&times;</button>
+            <h2><i class="fa-solid fa-gear"></i> Gerenciar Gaveta</h2>
+            <p class="mensagem-alerta" id="gerenciar-info" style="margin-bottom: 20px;"></p>
+
+            <div class="gerenciar-acoes">
+                <button class="acao-card" onclick="window.duplicarGavetaAtual()">
+                    <i class="fa-solid fa-clone" style="color:#0284c7"></i>
+                    <div>
+                        <strong>Duplicar Gaveta</strong>
+                        <small>Cria uma nova gaveta vazia com o mesmo título</small>
+                    </div>
+                </button>
+
+                <button class="acao-card" onclick="window.iniciarMoverTodasPecas()">
+                    <i class="fa-solid fa-truck-arrow-right" style="color:#16a34a"></i>
+                    <div>
+                        <strong>Mover Todas as Peças</strong>
+                        <small>Transfere todas as peças desta gaveta pra outra</small>
+                    </div>
+                </button>
+
+                <button class="acao-card acao-card-amarelo" onclick="window.esvaziarGavetaAtual()">
+                    <i class="fa-solid fa-broom" style="color:#ca8a04"></i>
+                    <div>
+                        <strong>Esvaziar Gaveta</strong>
+                        <small>Apaga todas as peças, mas mantém a gaveta vazia</small>
+                    </div>
+                </button>
+
+                <button class="acao-card acao-card-vermelho" onclick="window.excluirGavetaAtual()">
+                    <i class="fa-solid fa-trash-can" style="color:#dc2626"></i>
+                    <div>
+                        <strong>Excluir Gaveta Inteira</strong>
+                        <small>Apaga a gaveta e todas as peças. Sem volta.</small>
+                    </div>
+                </button>
+            </div>
+
+            <button class="btn-cancel btn-full" style="margin-top:16px" onclick="window.fecharModalGerenciarGaveta()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- MODAL: ESCOLHER GAVETA DESTINO (mover todas as peças) -->
+    <div id="modal-escolher-destino" class="modal-overlay view-hidden">
+        <div class="modal-content">
+            <button class="modal-close-btn" onclick="window.fecharModalEscolherDestino()" aria-label="Fechar">&times;</button>
+            <h2><i class="fa-solid fa-truck-arrow-right"></i> Escolher Gaveta Destino</h2>
+            <p class="mensagem-alerta" id="destino-info" style="margin-bottom: 16px;"></p>
+            <div id="lista-gavetas-destino" class="gerenciar-acoes"></div>
+            <button class="btn-cancel btn-full" style="margin-top:16px" onclick="window.fecharModalEscolherDestino()">Cancelar</button>
+        </div>
+    </div>
+
     <!-- BOTÃO FLUTUANTE LIXEIRA — só aparece enquanto arrasta uma peça -->
     <div id="btn-excluir-flutuante" class="btn-excluir-flutuante">
         <i class="fa-solid fa-trash-can"></i> Excluir
     </div>
 
-    <script type="module" src="script.js?v=10"></script>
+    <script type="module" src="script.js?v=11"></script>
 </body>
 </html>
