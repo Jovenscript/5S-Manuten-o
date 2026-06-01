@@ -681,6 +681,10 @@ async function iniciarSincronizacaoFirebase() {
             // Garante que toda gaveta tenha um array de items inicializado
             getTodasGavetas().forEach(g => { if (!database.items[g.id]) database.items[g.id] = []; });
             registrarListenersGavetas();
+            
+            // AUTO-LOGIN: tenta restaurar sessão salva no localStorage (estilo Insta).
+            // Só roda 1x: depois que o Firebase carregou os usuários pela primeira vez.
+            tentarRestaurarSessao();
         } else {
             salvarConfig();
             registrarListenersGavetas();
@@ -833,6 +837,13 @@ function cancelarRedefinicaoSenha() {
 
 function aplicarLogin(user) {
     usuarioLogado = user;
+    
+    // PERSISTÊNCIA: salva no localStorage pra próxima abertura do app
+    // já entrar direto sem pedir login (estilo Instagram/Facebook).
+    try {
+        localStorage.setItem('5s_user_logado', JSON.stringify(user));
+    } catch (e) { /* localStorage cheio ou bloqueado, ignora */ }
+    
     document.getElementById('usuario-logado-nome').innerText   = user.nome;
     document.getElementById('usuario-logado-codigo').innerText = `Crachá: ${user.cracha}`;
 
@@ -894,7 +905,44 @@ function mostrarTela(id) {
 function voltarParaContainers() { containerAtual = null; mostrarTela('view-containers'); }
 
 function voltarParaGavetas() { mostrarTela('view-gavetas'); }
-function sairDoSistema()     { location.reload(); }
+function sairDoSistema() {
+    // Limpa a sessão persistente do localStorage pra usuário ter que logar de novo.
+    try { localStorage.removeItem('5s_user_logado'); } catch (e) {}
+    location.reload();
+}
+
+// AUTO-LOGIN: restaura sessão salva no localStorage da última vez que o usuário logou.
+// Estilo Instagram/Facebook — abre o app e já tá dentro.
+// Validação: ADMIN entra direto; usuário normal só restaura se ainda existir
+// no Firebase com a mesma senha (segurança caso o admin tenha alterado/excluído).
+let sessaoJaRestaurada = false;
+function tentarRestaurarSessao() {
+    if (sessaoJaRestaurada || usuarioLogado) return;
+    sessaoJaRestaurada = true;
+    
+    let salvo;
+    try {
+        salvo = JSON.parse(localStorage.getItem('5s_user_logado') || 'null');
+    } catch (e) { return; }
+    if (!salvo) return;
+    
+    // ADMIN: bate as credenciais fixas
+    if (salvo.role === 'ADMIN') {
+        aplicarLogin(salvo);
+        return;
+    }
+    
+    // USUÁRIO NORMAL: confirma que ainda existe no Firebase com a mesma senha
+    const userAtual = usuariosSalvos.find(u => 
+        u.cracha === salvo.cracha && u.senha === salvo.senha
+    );
+    if (userAtual) {
+        aplicarLogin(userAtual);
+    } else {
+        // Conta deletada ou senha alterada pelo admin → força login manual
+        try { localStorage.removeItem('5s_user_logado'); } catch (e) {}
+    }
+}
 
 // =========================================================================
 // MOSTRAR/OCULTAR SENHA (botão de olho nos campos de senha)
