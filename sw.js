@@ -9,7 +9,7 @@
    - Cross-origin (Firebase, Cloudinary, gstatic): NÃO intercepta. Deixa o
      navegador cuidar. O SW só gerencia os arquivos do próprio app.
 ========================================================================= */
-const CACHE_NAME = '5s-manutencao-v12';
+const CACHE_NAME = '5s-manutencao-v13';
 // Lista de assets a pré-cachear. Apenas arquivos que REALMENTE existem
 // no servidor — evita erros 404 na instalação do SW.
 const ASSETS_TO_CACHE = [
@@ -19,7 +19,10 @@ const ASSETS_TO_CACHE = [
   './script.js',
   './manifest.json',
   './icon-192x192.png',
-  './icon-512x512.png'
+  './icon-512x512.png',
+  './icon-maskable-192x192.png',
+  './icon-maskable-512x512.png',
+  './apple-touch-icon.png'
 ];
 
 // INSTALL — pré-cacheia o app shell de forma RESILIENTE.
