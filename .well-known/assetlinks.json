@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.jovenscript.manutencao",
+        "sha256_cert_fingerprints": ["8A:53:14:BE:EF:A7:52:AE:D2:A1:18:B3:FC:FA:32:6C:FD:B4:68:0F:F6:3A:FB:66:E7:AE:C6:DC:6D:73:63:C5"]
+      }
+    }]
