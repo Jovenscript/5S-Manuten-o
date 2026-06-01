@@ -25,25 +25,13 @@
       "src": "icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-maskable-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "icon-maskable-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "shortcuts": [
@@ -52,37 +40,39 @@
       "short_name": "Pedido",
       "description": "Gerar pedido de reposição das peças faltantes",
       "url": "./?atalho=pedido",
-      "icons": [{ "src": "icon-192x192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Buscar Peça",
       "short_name": "Buscar",
       "description": "Buscar uma peça em todos os gaveteiros",
       "url": "./?atalho=buscar",
-      "icons": [{ "src": "icon-192x192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Histórico",
       "short_name": "Histórico",
       "description": "Ver histórico de retiradas e movimentações",
       "url": "./?atalho=historico",
-      "icons": [{ "src": "icon-192x192.png", "sizes": "192x192" }]
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Tela principal do 5S Manutenção"
-    },
-    {
-      "src": "icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Versão mobile do app"
+      "icons": [
+        {
+          "src": "icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }
