@@ -9,7 +9,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192x192.png">
     
-    <link rel="stylesheet" href="style.css?v=17">
+    <link rel="stylesheet" href="style.css?v=18">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -317,11 +317,43 @@
                 </div>
                 <div class="col">
                     <label>Almoxarifado:</label>
-                    <select id="novo-almoxarifado">
+                    <select id="novo-almoxarifado" onchange="window.toggleSecaoFornecedores('novo')">
                         <option value="Automação">Automação</option>
                         <option value="Estoque">Estoque</option>
+                        <option value="Contrato">Contrato</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- CÓDIGO INTERNO (SKU estável) + UNIDADE DE MEDIDA -->
+            <div class="form-group row">
+                <div class="col">
+                    <label>Código Interno <small style="color:var(--text-secondary)">(SKU, não muda)</small>:</label>
+                    <input type="text" id="novo-codigo-interno" placeholder="Ex: UR-4-18">
+                </div>
+                <div class="col">
+                    <label>Unidade:</label>
+                    <select id="novo-unidade-medida">
+                        <option value="PC">PC (peça)</option>
+                        <option value="M">M (metro)</option>
+                        <option value="KG">KG (quilo)</option>
+                        <option value="L">L (litro)</option>
+                        <option value="CX">CX (caixa)</option>
+                        <option value="RL">RL (rolo)</option>
+                        <option value="PAR">PAR (par)</option>
+                        <option value="JG">JG (jogo)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- SEÇÃO FORNECEDORES (só aparece quando almoxarifado = Contrato) -->
+            <div id="novo-secao-fornecedores" class="secao-fornecedores view-hidden">
+                <h4><i class="fa-solid fa-handshake"></i> Fornecedores do Contrato</h4>
+                <small>Cadastre os fornecedores disponíveis pra essa peça e o código de cada um.</small>
+                <div id="novo-lista-fornecedores" class="lista-fornecedores"></div>
+                <button type="button" class="btn-add-fornecedor" onclick="window.adicionarLinhaFornecedor('novo')">
+                    <i class="fa-solid fa-plus"></i> Adicionar fornecedor
+                </button>
             </div>
 
             <div class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 2px solid #cbd5e1;">
@@ -396,11 +428,43 @@
                 </div>
                 <div class="col">
                     <label>Almoxarifado:</label>
-                    <select id="edit-peca-almoxarifado">
+                    <select id="edit-peca-almoxarifado" onchange="window.toggleSecaoFornecedores('edit')">
                         <option value="Automação">Automação</option>
                         <option value="Estoque">Estoque</option>
+                        <option value="Contrato">Contrato</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- CÓDIGO INTERNO + UNIDADE -->
+            <div class="form-group row">
+                <div class="col">
+                    <label>Código Interno <small style="color:var(--text-secondary)">(SKU, não muda)</small>:</label>
+                    <input type="text" id="edit-codigo-interno" placeholder="Ex: UR-4-18">
+                </div>
+                <div class="col">
+                    <label>Unidade:</label>
+                    <select id="edit-unidade-medida">
+                        <option value="PC">PC (peça)</option>
+                        <option value="M">M (metro)</option>
+                        <option value="KG">KG (quilo)</option>
+                        <option value="L">L (litro)</option>
+                        <option value="CX">CX (caixa)</option>
+                        <option value="RL">RL (rolo)</option>
+                        <option value="PAR">PAR (par)</option>
+                        <option value="JG">JG (jogo)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- SEÇÃO FORNECEDORES (Contrato) -->
+            <div id="edit-secao-fornecedores" class="secao-fornecedores view-hidden">
+                <h4><i class="fa-solid fa-handshake"></i> Fornecedores do Contrato</h4>
+                <small>Cadastre os fornecedores disponíveis pra essa peça e o código de cada um.</small>
+                <div id="edit-lista-fornecedores" class="lista-fornecedores"></div>
+                <button type="button" class="btn-add-fornecedor" onclick="window.adicionarLinhaFornecedor('edit')">
+                    <i class="fa-solid fa-plus"></i> Adicionar fornecedor
+                </button>
             </div>
 
             <div class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 2px solid #cbd5e1;">
@@ -783,6 +847,6 @@
         <i class="fa-solid fa-trash-can"></i> Excluir
     </div>
 
-    <script type="module" src="script.js?v=17"></script>
+    <script type="module" src="script.js?v=18"></script>
 </body>
 </html>
