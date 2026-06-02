@@ -9,7 +9,9 @@
    - Cross-origin (Firebase, Cloudinary, gstatic): NÃO intercepta. Deixa o
      navegador cuidar. O SW só gerencia os arquivos do próprio app.
 ========================================================================= */
-const CACHE_NAME = '5s-manutencao-v4';
+const CACHE_NAME = '5s-manutencao-v16';
+// Lista de assets a pré-cachear. Apenas arquivos que REALMENTE existem
+// no servidor — evita erros 404 na instalação do SW.
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -23,10 +25,20 @@ const ASSETS_TO_CACHE = [
   './apple-touch-icon.png'
 ];
 
-// INSTALL — pré-cacheia o app shell
+// INSTALL — pré-cacheia o app shell de forma RESILIENTE.
+// Antes usávamos cache.addAll() que aborta TUDO se um único arquivo falhar (404).
+// Agora cacheamos um por um com try/catch: arquivo faltando = warning, não erro fatal.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await Promise.all(ASSETS_TO_CACHE.map(async (asset) => {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn(`[SW] não cacheou "${asset}":`, err.message);
+        }
+      }));
+    })
   );
   self.skipWaiting();
 });
@@ -65,7 +77,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Estáticos: stale-while-revalidate
+  // CSS e JS: network-first -> sempre tenta o arquivo NOVO online; usa cache só offline.
+  // Isso garante que uma atualização de código apareça IMEDIATAMENTE (sem 2º reload).
+  if (url.pathname.endsWith('.css') || url.pathname.endsWith('.js')) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Demais estáticos (imagens, manifest): stale-while-revalidate
   event.respondWith(
     caches.match(req).then((cached) => {
       const network = fetch(req)
