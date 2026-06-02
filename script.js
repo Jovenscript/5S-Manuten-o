@@ -178,6 +178,16 @@ window.onload = () => {
     iniciarSincronizacaoFirebase();
     configurarEventosEnter();
     configurarBotaoExcluir();  // Handlers do botão lixeira
+    
+    // Re-renderiza a gaveta atual quando a tela muda de tamanho (girar celular)
+    // pra alternar entre layout desktop (5 colunas) e mobile (lista vertical).
+    let _resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(() => {
+            if (gavetaAtualAberta) renderizarPecasDaGaveta(gavetaAtualAberta);
+        }, 150);
+    });
 
     const deviceAuthorized = localStorage.getItem('5s_device_authorized');
     if (deviceAuthorized === 'true') {
@@ -1737,6 +1747,91 @@ function montarConteudoPeca(peca, tam, statusPeca) {
         </div>`;
 }
 
+// =========================================================================
+// RENDER MOBILE — layout vertical com compartimentos
+// -------------------------------------------------------------------------
+// No celular, ao invés de simular as 5 colunas físicas (que ficam ilegíveis
+// em tela estreita), renderiza uma LISTA VERTICAL de "compartimentos".
+// Peças com mesmo `grupoMescla` ficam LADO A LADO num mesmo compartimento
+// (mostrando visualmente que dividem o mesmo slot físico na gaveta real).
+// Peças solo ocupam o compartimento inteiro.
+// =========================================================================
+function renderizarPecasMobile(pecasBrutas, mainContainer, idGaveta) {
+    const ehAdmin = usuarioLogado && usuarioLogado.role === 'ADMIN';
+
+    // Container vertical da lista mobile
+    const lista = document.createElement('div');
+    lista.className = 'gaveta-mobile-lista';
+
+    // Agrupa peças mescladas. Peças sem grupoMescla viram blocos solo.
+    const blocos = montarBlocos(pecasBrutas);
+
+    // Ordena pelos campos position/coluna pra manter consistência com desktop
+    blocos.sort((a, b) => {
+        const pa = (a.pecas[0].position || 999);
+        const pb = (b.pecas[0].position || 999);
+        return pa - pb;
+    });
+
+    blocos.forEach((bloco) => {
+        const compartimento = document.createElement('div');
+        compartimento.className = 'compartimento-mobile';
+        // Se tem mais de 1 peça, marca como "mesclado" (visual de divisão)
+        if (bloco.pecas.length > 1) compartimento.classList.add('compartimento-mesclado');
+
+        bloco.pecas.forEach((peca) => {
+            compartimento.appendChild(criarCardPecaMobile(peca, idGaveta, ehAdmin));
+        });
+
+        lista.appendChild(compartimento);
+    });
+
+    mainContainer.appendChild(lista);
+}
+
+// Cria o card de UMA peça no layout mobile
+function criarCardPecaMobile(peca, idGaveta, ehAdmin) {
+    const statusPeca = getPecaStatus(peca);
+    const card = document.createElement('div');
+    card.className = `peca-card-mobile status-${statusPeca}`;
+    card.dataset.pecaId = peca.id;
+
+    const corStatus = {
+        verde:    '#16a34a',
+        amarelo:  '#eab308',
+        vermelho: '#dc2626',
+        cinza:    '#64748b'
+    }[statusPeca] || '#64748b';
+
+    const imgSrc = peca.image || '';
+    const imgHtml = imgSrc 
+        ? `<img src="${imgSrc}" class="peca-card-mobile-img" alt="${peca.name}">`
+        : `<div class="peca-card-mobile-img sem-foto"><i class="fa-solid fa-box"></i></div>`;
+
+    card.innerHTML = `
+        <div class="peca-card-mobile-status" style="background:${corStatus}"></div>
+        ${imgHtml}
+        <div class="peca-card-mobile-info">
+            <div class="peca-card-mobile-nome">${peca.name || 'Sem nome'}</div>
+            <div class="peca-card-mobile-codigo">${peca.code || 'sem código'}</div>
+        </div>
+        <div class="peca-card-mobile-controles">
+            <button class="btn-qtd-mobile btn-menos" onclick="window.ajusteRapidoEstoque(${peca.id}, -1)" ${peca.current <= 0 ? 'disabled' : ''}>
+                <i class="fa-solid fa-minus"></i>
+            </button>
+            <div class="peca-card-mobile-qtd">
+                <strong>${peca.current}</strong>
+                <small>/${peca.expected}</small>
+            </div>
+            <button class="btn-qtd-mobile btn-mais" onclick="window.ajusteRapidoEstoque(${peca.id}, 1)">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+        ${ehAdmin ? `<button class="peca-card-mobile-menu" onclick="window.abrirAcoesPeca(${peca.id})" aria-label="Mais opções">⋮</button>` : ''}
+    `;
+    return card;
+}
+
 function renderizarPecasDaGaveta(idGaveta) {
     const mainContainer = document.getElementById('container-divisorias');
     if (!mainContainer) return;
@@ -1746,6 +1841,11 @@ function renderizarPecasDaGaveta(idGaveta) {
     if (pecasBrutas.length === 0) {
         mainContainer.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.1rem; padding:40px;">Nenhuma peça cadastrada nesta gaveta.</p>';
         return;
+    }
+
+    // MOBILE (< 768px): renderiza vertical com peças mescladas lado a lado
+    if (window.matchMedia('(max-width: 768px)').matches) {
+        return renderizarPecasMobile(pecasBrutas, mainContainer, idGaveta);
     }
 
     // Distribui TODAS as peças da gaveta nas 5 colunas físicas (sem sobreposição)
