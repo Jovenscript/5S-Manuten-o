@@ -2261,11 +2261,16 @@ function salvarNomeGaveta() {
 // GERENCIAMENTO DE PEÇAS
 // =========================================================================
 function abrirModalCadastro() {
-    ['novo-codigo', 'novo-nome', 'novo-posicao'].forEach(id => { document.getElementById(id).value = ''; });
+    ['novo-codigo', 'novo-nome', 'novo-posicao', 'novo-codigo-interno'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('novo-esperado').value  = '1';
     document.getElementById('novo-atual').value     = '0';
     document.getElementById('novo-divisoria').value = 'Geral';
     document.getElementById('novo-almoxarifado').value = 'Automação';
+    document.getElementById('novo-unidade-medida').value = 'PC';
+
+    // Limpa fornecedores e esconde a seção (só reaparece se escolher Contrato)
+    document.getElementById('novo-lista-fornecedores').innerHTML = '';
+    document.getElementById('novo-secao-fornecedores').classList.add('view-hidden');
 
     // TAMANHO FÍSICO: padrão 2 espaços (peça pequena/média)
     document.getElementById('novo-tamanho').value   = '4';
@@ -2278,6 +2283,81 @@ function abrirModalCadastro() {
 
 function fecharModalCadastro() { document.getElementById('modal-cadastro').classList.add('view-hidden'); }
 
+// =========================================================================
+// FORNECEDORES POR ITEM (estrutura compatível com SAP Source List)
+// -------------------------------------------------------------------------
+// Um item pode ter N fornecedores. Cada fornecedor tem nome + código DELE
+// pra essa peça. Só aparece quando almoxarifado = "Contrato".
+// Fornecedores iniciais: Hennigs, GK (lista expansível).
+// =========================================================================
+const FORNECEDORES_DISPONIVEIS = ['Hennigs', 'GK'];
+
+// Mostra/esconde a seção de fornecedores conforme o almoxarifado escolhido
+function toggleSecaoFornecedores(prefixo) {
+    const almox = document.getElementById(prefixo === 'novo' ? 'novo-almoxarifado' : 'edit-peca-almoxarifado').value;
+    const secao = document.getElementById(`${prefixo}-secao-fornecedores`);
+    if (!secao) return;
+    if (almox === 'Contrato') {
+        secao.classList.remove('view-hidden');
+        // Se não tem nenhuma linha ainda, adiciona uma vazia
+        const lista = document.getElementById(`${prefixo}-lista-fornecedores`);
+        if (lista && lista.children.length === 0) adicionarLinhaFornecedor(prefixo);
+    } else {
+        secao.classList.add('view-hidden');
+    }
+}
+
+// Adiciona uma linha de fornecedor (select de nome + input de código + remover)
+function adicionarLinhaFornecedor(prefixo, nome = '', codigo = '') {
+    const lista = document.getElementById(`${prefixo}-lista-fornecedores`);
+    if (!lista) return;
+    const linha = document.createElement('div');
+    linha.className = 'linha-fornecedor';
+    const opcoes = FORNECEDORES_DISPONIVEIS.map(f =>
+        `<option value="${f}" ${f === nome ? 'selected' : ''}>${f}</option>`
+    ).join('');
+    linha.innerHTML = `
+        <select class="forn-nome">
+            <option value="">Selecione...</option>
+            ${opcoes}
+        </select>
+        <input type="text" class="forn-codigo" placeholder="Código do fornecedor" value="${codigo}">
+        <button type="button" class="btn-remover-fornecedor" onclick="this.parentElement.remove()" title="Remover">
+            <i class="fa-solid fa-trash-can"></i>
+        </button>
+    `;
+    lista.appendChild(linha);
+}
+
+// Lê os fornecedores preenchidos no formulário (retorna array)
+function lerFornecedores(prefixo) {
+    const lista = document.getElementById(`${prefixo}-lista-fornecedores`);
+    if (!lista) return [];
+    const fornecedores = [];
+    lista.querySelectorAll('.linha-fornecedor').forEach((linha, idx) => {
+        const nome = linha.querySelector('.forn-nome').value;
+        const codigo = linha.querySelector('.forn-codigo').value.trim();
+        if (nome) {
+            fornecedores.push({
+                nome: nome,
+                codigoFornecedor: codigo,
+                preco: null,             // reservado pra futuro (preço de contrato)
+                prazoEntregaDias: null,  // reservado
+                preferencial: idx === 0  // primeiro = preferencial
+            });
+        }
+    });
+    return fornecedores;
+}
+
+// Popula as linhas de fornecedores ao abrir a edição de uma peça existente
+function popularFornecedores(prefixo, fornecedores) {
+    const lista = document.getElementById(`${prefixo}-lista-fornecedores`);
+    if (!lista) return;
+    lista.innerHTML = '';
+    (fornecedores || []).forEach(f => adicionarLinhaFornecedor(prefixo, f.nome, f.codigoFornecedor));
+}
+
 async function salvarNovoItem() {
     const codigo    = document.getElementById('novo-codigo').value.trim();
     const nome      = document.getElementById('novo-nome').value.trim();
@@ -2286,6 +2366,9 @@ async function salvarNovoItem() {
     const posicao   = parseInt(document.getElementById('novo-posicao').value) || 999;
     const divisoria = document.getElementById('novo-divisoria').value.trim() || 'Geral';
     const almoxarifado = document.getElementById('novo-almoxarifado').value || 'Automação';
+    const codigoInterno = document.getElementById('novo-codigo-interno').value.trim();
+    const unidadeMedida = document.getElementById('novo-unidade-medida').value || 'PC';
+    const fornecedores  = almoxarifado === 'Contrato' ? lerFornecedores('novo') : [];
 
     // TAMANHO FÍSICO: quantos espaços verticais (1-10) a peça ocupa.
     // A posição (coluna/linha) é calculada AUTOMATICAMENTE pelo bin-packing.
@@ -2294,25 +2377,34 @@ async function salvarNovoItem() {
     const imgInput  = document.getElementById('novo-imagem');
 
     if (!nome) return mostrarAlerta('Erro', 'O nome da peça é obrigatório!');
+    if (almoxarifado === 'Contrato' && fornecedores.length === 0) {
+        return mostrarAlerta('Erro', 'Almoxarifado "Contrato" precisa de pelo menos um fornecedor.');
+    }
 
     const btnSalvar = document.querySelector('#modal-cadastro .btn-save');
     if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = 'Aguarde...'; }
 
+    const agora = Date.now();
     const novaPeca = {
-        id:          Date.now(),
+        id:          agora,
         code:        codigo || `G${gavetaAtualAberta}-P${(database.items[gavetaAtualAberta] || []).length + 1}`,
+        codigoInterno: codigoInterno || (codigo || `SKU-${agora}`),   // SKU estável (futuro MATNR do SAP)
         name:        nome, 
         expected:    esperado, 
         current:     atual, 
         position:    posicao,
         divisoria:   divisoria, 
-        almoxarifado: almoxarifado,   // Automação ou Estoque (usado no pedido de compra)
+        almoxarifado: almoxarifado,   // Automação | Estoque | Contrato
+        unidadeMedida: unidadeMedida, // UoM (futuro MEINS do SAP)
+        fornecedores: fornecedores,   // Source List (só preenche se Contrato)
         tamanho:     tamanho,   // Tamanho físico vertical na ESCALA NOVA (1-20)
         size:        tamanho,   // Compatibilidade com código/dados antigos
         escalaV2:    true,      // Marca que já está na escala dobrada (não migrar de novo)
         requested:   false, 
         lastTakenBy: null, 
-        image:       null
+        image:       null,
+        criadoEm:    agora,     // Auditoria (SAP-friendly)
+        atualizadoEm: agora
     };
 
     if (imgInput.files && imgInput.files[0]) {
@@ -2339,6 +2431,12 @@ function abrirModalEditarPeca(idPeca) {
     document.getElementById('edit-peca-posicao').value   = (peca.position && peca.position !== 999) ? peca.position : '';
     document.getElementById('edit-peca-divisoria').value = peca.divisoria || 'Geral';
     document.getElementById('edit-peca-almoxarifado').value = peca.almoxarifado || 'Automação';
+    document.getElementById('edit-codigo-interno').value = peca.codigoInterno || '';
+    document.getElementById('edit-unidade-medida').value = peca.unidadeMedida || 'PC';
+
+    // Carrega os fornecedores e mostra/esconde a seção conforme almoxarifado
+    popularFornecedores('edit', peca.fornecedores);
+    toggleSecaoFornecedores('edit');
 
     // TAMANHO FÍSICO (1-10), com default pra dados antigos
     document.getElementById('edit-peca-tamanho').value = getTamanhoPeca(peca);
@@ -2377,9 +2475,18 @@ async function salvarEdicaoPeca() {
     peca.position   = novaPosicao;
     peca.divisoria  = novaDivisoria;
     peca.almoxarifado = document.getElementById('edit-peca-almoxarifado').value || 'Automação';
+    peca.codigoInterno = document.getElementById('edit-codigo-interno').value.trim() || peca.codigoInterno || peca.code;
+    peca.unidadeMedida = document.getElementById('edit-unidade-medida').value || 'PC';
+    peca.fornecedores = peca.almoxarifado === 'Contrato' ? lerFornecedores('edit') : [];
     peca.tamanho    = novoTamanho;
     peca.size       = novoTamanho;  // Compatibilidade
     peca.escalaV2   = true;         // Já na escala nova (1-20)
+    peca.atualizadoEm = Date.now(); // Auditoria
+
+    if (peca.almoxarifado === 'Contrato' && peca.fornecedores.length === 0) {
+        if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = 'Salvar Alterações'; }
+        return mostrarAlerta('Erro', 'Almoxarifado "Contrato" precisa de pelo menos um fornecedor.');
+    }
 
     if (peca.current >= peca.expected) peca.requested = false;
 
@@ -2445,8 +2552,11 @@ function gerarEmailPedido() {
                 itensFaltando.push({
                     nome: peca.name,
                     codigo: peca.code,
+                    codigoInterno: peca.codigoInterno || peca.code,
+                    unidadeMedida: peca.unidadeMedida || 'PC',
                     falta: peca.expected - peca.current,
                     almoxarifado: peca.almoxarifado || 'Automação',
+                    fornecedores: peca.fornecedores || [],
                     pecaId: peca.id,
                     gavetaId: gaveta.id
                 });
@@ -2465,21 +2575,38 @@ function gerarEmailPedido() {
     itensFaltando.forEach((item, index) => {
         const div = document.createElement('div');
         div.className = 'pedido-item-card';
-        const corAlmox = item.almoxarifado === 'Estoque' ? '#0284c7' : '#16a34a';
+        const ehContrato = item.almoxarifado === 'Contrato';
+        const corAlmox = ehContrato ? '#7c3aed' : (item.almoxarifado === 'Estoque' ? '#0284c7' : '#16a34a');
+
+        // Se for contrato com fornecedores, monta um seletor de fornecedor
+        let blocoFornecedor = '';
+        if (ehContrato && item.fornecedores.length > 0) {
+            const opcoes = item.fornecedores.map((f, i) =>
+                `<option value="${f.nome}|${f.codigoFornecedor || ''}" ${i === 0 ? 'selected' : ''}>${f.nome}${f.codigoFornecedor ? ' · ' + f.codigoFornecedor : ''}</option>`
+            ).join('');
+            blocoFornecedor = `
+                <label>
+                    <span><i class="fa-solid fa-handshake"></i> Fornecedor do contrato</span>
+                    <select id="forn-contrato-${index}" class="select-fornecedor-contrato">${opcoes}</select>
+                </label>
+            `;
+        }
+
         div.innerHTML = `
             <div class="pedido-item-linha">
                 <div class="pedido-item-info">
                     <span class="pedido-item-qtd">${item.falta}x</span>
                     <div class="pedido-item-meta">
                         <strong>${item.nome}</strong>
-                        <small>${item.codigo || 'sem código'} · <span style="color:${corAlmox}">${item.almoxarifado}</span></small>
+                        <small>${item.codigo || 'sem código'} · <span style="color:${corAlmox}">${item.almoxarifado}</span>${ehContrato ? ' <i class="fa-solid fa-handshake" style="color:#7c3aed"></i>' : ''}</small>
                     </div>
                 </div>
-                <button class="pedido-item-toggle" onclick="window.toggleCompradoFora(${index})" id="toggle-${index}" title="Detalhes / Comprado fora">
+                <button class="pedido-item-toggle" onclick="window.toggleCompradoFora(${index})" id="toggle-${index}" title="Detalhes">
                     <i class="fa-solid fa-chevron-down"></i>
                 </button>
             </div>
             <div class="pedido-item-extra view-hidden" id="extra-${index}">
+                ${blocoFornecedor}
                 <div class="pedido-extra-grid">
                     <label>
                         <span>OS individual</span>
@@ -2590,14 +2717,24 @@ function processarFormularioPedido() {
         const os   = osIndividual || osGlobal || 'Não informada';
         const fora = document.getElementById(`fora-${index}`).checked;
         const almo = fora ? 'Comprado Fora' : item.almoxarifado;
+        const unid = item.unidadeMedida || 'PC';
 
-        textoFinal += `- ${item.falta} un. | ${item.nome} (Item: ${item.codigo || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
+        textoFinal += `- ${item.falta} ${unid} | ${item.nome} (Item: ${item.codigo || 'S/N'} | SKU: ${item.codigoInterno || 'S/N'}) | OS: ${os} | Almox: ${almo}\n`;
+
+        // CONTRATO: adiciona o fornecedor escolhido + código dele
+        if (item.almoxarifado === 'Contrato' && !fora) {
+            const seletor = document.getElementById(`forn-contrato-${index}`);
+            if (seletor && seletor.value) {
+                const [nomeForn, codForn] = seletor.value.split('|');
+                textoFinal += `  > Contrato - Fornecedor: ${nomeForn}${codForn ? ' | Cód. Fornecedor: ' + codForn : ''}\n`;
+            }
+        }
 
         if (fora) {
             const forn = document.getElementById(`forn-${index}`).value || 'Não informado';
-            const unid = document.getElementById(`unid-${index}`).value || 'Não informada';
+            const unidFora = document.getElementById(`unid-${index}`).value || unid;
             const just = document.getElementById(`just-${index}`).value || 'Não informada';
-            textoFinal += `  > Detalhes Compra Externa - Fornecedor: ${forn} | UM: ${unid} | Justificativa: ${just}\n`;
+            textoFinal += `  > Detalhes Compra Externa - Fornecedor: ${forn} | UM: ${unidFora} | Justificativa: ${just}\n`;
         }
     });
 
@@ -2844,6 +2981,8 @@ window.abrirModalMoverPeca       = abrirModalMoverPeca;
 window.fecharModalMoverPeca      = fecharModalMoverPeca;
 window.confirmarMoverPeca        = confirmarMoverPeca;
 window.toggleCompradoFora        = toggleCompradoFora;
+window.toggleSecaoFornecedores   = toggleSecaoFornecedores;
+window.adicionarLinhaFornecedor  = adicionarLinhaFornecedor;
 window.processarFormularioPedido = processarFormularioPedido;
 window.recuperarRascunhoPedido   = recuperarRascunhoPedido;
 window.descartarRascunhoPedido   = descartarRascunhoPedido;
