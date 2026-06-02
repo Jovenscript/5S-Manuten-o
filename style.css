@@ -2102,6 +2102,90 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .compartimento-mesclado .peca-card-mobile-controles { padding-right: 6px; }
 .compartimento-mesclado .peca-card-mobile-menu { display: none; }
 
+/* SEÇÃO FORNECEDORES (cadastro/edição quando almoxarifado = Contrato) */
+.secao-fornecedores {
+    background: linear-gradient(135deg, #faf5ff, #f3e8ff);
+    border: 2px solid #d8b4fe;
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 12px;
+}
+.secao-fornecedores h4 {
+    margin: 0 0 4px 0;
+    color: #7c3aed;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.secao-fornecedores > small {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    margin-bottom: 12px;
+}
+.lista-fornecedores {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.linha-fornecedor {
+    display: grid;
+    grid-template-columns: 130px 1fr 40px;
+    gap: 8px;
+    align-items: center;
+}
+.linha-fornecedor .forn-nome,
+.linha-fornecedor .forn-codigo {
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+.btn-remover-fornecedor {
+    background: #fee2e2;
+    color: #dc2626;
+    border: none;
+    border-radius: 6px;
+    height: 36px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-remover-fornecedor:hover { background: #fecaca; }
+.btn-add-fornecedor {
+    background: #7c3aed;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+.btn-add-fornecedor:hover { background: #6d28d9; }
+
+/* Seletor de fornecedor no gerador de pedido */
+.select-fornecedor-contrato {
+    padding: 8px 10px;
+    border: 1px solid #d8b4fe;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background: #faf5ff;
+    width: 100%;
+}
+
+/* Mobile: linha de fornecedor empilha */
+@media (max-width: 768px) {
+    .linha-fornecedor { grid-template-columns: 1fr 1fr 44px; }
+    .secao-fornecedores { padding: 12px; }
+}
+
+/* SEÇÃO FORNECEDORES fim */
 /* SPACER invisível pra ocupar a sobra de uma coluna (sem mostrar "X livre") */
 .coluna-spacer {
     flex: 1 1 auto;
