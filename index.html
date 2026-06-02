@@ -2,58 +2,59 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>5S Manutenção - Gaveteiro Elétrico</title>
-
-    <!-- ===== PWA / INSTALAÇÃO ===== -->
-    <link rel="manifest" href="manifest.json">
+    
     <meta name="theme-color" content="#1e3a5f">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="5S Manutenção">
-    <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192x192.png">
-
-    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+    
+    <link rel="stylesheet" href="style.css?v=16">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
     <div id="mobile-overlay" class="sidebar-overlay" onclick="window.toggleMenuMobile()"></div>
 
-    <!-- Botão flutuante de instalação (aparece quando o navegador permite) -->
-    <button id="btn-instalar-pwa" class="btn-instalar-pwa view-hidden" onclick="window.instalarPWA()">
-        <i class="fa-solid fa-download"></i> Instalar App
-    </button>
-
+    <!-- TELA DE AUTORIZAÇÃO DO DISPOSITIVO -->
     <section id="view-device-auth" class="view-active lock-screen">
         <div class="login-container lock-container">
             <i class="fa-solid fa-lock lock-icon"></i>
             <h2>Acesso Restrito</h2>
             <p>Este dispositivo não está autorizado para acessar a rede 5S da Manutenção.</p>
-
+            
             <div class="form-group" style="margin-top: 2rem;">
                 <label>Chave de Liberação (Somente ADM)</label>
-                <input type="password" id="input-device-key" placeholder="Digite a chave mestre" autocomplete="off">
+                <div class="senha-wrapper">
+                    <input type="password" id="input-device-key" placeholder="Digite a chave mestre">
+                    <button type="button" class="btn-ver-senha" onclick="window.toggleVerSenha('input-device-key', this)" title="Mostrar/ocultar">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
             </div>
             <button class="btn-login btn-auth" onclick="window.autorizarDispositivo()">Liberar Dispositivo</button>
         </div>
     </section>
 
+    <!-- TELA DE LOGIN / REGISTRO -->
     <section id="view-login" class="view-hidden">
         <div class="login-container">
             <h2>Sistema de Manutenção 5S</h2>
             <p id="login-subtitle">Controle de Gaveteiro Elétrico</p>
-
+            
             <div id="form-entrar">
                 <div class="form-group">
                     <label for="input-login-id">Crachá (WEG) ou E-mail (Admin)</label>
-                    <input type="text" id="input-login-id" placeholder="Usuario ou cadastro" autocomplete="username">
+                    <input type="text" id="input-login-id" placeholder="Usuario ou cadastro">
                 </div>
                 <div class="form-group">
                     <label for="input-login-senha">Senha</label>
-                    <input type="password" id="input-login-senha" placeholder="Sua senha" autocomplete="current-password">
+                    <div class="senha-wrapper">
+                        <input type="password" id="input-login-senha" placeholder="Sua senha">
+                        <button type="button" class="btn-ver-senha" onclick="window.toggleVerSenha('input-login-senha', this)" title="Mostrar/ocultar senha">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
                 <button class="btn-login" onclick="window.realizarLogin()">Entrar no Sistema</button>
                 <p class="link-toggle" onclick="window.alternarTelaLogin()">Primeiro Acesso? Crie seu cadastro</p>
@@ -70,7 +71,12 @@
                 </div>
                 <div class="form-group">
                     <label for="reg-senha">Crie uma Senha</label>
-                    <input type="password" id="reg-senha" placeholder="Sua senha secreta">
+                    <div class="senha-wrapper">
+                        <input type="password" id="reg-senha" placeholder="Sua senha secreta">
+                        <button type="button" class="btn-ver-senha" onclick="window.toggleVerSenha('reg-senha', this)" title="Mostrar/ocultar senha">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
                     <small style="display:block; margin-top:5px; color:var(--text-secondary); font-size:0.75rem; line-height: 1.2;">
                         Mín. 8 caracteres, contendo 1 maiúscula, 1 minúscula, 1 número e 1 símbolo.
                     </small>
@@ -81,30 +87,36 @@
         </div>
     </section>
 
+    <!-- APLICAÇÃO PRINCIPAL -->
     <main id="app-container" class="view-hidden">
-
+        
         <nav class="sidebar" id="sidebar-menu">
             <div class="logo">5S</div>
             <div class="nav-items">
-                <div class="nav-item" data-view="view-dashboard" onclick="window.mostrarTela('view-dashboard')">
+                <div class="nav-secao">NAVEGAR</div>
+                <div class="nav-item active" onclick="window.mostrarTela('view-dashboard')">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <span>Início</span>
                 </div>
-                <div class="nav-item" data-view="view-gavetas" onclick="window.mostrarTela('view-gavetas')">
-                    <i class="fa-solid fa-house"></i>
-                    <span>Armário</span>
+                <div class="nav-item" onclick="window.mostrarTela('view-containers')">
+                    <i class="fa-solid fa-warehouse"></i>
+                    <span>Locais</span>
                 </div>
-                <div class="nav-item admin-only" data-view="view-historico" onclick="window.mostrarTela('view-historico')">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
-                    <span>Histórico</span>
-                </div>
-                <div class="nav-item admin-only" data-view="view-config" onclick="window.mostrarTela('view-config')">
-                    <i class="fa-solid fa-gear"></i>
-                    <span>Ajustes</span>
-                </div>
+
+                <div class="nav-secao">AÇÕES</div>
                 <div class="nav-item" onclick="window.gerarEmailPedido()">
                     <i class="fa-solid fa-envelope-open-text"></i>
                     <span>Pedir Peças</span>
+                </div>
+
+                <div class="nav-secao admin-only">SISTEMA</div>
+                <div class="nav-item admin-only" onclick="window.mostrarTela('view-historico')">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Histórico</span>
+                </div>
+                <div class="nav-item admin-only" onclick="window.mostrarTela('view-config')">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Ajustes</span>
                 </div>
             </div>
             <div class="nav-footer" onclick="window.sairDoSistema()">
@@ -131,20 +143,25 @@
                 </div>
             </header>
 
-            <div class="main-padding" id="area-conteudo-scroll">
+            <!-- BREADCRUMB: mostra onde o usuário está agora (Locais > Elétrica > G4...) -->
+            <nav id="breadcrumb" class="breadcrumb"></nav>
 
+            <div class="main-padding" id="area-conteudo-scroll">
+                
+                <!-- ALERTA GLOBAL DE ESTOQUE ZERADO -->
                 <div id="alerta-global-zerado" class="alerta-global view-hidden">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem;"></i>
                     <span id="texto-alerta-zerado"><strong>Atenção:</strong> Existem itens com estoque ZERADO no armário!</span>
                 </div>
 
+                <!-- VIEW: DASHBOARD DE BUSCA -->
                 <section id="view-dashboard" class="view-active">
                     <div class="dashboard-wrapper">
                         <div class="dashboard-overlay"></div>
                         <div class="glass-panel">
-                            <h2 class="glass-titulo">O que você procura hoje?</h2>
-                            <p class="glass-sub">Busque componentes em todos os compartimentos do sistema.</p>
-
+                            <h2 style="color: white; font-size: 2.5rem; margin-bottom: 15px; text-shadow: 2px 2px 8px rgba(0,0,0,0.8);">O que você procura hoje?</h2>
+                            <p style="color: #e2e8f0; margin-bottom: 35px; font-size: 1.2rem; text-shadow: 1px 1px 4px rgba(0,0,0,0.8);">Busque componentes em todos os compartimentos do sistema.</p>
+                            
                             <div class="search-box-container">
                                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
                                 <input type="text" id="input-busca-global" class="search-input-glass" oninput="window.buscarPecasGlobal()" placeholder="Digite o nome ou local do item...">
@@ -155,9 +172,31 @@
                     </div>
                 </section>
 
+                <!-- VIEW: SELEÇÃO DE LOCAIS (CONTAINERS) -->
+                <section id="view-containers" class="view-hidden">
+                    <div class="header-gaveta" style="justify-content: space-between;">
+                        <h2><i class="fa-solid fa-warehouse"></i> Locais de Estoque</h2>
+                        <button class="btn-add-item admin-only" onclick="window.abrirWizardContainer()">
+                            <i class="fa-solid fa-plus"></i> Novo Local
+                        </button>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
+                        <i class="fa-solid fa-hand-pointer"></i> Escolha um gaveteiro, armário ou mezanino para ver o que tem dentro.
+                    </p>
+                    <div class="containers-grid" id="containers-grid"></div>
+                </section>
+
+                <!-- VIEW: GAVETAS DO CONTAINER SELECIONADO -->
                 <section id="view-gavetas" class="view-hidden">
+                    <div class="header-gaveta" style="justify-content: space-between;">
+                        <button class="btn-voltar" onclick="window.voltarParaContainers()">⬅ Locais</button>
+                        <h2 id="titulo-container-atual" style="text-align:center; flex:1; color: var(--cabinet-blue);"><i class="fa-solid fa-bolt"></i> Elétrica</h2>
+                        <button class="btn-add-item admin-only" onclick="window.abrirModalNovaGaveta()">
+                            <i class="fa-solid fa-plus"></i> Nova Gaveta
+                        </button>
+                    </div>
                     <div class="relatorio-geral">
-                        <h3>Visão Geral do Armário</h3>
+                        <h3>Visão Geral deste Local</h3>
                         <div class="kpi-grid">
                             <div class="kpi-summary">
                                 <div class="kpi-big-number">
@@ -168,20 +207,13 @@
                             <div class="kpi-status-list" id="kpi-lista-gavetas"></div>
                         </div>
                     </div>
-
-                    <div class="barra-armario">
-                        <h3 class="barra-armario-titulo"><i class="fa-solid fa-warehouse"></i> Gavetas</h3>
-                        <button id="btn-toggle-reorganizar" class="btn-reorganizar admin-only" onclick="window.alternarModoReorganizar()">
-                            <i class="fa-solid fa-up-down-left-right"></i> <span>Reorganizar</span>
-                        </button>
-                    </div>
-                    <p id="dica-reorganizar" class="dica-reorganizar view-hidden">
-                        <i class="fa-solid fa-hand-pointer"></i> Arraste as gavetas para reordenar, ou use as setas. Toque em <strong>Concluir</strong> para salvar.
+                    <p class="admin-only" style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9rem;">
+                        <i class="fa-solid fa-info-circle"></i> Como admin, você pode clicar e arrastar as gavetas abaixo para reorganizar a ordem.
                     </p>
-
                     <div class="cabinet-vertical" id="menu-gavetas"></div>
                 </section>
 
+                <!-- VIEW: HISTÓRICO DE ATIVIDADES -->
                 <section id="view-historico" class="view-hidden">
                     <div class="header-gaveta">
                         <h2><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Atividades</h2>
@@ -190,6 +222,7 @@
                     <div id="lista-historico" class="historico-lista"></div>
                 </section>
 
+                <!-- VIEW: CONFIGURAÇÕES (SOMENTE ADMIN) -->
                 <section id="view-config" class="view-hidden">
                     <div class="header-gaveta"><h2><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2></div>
                     <div class="config-grid">
@@ -210,28 +243,51 @@
                                 <button class="btn-save" style="background-color: #3b82f6;" onclick="window.exportarHistoricoCSV()"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
                             </div>
                         </div>
+                        <div class="config-card config-card-perigo">
+                            <h3 style="color: #b91c1c;"><i class="fa-solid fa-triangle-exclamation"></i> Zona de Perigo</h3>
+                            <p>Restaurar o padrão de fábrica <strong>apaga todas as peças, gavetas criadas e o histórico</strong>. Não pode ser desfeito. Use só se realmente precisa começar do zero.</p>
+                            <div class="config-buttons">
+                                <button class="btn-save" style="background-color: #dc2626;" onclick="window.restaurarPadraoFabrica()">
+                                    <i class="fa-solid fa-rotate-left"></i> Restaurar Padrão de Fábrica
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
+                <!-- VIEW: INTERIOR DA GAVETA (COLMEIA INDUSTRIAL 5 COLUNAS) -->
                 <section id="view-compartimentos" class="view-hidden">
-                    <div class="header-gaveta header-compartimentos">
-                        <button class="btn-voltar" onclick="window.voltarParaGavetas()"><i class="fa-solid fa-arrow-left"></i> Voltar</button>
-                        <h2 id="titulo-gaveta-aberta">Gaveta X</h2>
-                        <button class="btn-add-item admin-only" onclick="window.abrirModalCadastro()">
-                            <i class="fa-solid fa-plus"></i> Nova Peça
-                        </button>
+                    <div class="header-gaveta" style="display: flex; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 8px;">
+                        <button class="btn-voltar" onclick="window.voltarParaGavetas()">⬅ Voltar</button>
+                        <h2 id="titulo-gaveta-aberta" style="text-align: center; flex: 1; min-width: 200px;">Gaveta X</h2>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn-voltar admin-only" onclick="window.abrirModalGerenciarGaveta()" title="Excluir, esvaziar, duplicar ou mover peças desta gaveta" style="background: #475569;">
+                                <i class="fa-solid fa-gear"></i> Gerenciar
+                            </button>
+                            <button class="btn-voltar admin-only" onclick="window.padronizarTamanhos()" title="Aplicar o mesmo tamanho a todas as peças desta gaveta" style="background: var(--drawer-blue);">
+                                <i class="fa-solid fa-arrows-up-down"></i> Padronizar
+                            </button>
+                            <button class="btn-add-item admin-only" onclick="window.abrirModalCadastro()">
+                                <i class="fa-solid fa-plus"></i> Nova Peça
+                            </button>
+                        </div>
                     </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem; text-align: center;">
+                        <i class="fa-solid fa-table-cells"></i> Vista interna do gaveteiro: 5 colunas físicas. A altura de cada encaixe segue o campo <strong>"Altura Física (Slots)"</strong> da peça.
+                    </p>
                     <div id="container-divisorias"></div>
                 </section>
+
             </div>
         </div>
     </main>
 
+    <!-- MODAL: CADASTRAR NOVA PEÇA -->
     <div id="modal-cadastro" class="modal-overlay view-hidden">
         <div class="modal-content">
             <h3>Cadastrar Novo Componente</h3>
             <p id="modal-gaveta-alvo" class="modal-subtitle"></p>
-
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Item/Local (Opcional):</label>
@@ -242,7 +298,7 @@
                     <input type="text" id="novo-nome" placeholder="Ex: Contatora">
                 </div>
             </div>
-
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Padrão 5S (Qtd Ideal):</label>
@@ -260,8 +316,30 @@
                     <input type="text" id="novo-divisoria" placeholder="Ex: A, B, Geral..." value="Geral">
                 </div>
                 <div class="col">
-                    <label>Altura Física (Linhas):</label>
-                    <input type="number" id="novo-tamanho" placeholder="Altura (1, 2, 3...)" min="1" value="1">
+                    <label>Almoxarifado:</label>
+                    <select id="novo-almoxarifado">
+                        <option value="Automação">Automação</option>
+                        <option value="Estoque">Estoque</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 2px solid #cbd5e1;">
+                <h4 style="margin: 0 0 12px 0; color: var(--drawer-blue); font-size: 0.95rem;">
+                    📐 Tamanho Físico da Peça (encaixe automático)
+                </h4>
+                <div class="form-group row">
+                    <div class="col">
+                        <label>Tamanho (1 a 20 espaços verticais):</label>
+                        <input type="number" id="novo-tamanho" min="1" max="20" value="4" placeholder="1 a 20" oninput="window.atualizarPreviewTamanho('novo')">
+                    </div>
+                </div>
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin: 4px 0 8px;">
+                    💡 1 = encaixe mínimo · 2 = pequeno · 10 = metade da coluna · 20 = coluna inteira. Dá pra dividir: 2 itens de tamanho 1 ocupam o espaço de um tamanho 2. O sistema encaixa automaticamente.
+                </small>
+                <div class="tam-preview-wrapper">
+                    <span class="grid-preview-label">Quanto ocupa numa coluna:</span>
+                    <div id="novo-tam-preview" class="tam-preview"></div>
                 </div>
             </div>
 
@@ -275,7 +353,7 @@
                 <label>Foto do Componente (Opcional):</label>
                 <input type="file" id="novo-imagem" accept="image/*" class="file-input">
             </div>
-
+            
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="window.fecharModalCadastro()">Cancelar</button>
                 <button class="btn-save" onclick="window.salvarNovoItem()">Salvar Peça</button>
@@ -283,11 +361,12 @@
         </div>
     </div>
 
+    <!-- MODAL: EDITAR PEÇA -->
     <div id="modal-editar-peca" class="modal-overlay view-hidden">
         <div class="modal-content">
             <h3>Editar Componente</h3>
             <p class="modal-subtitle">Altere as informações da peça selecionada.</p>
-
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Item/Local:</label>
@@ -298,7 +377,7 @@
                     <input type="text" id="edit-peca-nome">
                 </div>
             </div>
-
+            
             <div class="form-group row">
                 <div class="col">
                     <label>Padrão 5S (Qtd Ideal):</label>
@@ -316,8 +395,30 @@
                     <input type="text" id="edit-peca-divisoria" placeholder="Ex: A, B, Geral...">
                 </div>
                 <div class="col">
-                    <label>Altura Física (Linhas):</label>
-                    <input type="number" id="edit-peca-tamanho" placeholder="Altura (1, 2, 3...)" min="1">
+                    <label>Almoxarifado:</label>
+                    <select id="edit-peca-almoxarifado">
+                        <option value="Automação">Automação</option>
+                        <option value="Estoque">Estoque</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 2px solid #cbd5e1;">
+                <h4 style="margin: 0 0 12px 0; color: var(--drawer-blue); font-size: 0.95rem;">
+                    📐 Tamanho Físico da Peça (encaixe automático)
+                </h4>
+                <div class="form-group row">
+                    <div class="col">
+                        <label>Tamanho (1 a 20 espaços verticais):</label>
+                        <input type="number" id="edit-peca-tamanho" min="1" max="20" placeholder="1 a 20" oninput="window.atualizarPreviewTamanho('edit')">
+                    </div>
+                </div>
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin: 4px 0 8px;">
+                    💡 1 = encaixe mínimo · 2 = pequeno · 10 = metade da coluna · 20 = coluna inteira. O sistema reencaixa automaticamente.
+                </small>
+                <div class="tam-preview-wrapper">
+                    <span class="grid-preview-label">Quanto ocupa numa coluna:</span>
+                    <div id="edit-tam-preview" class="tam-preview"></div>
                 </div>
             </div>
 
@@ -331,7 +432,7 @@
                 <label>Nova Foto (Deixe em branco para manter a atual):</label>
                 <input type="file" id="edit-peca-imagem" accept="image/*" class="file-input">
             </div>
-
+            
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="window.fecharModalEditarPeca()">Cancelar</button>
                 <button class="btn-save" onclick="window.salvarEdicaoPeca()">Salvar Alterações</button>
@@ -339,16 +440,17 @@
         </div>
     </div>
 
+    <!-- MODAL: CONTAGEM FÍSICA -->
     <div id="modal-conferencia" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno">
             <h3 id="conf-nome-peca">Nome da Peça</h3>
             <p class="modal-subtitle">Informe a quantidade física exata na gaveta agora.</p>
-
+            
             <div class="form-group text-center">
                 <label>Quantidade Atual:</label>
                 <input type="number" id="conf-qtd-atual" min="0" class="input-grande">
             </div>
-
+            
             <div class="modal-actions centralizado">
                 <button class="btn-cancel" onclick="window.fecharModalConferencia()">Cancelar</button>
                 <button class="btn-save" onclick="window.salvarConferencia()">Confirmar Contagem</button>
@@ -356,6 +458,7 @@
         </div>
     </div>
 
+    <!-- MODAL: RENOMEAR GAVETA -->
     <div id="modal-editar-gaveta" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno">
             <h3>Editar Nome da Gaveta</h3>
@@ -370,35 +473,87 @@
         </div>
     </div>
 
+    <!-- MODAL: PEDIDO DE PEÇAS -->
     <div id="modal-pedido" class="modal-overlay view-hidden">
-        <div class="modal-content modal-largo">
-            <h3>Solicitação de Compra</h3>
-            <p class="modal-subtitle" id="pedido-subtitle">Preencha os detalhes de cada item para gerar a solicitação.</p>
-
-            <div id="formulario-pedido-itens" style="max-height: 55vh; overflow-y: auto; margin-bottom: 15px; padding-right: 10px;">
+        <div class="modal-content modal-largo modal-pedido-v2">
+            <!-- HEADER COMPACTO -->
+            <div class="pedido-header">
+                <h3><i class="fa-solid fa-cart-shopping"></i> Pedido de Compra</h3>
+                <button class="pedido-btn-fechar" onclick="window.fecharModalPedido()" aria-label="Fechar">&times;</button>
             </div>
 
-            <textarea id="texto-pedido-gerado" readonly rows="14" class="textarea-pedido view-hidden"></textarea>
+            <!-- STEPPER VISUAL -->
+            <div class="pedido-stepper">
+                <div class="step ativa" id="step-1">
+                    <span class="step-num">1</span>
+                    <span class="step-label">Revisar itens</span>
+                </div>
+                <div class="step-linha"></div>
+                <div class="step" id="step-2">
+                    <span class="step-num">2</span>
+                    <span class="step-label">Copiar texto</span>
+                </div>
+            </div>
 
-            <div class="modal-actions espacado">
-                <button class="btn-cancel" onclick="window.fecharModalPedido()">Fechar</button>
+            <!-- BANNER DE RASCUNHO (compacto) -->
+            <div id="pedido-rascunho-banner" class="pedido-rascunho-v2 view-hidden">
+                <div class="rascunho-info">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Tem um pedido salvo da última vez</span>
+                </div>
+                <div class="rascunho-acoes">
+                    <button class="btn-mini btn-recuperar" onclick="window.recuperarRascunhoPedido()">Recuperar</button>
+                    <button class="btn-mini btn-descartar" onclick="window.descartarRascunhoPedido()" title="Descartar">&times;</button>
+                </div>
+            </div>
 
-                <button id="btn-gerar-texto-pedido" class="btn-save" onclick="window.processarFormularioPedido()">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Texto
+            <!-- RESUMO TOP -->
+            <div id="pedido-resumo" class="pedido-resumo">
+                <div class="resumo-bloco">
+                    <span class="resumo-numero" id="resumo-qtd-itens">0</span>
+                    <span class="resumo-label">Item(ns) faltando</span>
+                </div>
+                <div class="resumo-bloco">
+                    <span class="resumo-numero" id="resumo-qtd-unidades">0</span>
+                    <span class="resumo-label">Unidade(s) total</span>
+                </div>
+            </div>
+
+            <!-- OS ÚNICA (aplica em todos itens — usuário pode sobrescrever individual) -->
+            <div class="pedido-os-global">
+                <label for="pedido-os-global"><i class="fa-solid fa-hashtag"></i> OS para todos os itens <small>(opcional)</small></label>
+                <input type="text" id="pedido-os-global" placeholder="Ex: 12345678" autocomplete="off">
+            </div>
+
+            <!-- LISTA DE ITENS (cards compactos) -->
+            <div id="formulario-pedido-itens" class="pedido-itens-lista"></div>
+
+            <!-- TEXTAREA DO RESULTADO -->
+            <textarea id="texto-pedido-gerado" readonly class="textarea-pedido-v2 view-hidden" rows="14"></textarea>
+
+            <!-- AÇÕES NO RODAPÉ (sticky) -->
+            <div class="pedido-acoes">
+                <button id="btn-gerar-texto-pedido" class="btn-pedido-principal" onclick="window.processarFormularioPedido()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Texto do Pedido
                 </button>
 
-                <button id="btn-copiar-pedido" class="btn-save btn-copiar view-hidden" onclick="window.copiarTextoPedido(event)">
+                <button id="btn-copiar-pedido" class="btn-pedido-principal btn-pedido-success view-hidden" onclick="window.copiarTextoPedido(event)">
                     <i class="fa-solid fa-copy"></i> Copiar Mensagem
+                </button>
+
+                <button id="btn-marcar-requisitados" class="btn-pedido-secundario view-hidden" onclick="window.marcarTodosRequisitados()">
+                    <i class="fa-solid fa-check-double"></i> Marcar todos como requisitados
                 </button>
             </div>
         </div>
     </div>
 
+    <!-- MODAL: REDEFINIR SENHA OBRIGATÓRIA -->
     <div id="modal-redefinir-senha" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno">
             <h3 style="color: var(--status-vermelho);"><i class="fa-solid fa-shield-halved"></i> Atualização de Segurança</h3>
             <p class="modal-subtitle" style="margin-top: 10px;">Sua senha atual não atende aos novos requisitos corporativos de segurança. Por favor, crie uma nova senha forte para acessar o sistema.</p>
-
+            
             <ul style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px; padding-left: 20px;">
                 <li>No mínimo 8 caracteres</li>
                 <li>Pelo menos uma letra maiúscula</li>
@@ -415,7 +570,7 @@
                 <label>Confirme a Nova Senha:</label>
                 <input type="password" id="nova-senha-confirma" placeholder="Repita a senha">
             </div>
-
+            
             <div class="modal-actions centralizado">
                 <button class="btn-cancel" onclick="window.cancelarRedefinicaoSenha()">Cancelar Login</button>
                 <button class="btn-save" onclick="window.salvarSenhaObrigatoria()">Salvar e Entrar</button>
@@ -423,6 +578,7 @@
         </div>
     </div>
 
+    <!-- MODAL: ALERTA GENÉRICO -->
     <div id="modal-alerta" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno text-center">
             <i class="fa-solid fa-circle-exclamation icone-alerta-grande"></i>
@@ -432,25 +588,14 @@
         </div>
     </div>
 
-    <div id="modal-confirmar" class="modal-overlay view-hidden">
-        <div class="modal-content modal-pequeno text-center">
-            <i class="fa-solid fa-circle-question icone-alerta-grande" style="color: var(--drawer-blue);"></i>
-            <h3 id="confirmar-titulo" class="titulo-alerta">Confirmar</h3>
-            <p id="confirmar-mensagem" class="mensagem-alerta">Tem certeza?</p>
-            <div class="modal-actions centralizado">
-                <button class="btn-cancel" onclick="window.fecharConfirmar()">Cancelar</button>
-                <button class="btn-save" id="btn-confirmar-ok" style="background: var(--status-vermelho);">Confirmar</button>
-            </div>
-        </div>
-    </div>
-
+    <!-- MODAL: MOVER PEÇA DE GAVETA -->
     <div id="modal-mover-peca" class="modal-overlay view-hidden">
         <div class="modal-content modal-pequeno">
             <h3>Mover Peça de Gaveta</h3>
             <p id="mover-peca-nome" class="modal-subtitle" style="font-weight:bold;font-size:1rem;color:#0f172a;"></p>
             <div class="form-group" style="margin-top:15px;">
                 <label>Mover para a Gaveta:</label>
-                <select id="mover-destino-select"></select>
+                <select id="mover-destino-select" style="width:100%;padding:0.8rem;border:1px solid #e2e8f0;border-radius:8px;font-size:1rem;"></select>
             </div>
             <div class="modal-actions centralizado">
                 <button class="btn-cancel" onclick="window.fecharModalMoverPeca()">Cancelar</button>
@@ -459,6 +604,185 @@
         </div>
     </div>
 
-    <script type="module" src="script.js"></script>
+    <!-- MODAL: ASSISTENTE DE CRIAÇÃO DE NOVO LOCAL (WIZARD) -->
+    <div id="modal-wizard-container" class="modal-overlay view-hidden">
+        <div class="modal-content">
+            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Criar Novo Local de Estoque</h3>
+            <p class="modal-subtitle">Responda as perguntas abaixo que eu monto a estrutura automaticamente.</p>
+
+            <div class="form-group">
+                <label>1. Qual o nome deste local?</label>
+                <input type="text" id="wiz-nome" placeholder="Ex: Mecânica, Almoxarifado, Mezanino...">
+            </div>
+
+            <div class="form-group">
+                <label>2. Que tipo de local é?</label>
+                <select id="wiz-tipo" onchange="window.wizardTipoMudou()">
+                    <option value="gaveteiro">🗄️ Gaveteiro (tem gavetas)</option>
+                    <option value="armario">🚪 Armário (portas + prateleiras)</option>
+                    <option value="mezanino">🏗️ Mezanino / Almoxarifado (seções)</option>
+                </select>
+            </div>
+
+            <!-- Campos do GAVETEIRO -->
+            <div id="wiz-campos-gaveteiro" class="wiz-campos">
+                <div class="form-group">
+                    <label>3. Quantas gavetas tem?</label>
+                    <input type="number" id="wiz-num-gavetas" min="1" max="50" value="12">
+                </div>
+            </div>
+
+            <!-- Campos do ARMÁRIO -->
+            <div id="wiz-campos-armario" class="wiz-campos" style="display:none;">
+                <div class="form-group row">
+                    <div class="col">
+                        <label>3. Quantas portas?</label>
+                        <input type="number" id="wiz-num-portas" min="1" max="20" value="2">
+                    </div>
+                    <div class="col">
+                        <label>4. Prateleiras por porta?</label>
+                        <input type="number" id="wiz-num-prateleiras" min="1" max="20" value="4">
+                    </div>
+                </div>
+                <small style="color: var(--text-secondary); font-size: 0.78rem;">
+                    💡 Cada prateleira vira um compartimento próprio com sua grade de peças.
+                </small>
+            </div>
+
+            <!-- Campos do MEZANINO -->
+            <div id="wiz-campos-mezanino" class="wiz-campos" style="display:none;">
+                <div class="form-group">
+                    <label>3. Quantas seções/estantes?</label>
+                    <input type="number" id="wiz-num-secoes" min="1" max="100" value="10">
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="window.fecharWizardContainer()">Cancelar</button>
+                <button class="btn-save" onclick="window.criarContainer()"><i class="fa-solid fa-check"></i> Criar Local</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NOVA GAVETA AVULSA (adiciona uma gaveta ao local atual) -->
+    <div id="modal-nova-gaveta" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3><i class="fa-solid fa-plus"></i> Nova Gaveta</h3>
+            <p class="modal-subtitle">Adicione uma gaveta avulsa a este local.</p>
+            <div class="form-group row">
+                <div class="col">
+                    <label>Etiqueta (curta):</label>
+                    <input type="text" id="nova-gaveta-label" placeholder="Ex: G13, M7...">
+                </div>
+                <div class="col">
+                    <label>Nome/Descrição:</label>
+                    <input type="text" id="nova-gaveta-title" placeholder="Ex: Sensores novos">
+                </div>
+            </div>
+            <div class="modal-actions centralizado">
+                <button class="btn-cancel" onclick="window.fecharModalNovaGaveta()">Cancelar</button>
+                <button class="btn-save" onclick="window.salvarNovaGaveta()">Criar Gaveta</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PAINEL DE AÇÕES DA PEÇA (abre ao tocar numa peça da gaveta) -->
+    <div id="modal-acoes-peca" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno">
+            <h3 id="acoes-peca-nome">Peça</h3>
+            <p class="modal-subtitle" id="acoes-peca-info"></p>
+            <div id="acoes-peca-imagem" style="display:flex; align-items:center; justify-content:center; min-height:120px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-bottom:12px;"></div>
+            <div id="acoes-peca-qtd" style="display:flex; align-items:center; justify-content:space-between; background:var(--bg-grey); padding:12px; border-radius:8px; margin-bottom:12px;"></div>
+            <div id="acoes-peca-botoes" class="botoes-acao-card"></div>
+            <div class="modal-actions centralizado" style="margin-top:12px;">
+                <button class="btn-cancel btn-full" onclick="window.fecharAcoesPeca()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MESCLAR OU TROCAR (ao arrastar uma peça sobre outra) -->
+    <div id="modal-mesclar" class="modal-overlay view-hidden">
+        <div class="modal-content modal-pequeno text-center">
+            <div class="mesclar-icone"><i class="fa-solid fa-object-group"></i></div>
+            <h3 class="titulo-alerta">Compartilhar compartimento?</h3>
+            <p class="mensagem-alerta" id="mesclar-texto"></p>
+            <div class="mesclar-opcoes">
+                <button class="btn-mesclar-op btn-mesclar" onclick="window.confirmarMesclar()">
+                    <i class="fa-solid fa-object-group"></i>
+                    <span>Mesclar</span>
+                    <small>Os dois dividem o mesmo espaço, lado a lado</small>
+                </button>
+                <button class="btn-mesclar-op btn-trocar" onclick="window.confirmarTrocar()">
+                    <i class="fa-solid fa-right-left"></i>
+                    <span>Trocar de posição</span>
+                    <small>Um vai pro lugar do outro</small>
+                </button>
+            </div>
+            <button class="btn-cancel btn-full" style="margin-top:14px" onclick="window.fecharModalMesclar()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- MODAL: GERENCIAR GAVETA (admin) — excluir, esvaziar, duplicar, mover peças -->
+    <div id="modal-gerenciar-gaveta" class="modal-overlay view-hidden">
+        <div class="modal-content modal-gerenciar">
+            <button class="modal-close-btn" onclick="window.fecharModalGerenciarGaveta()" aria-label="Fechar">&times;</button>
+            <h2><i class="fa-solid fa-gear"></i> Gerenciar Gaveta</h2>
+            <p class="mensagem-alerta" id="gerenciar-info" style="margin-bottom: 20px;"></p>
+
+            <div class="gerenciar-acoes">
+                <button class="acao-card" onclick="window.duplicarGavetaAtual()">
+                    <i class="fa-solid fa-clone" style="color:#0284c7"></i>
+                    <div>
+                        <strong>Duplicar Gaveta</strong>
+                        <small>Cria uma nova gaveta vazia com o mesmo título</small>
+                    </div>
+                </button>
+
+                <button class="acao-card" onclick="window.iniciarMoverTodasPecas()">
+                    <i class="fa-solid fa-truck-arrow-right" style="color:#16a34a"></i>
+                    <div>
+                        <strong>Mover Todas as Peças</strong>
+                        <small>Transfere todas as peças desta gaveta pra outra</small>
+                    </div>
+                </button>
+
+                <button class="acao-card acao-card-amarelo" onclick="window.esvaziarGavetaAtual()">
+                    <i class="fa-solid fa-broom" style="color:#ca8a04"></i>
+                    <div>
+                        <strong>Esvaziar Gaveta</strong>
+                        <small>Apaga todas as peças, mas mantém a gaveta vazia</small>
+                    </div>
+                </button>
+
+                <button class="acao-card acao-card-vermelho" onclick="window.excluirGavetaAtual()">
+                    <i class="fa-solid fa-trash-can" style="color:#dc2626"></i>
+                    <div>
+                        <strong>Excluir Gaveta Inteira</strong>
+                        <small>Apaga a gaveta e todas as peças. Sem volta.</small>
+                    </div>
+                </button>
+            </div>
+
+            <button class="btn-cancel btn-full" style="margin-top:16px" onclick="window.fecharModalGerenciarGaveta()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- MODAL: ESCOLHER GAVETA DESTINO (mover todas as peças) -->
+    <div id="modal-escolher-destino" class="modal-overlay view-hidden">
+        <div class="modal-content">
+            <button class="modal-close-btn" onclick="window.fecharModalEscolherDestino()" aria-label="Fechar">&times;</button>
+            <h2><i class="fa-solid fa-truck-arrow-right"></i> Escolher Gaveta Destino</h2>
+            <p class="mensagem-alerta" id="destino-info" style="margin-bottom: 16px;"></p>
+            <div id="lista-gavetas-destino" class="gerenciar-acoes"></div>
+            <button class="btn-cancel btn-full" style="margin-top:16px" onclick="window.fecharModalEscolherDestino()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- BOTÃO FLUTUANTE LIXEIRA — só aparece enquanto arrasta uma peça -->
+    <div id="btn-excluir-flutuante" class="btn-excluir-flutuante">
+        <i class="fa-solid fa-trash-can"></i> Excluir
+    </div>
+
+    <script type="module" src="script.js?v=16"></script>
 </body>
 </html>
