@@ -9,7 +9,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192x192.png">
     
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -133,6 +133,10 @@
                     </div>
                     <h1>5S Manutenção - Controle</h1>
                 </div>
+
+                <!-- BADGE WORKSPACE ATIVO: mostra qual área tá em uso + botão trocar -->
+                <div id="badge-workspace" class="badge-workspace view-hidden"></div>
+
                 <div class="user-profile">
                     <div class="user-text">
                         <p class="user-name" id="usuario-logado-nome">---</p>
@@ -172,18 +176,18 @@
                     </div>
                 </section>
 
-                <!-- VIEW: SELEÇÃO DE LOCAIS (CONTAINERS) -->
+                <!-- VIEW: SELEÇÃO DE ÁREA DE TRABALHO (workspaces) -->
                 <section id="view-containers" class="view-hidden">
-                    <div class="header-gaveta" style="justify-content: space-between;">
-                        <h2><i class="fa-solid fa-warehouse"></i> Locais de Estoque</h2>
-                        <button class="btn-add-item admin-only" onclick="window.abrirWizardContainer()">
-                            <i class="fa-solid fa-plus"></i> Novo Local
+                    <div class="selecionar-area-header">
+                        <h2><i class="fa-solid fa-warehouse"></i> Selecione sua Área de Trabalho</h2>
+                        <p>Cada área tem seus próprios armários, peças e pedidos. Escolha onde você vai atuar agora.</p>
+                    </div>
+                    <div class="containers-grid" id="containers-grid"></div>
+                    <div class="selecionar-area-rodape admin-only">
+                        <button class="btn-add-item" onclick="window.abrirWizardContainer()">
+                            <i class="fa-solid fa-plus"></i> Criar Nova Área
                         </button>
                     </div>
-                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
-                        <i class="fa-solid fa-hand-pointer"></i> Escolha um gaveteiro, armário ou mezanino para ver o que tem dentro.
-                    </p>
-                    <div class="containers-grid" id="containers-grid"></div>
                 </section>
 
                 <!-- VIEW: GAVETAS DO CONTAINER SELECIONADO -->
@@ -847,6 +851,6 @@
         <i class="fa-solid fa-trash-can"></i> Excluir
     </div>
 
-    <script type="module" src="script.js?v=18"></script>
+    <script type="module" src="script.js?v=19"></script>
 </body>
 </html>
