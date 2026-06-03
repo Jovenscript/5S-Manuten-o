@@ -2102,6 +2102,97 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .compartimento-mesclado .peca-card-mobile-controles { padding-right: 6px; }
 .compartimento-mesclado .peca-card-mobile-menu { display: none; }
 
+/* =========================================================================
+   WORKSPACE-FIRST (Fase 1)
+   Badge no header mostrando a área ativa + tela "Selecionar Área de Trabalho"
+========================================================================= */
+
+/* Badge da área ativa no header */
+.badge-workspace {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.12);
+    padding: 6px 6px 6px 14px;
+    border-radius: 24px;
+    border: 1px solid rgba(255,255,255,0.18);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: white;
+    max-width: 220px;
+}
+.badge-workspace i { font-size: 1rem; }
+.badge-ws-nome {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
+}
+.badge-ws-trocar {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.badge-ws-trocar:hover {
+    background: white;
+    color: var(--drawer-blue);
+    transform: rotate(180deg);
+}
+
+/* Tela Selecionar Área de Trabalho */
+.selecionar-area-header {
+    text-align: center;
+    margin-bottom: 28px;
+    padding: 28px 20px 20px;
+}
+.selecionar-area-header h2 {
+    font-size: 1.5rem;
+    color: var(--cabinet-blue);
+    margin-bottom: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+.selecionar-area-header p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.4;
+}
+.selecionar-area-rodape {
+    margin-top: 32px;
+    display: flex;
+    justify-content: center;
+    padding-bottom: 24px;
+}
+.selecionar-area-rodape .btn-add-item {
+    padding: 12px 24px;
+    font-size: 0.95rem;
+}
+
+/* Mobile: header compacta o badge */
+@media (max-width: 768px) {
+    .badge-workspace {
+        padding: 4px 4px 4px 10px;
+        font-size: 0.75rem;
+        max-width: 150px;
+    }
+    .badge-ws-nome { max-width: 70px; }
+    .badge-ws-trocar { width: 28px; height: 28px; }
+    .selecionar-area-header { padding: 18px 16px 14px; }
+    .selecionar-area-header h2 { font-size: 1.2rem; }
+    .selecionar-area-header p { font-size: 0.85rem; }
+}
+
 /* SEÇÃO FORNECEDORES (cadastro/edição quando almoxarifado = Contrato) */
 .secao-fornecedores {
     background: linear-gradient(135deg, #faf5ff, #f3e8ff);
