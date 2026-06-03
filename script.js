@@ -1010,8 +1010,15 @@ function aplicarLogin(user) {
 
     solicitarPermissaoNotificacao();
     iniciarListenerMural();  // Ouve retiradas de outros usuários em tempo real
-    atualizarDashboard();
-    mostrarTela('view-dashboard');
+    
+    // FLUXO WORKSPACE-FIRST: sempre começa pedindo pra escolher a área de trabalho.
+    // Se só existir 1 área cadastrada, entra direto nela (UX inteligente).
+    if (database.containers.length === 1) {
+        abrirContainer(database.containers[0].id);
+    } else {
+        mostrarTela('view-containers');
+    }
+    atualizarHeaderWorkspace();
     
     // Notificação semanal de peças pendentes — espera 3s pra Firebase sincronizar
     setTimeout(verificarNotificacoesPendencias, 3000);
@@ -1038,10 +1045,11 @@ function mostrarTela(id) {
     document.getElementById('mobile-overlay').classList.remove('open');
 
     if (id === 'view-gavetas' || id === 'view-dashboard' || id === 'view-containers') gavetaAtualAberta = null;
-    if (id === 'view-containers') renderContainers();   // Tela de seleção de locais
+    if (id === 'view-containers') { containerAtual = null; renderContainers(); }   // Selecionar área
     if (id === 'view-historico')  renderizarHistorico();
 
     atualizarBreadcrumb(id);
+    atualizarHeaderWorkspace();   // Mostra/esconde badge da área ativa
 
     const scroll = document.getElementById('area-conteudo-scroll');
     if (scroll) scroll.scrollTo(0, 0);
@@ -1052,6 +1060,40 @@ function mostrarTela(id) {
     } else {
         pararCarrosselDashboard();
     }
+}
+
+// =========================================================================
+// WORKSPACE-FIRST (Fase 1) — Mecânica vs Elétrica como áreas isoladas
+// -------------------------------------------------------------------------
+// Cada container do sistema é uma "área de trabalho" (workspace). Quando
+// uma área tá ativa, TUDO filtra por ela: dashboard, pedidos, busca, mural.
+// =========================================================================
+
+// Atualiza o badge do workspace no header (mostra qual área tá ativa)
+function atualizarHeaderWorkspace() {
+    const badge = document.getElementById('badge-workspace');
+    if (!badge) return;
+    const cont = containerAtual ? getContainerAtual() : null;
+    if (cont) {
+        badge.innerHTML = `
+            <i class="fa-solid ${cont.icone || 'fa-box-archive'}" style="color:${cont.cor || '#fbbf24'}"></i>
+            <span class="badge-ws-nome">${cont.nome}</span>
+            <button class="badge-ws-trocar" onclick="window.trocarArea()" title="Trocar área de trabalho">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i>
+            </button>
+        `;
+        badge.classList.remove('view-hidden');
+    } else {
+        badge.classList.add('view-hidden');
+    }
+}
+
+// Sai da área atual e volta pra tela de seleção
+function trocarArea() {
+    containerAtual = null;
+    gavetaAtualAberta = null;
+    mostrarTela('view-containers');
+    atualizarHeaderWorkspace();
 }
 
 function voltarParaContainers() { containerAtual = null; mostrarTela('view-containers'); }
@@ -1406,6 +1448,7 @@ function abrirContainer(idContainer) {
     }
     atualizarDashboard();
     mostrarTela('view-gavetas');
+    atualizarHeaderWorkspace();  // Mostra a área ativa no badge do header
 }
 
 // =========================================================================
@@ -2290,7 +2333,7 @@ function fecharModalCadastro() { document.getElementById('modal-cadastro').class
 // pra essa peça. Só aparece quando almoxarifado = "Contrato".
 // Fornecedores iniciais: Hennigs, GK (lista expansível).
 // =========================================================================
-const FORNECEDORES_DISPONIVEIS = ['Hennigs', 'GK','Manes','Outros'];
+const FORNECEDORES_DISPONIVEIS = ['Hennigs', 'GK'];
 
 // Mostra/esconde a seção de fornecedores conforme o almoxarifado escolhido
 function toggleSecaoFornecedores(prefixo) {
@@ -2545,7 +2588,21 @@ function gerarEmailPedido() {
     containerItens.innerHTML = '';
     let itensFaltando = [];
 
-    getTodasGavetas().forEach(gaveta => {
+    // FILTRO WORKSPACE: se uma área tá ativa, só pega gavetas dela.
+    // Se não tem área ativa (ex: admin no dashboard global), pega tudo.
+    const gavetasParaPedido = containerAtual 
+        ? getGavetasDoContainer(containerAtual) 
+        : getTodasGavetas();
+    
+    const tituloHeader = document.querySelector('.pedido-header h3');
+    if (tituloHeader) {
+        const cont = containerAtual ? getContainerAtual() : null;
+        tituloHeader.innerHTML = cont
+            ? `<i class="fa-solid fa-cart-shopping"></i> Pedido — ${cont.nome}`
+            : `<i class="fa-solid fa-cart-shopping"></i> Pedido de Compra (Geral)`;
+    }
+
+    gavetasParaPedido.forEach(gaveta => {
         (database.items[gaveta.id] || []).forEach(peca => {
             // Só entram no pedido peças faltando E que AINDA não foram requisitadas
             if (peca.current < peca.expected && !peca.requested) {
@@ -2564,7 +2621,7 @@ function gerarEmailPedido() {
         });
     });
 
-    if (itensFaltando.length === 0) return mostrarAlerta("Tudo em Ordem", "Nenhuma peça pendente — todas as faltantes já estão marcadas como requisitadas.");
+    if (itensFaltando.length === 0) return mostrarAlerta("Tudo em Ordem", "Nenhuma peça pendente nesta área — todas as faltantes já estão marcadas como requisitadas.");
 
     // RESUMO TOP
     document.getElementById('resumo-qtd-itens').innerText = itensFaltando.length;
@@ -2709,7 +2766,9 @@ function descartarRascunhoPedido() {
 function processarFormularioPedido() {
     const nomeSolicitante = usuarioLogado ? usuarioLogado.nome : 'Manutenção';
     const osGlobal = document.getElementById('pedido-os-global').value.trim();
-    let textoFinal = `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes para o nosso gaveteiro elétrico:\n\n`;
+    const contAtual = containerAtual ? getContainerAtual() : null;
+    const areaTexto = contAtual ? ` da Manutenção ${contAtual.nome}` : '';
+    let textoFinal = `Olá,\n\nPor favor, solicito a compra/reposição dos seguintes materiais faltantes do gaveteiro${areaTexto}:\n\n`;
 
     window.itensFaltandoTemp.forEach((item, index) => {
         // OS: usa a individual se preenchida, senão a global, senão "Não informada"
@@ -2983,6 +3042,8 @@ window.confirmarMoverPeca        = confirmarMoverPeca;
 window.toggleCompradoFora        = toggleCompradoFora;
 window.toggleSecaoFornecedores   = toggleSecaoFornecedores;
 window.adicionarLinhaFornecedor  = adicionarLinhaFornecedor;
+window.trocarArea                = trocarArea;
+window.atualizarHeaderWorkspace  = atualizarHeaderWorkspace;
 window.processarFormularioPedido = processarFormularioPedido;
 window.recuperarRascunhoPedido   = recuperarRascunhoPedido;
 window.descartarRascunhoPedido   = descartarRascunhoPedido;
