@@ -2290,7 +2290,7 @@ function fecharModalCadastro() { document.getElementById('modal-cadastro').class
 // pra essa peça. Só aparece quando almoxarifado = "Contrato".
 // Fornecedores iniciais: Hennigs, GK (lista expansível).
 // =========================================================================
-const FORNECEDORES_DISPONIVEIS = ['Hennigs', 'GK'];
+const FORNECEDORES_DISPONIVEIS = ['Hennigs', 'GK','Manes','Outros'];
 
 // Mostra/esconde a seção de fornecedores conforme o almoxarifado escolhido
 function toggleSecaoFornecedores(prefixo) {
